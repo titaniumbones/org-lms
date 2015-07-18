@@ -1,0 +1,34 @@
+#+TODO: TODO(t) | READY(r)  SENT (s)
+* COMMENT Getting started.
+:PROPERTIES:
+:ID:       70e269d0-7296-4c79-bea8-800b94f9ab8d
+:END:
+
+This file is to be used as a template for grading. The ides is that a csv file has already been generated from class data, of which the first two fields contain student *names* and *emails*. This file will then be used to create sets of headlines, of the form:
+#+BEGIN_SRC 
+\* Assignment Title
+\** Student 1
+\** Student 2
+#+END_SRC
+Each subheading will bye populated by several "MAIL_HEADER" properties (to be used later by org-mime) and a blank grading template, and the todo-keyword property will be set to "TODO".
+
+Once grading for that student has been completed, and optionally a marked-up student paper attached to the subtree, the subtree should be manually marked as "READY".  Calling ~org-marking-mail-all~ will parse the buffer, looking for all READY trees, and send out all the mail that's ready to go, then mark those headlines as SENT. This allows the user to keep track of student progress, unsent messages, etc., with sparse trees. 
+
+#+BEGIN_SRC emacs-lisp :results silent
+  (let (
+        (students (parse-csv-file "./students.csv"))
+        (assignments
+         '((Definition . "
+  - Organization ::
+  - Clarity of Thesis ::
+  - Presentation of Evidence ::
+  - Grammar and Spelling ::
+  - Style ::
+  - Citations ::
+  - Further Comments ::
+  - Grade ::"))))
+    (org-marking-make-headings assignments students)
+       )
+
+#+END_SRC
+

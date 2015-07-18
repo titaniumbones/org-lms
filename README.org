@@ -1,0 +1,13 @@
+#+TITLE Org Marking Mode
+
+* What is this?
+This is an Emacs minor mode I use to make marking student papers just a little easier and more convenient for myself.
+
+* Requirements
+This mode relies on org, org-babel, and org-attach, and also loads cl just in case.
+
+* How do you use it?
+
+~org-marking-mode.el~ defines a few functions for parsing csv files, and using that output to populate an org-mode file with a series of subtrees. It als oprovides functions for mailing comments out to students, in bulk.  ~Grading-template.org~ shows how one might use marking mode in a more-or-less real-world situation.
+
+This README is just a stub, and the mode is not really flexible enough for other people to use just yet.  But I hope it eventually will be.  
