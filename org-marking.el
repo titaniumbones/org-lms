@@ -35,8 +35,37 @@ This fn was stolen from somewhere on the web..."
         (forward-line 1)))
     (reverse result)))
 
+(defun parse-plist-csv-file (file)
+  "Transforms into a plist.
+Not using this yet, but I would like to switch over to using plists
+for parsing csv files."
+  (interactive
+   (list (read-file-name "CSV file: ")))
+  (let ((buf (find-file-noselect file))
+        (result nil))
+    (with-current-buffer buf
+      (goto-char (point-min))
+      (let ((header-props (split-string  (buffer-substring-no-properties
+                                          (line-beginning-position) (line-end-position)) ","))
+            )
+        (message (format "header is: %s" header-props)) ;;(print header)
+        (while (not (eobp))
+          (let ((line  (split-string (buffer-substring-no-properties
+                                      (line-beginning-position) (line-end-position)) ","))
+                (count 0)
+                (new-plist '()))
+            ;;(print line)
+            (while (< count (length line))
+              (print (nth count header-props))
+              (print (nth count line))
+              (setq new-plist (plist-put new-plist  (nth count header-props) (nth count line)))
+              (setq count (1+ count)))
+            (push  new-plist result)
+            (forward-line 1))))
+      (reverse result))))
 (define-minor-mode org-marking-mode
   "a mode to get my marking in order"
+  ;;:keymap (kbd "C-c C-x C-g" . (call-interactively (org-set-property "GRADE")))
   :lighter " Mark"
   )
 (add-hook 'org-marking-mode-hook
@@ -68,6 +97,7 @@ second is the student email."
                             (insert (format "\n** %s" name))
                             (org-todo 'todo)
                             (insert template)
+                            (org-set-property "GRADE" nil)
                             (org-set-property "MAIL_TO" email)
                             (org-set-property "MAIL_CC" "matt.price@utoronto.ca")
                             (org-set-property "MAIL_REPLY" "matt.price@utoronto.ca")
