@@ -421,7 +421,7 @@ Simultaneously write results to results.csv in current directory."
   (dolist (assignment assignments)
     (save-excursion
       ;; jump to assignment
-      (org-open-link-from-string (format "[[*%s]]" assignment))
+      (org-open-link-from-string (format "[[%s]]" assignment))
       ;; map over entries
       (org-map-entries
        (lambda ()
