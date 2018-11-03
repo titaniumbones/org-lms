@@ -196,26 +196,12 @@ Canvas LMS allows for export of student information; the resultant csv file "
                                       (mwp-org-get-parent-headline) nname lname ))
                             ))
                          )
-                    (message "vars: %s %s %s %s " fname lname nname email)
-                    ;;(message  "pliste gets:%s %s %s %s" fname lname nname email)
                     (insert (format "\n** %s %s" nname lname))
                     (org-todo 'todo)
                     (insert template)
                     (dolist (p props)
                       (org-set-property (car p ) (cdr p)))
                     
-                    ;; (org-set-property "GRADE" "0")
-                    ;; (org-set-property "CHITS" "0")
-                    ;; (org-set-property "NICKNAME" nname)
-                    ;; (org-set-property "FIRSTNAME" fname)
-                    ;; (org-set-property "LASTNAME" lname)
-                    ;; (org-set-property "MAIL_TO" email)
-                    ;; (org-set-property "GITHUB" github)
-                    ;; ;; (org-set-property "MAIL_CC" "matt.price@utoronto.ca")
-                    ;; (org-set-property "MAIL_REPLY" "matt.price@utoronto.ca")
-                    ;; (org-set-property "MAIL_SUBJECT"
-                    ;;                   (format "Comments on %s Assignment (%s %s)"
-                    ;;                           (mwp-org-get-parent-headline) nname lname ))
                     ;; try to attach files, if possible
                     (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
                            (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
