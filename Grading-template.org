@@ -1,34 +1,72 @@
 #+TODO: TODO(t) | READY(r)  SENT (s)
-* COMMENT Getting started.
-:PROPERTIES:
-:ID:       70e269d0-7296-4c79-bea8-800b94f9ab8d
-:END:
+#+COURSE "RLG231"
+#+PROPERTY: GRADE 0 
+#+PROPERTY: COURSE (:name "hello" :id 2456)
+*  Set Up Course Properties                                            
 
-This file is to be used as a template for grading. The ides is that a csv file has already been generated from class data, of which the first two fields contain student *names* and *emails*. This file will then be used to create sets of headlines, of the form:
-#+BEGIN_SRC 
-\* Assignment Title
-\** Student 1
-\** Student 2
-#+END_SRC
-Each subheading will bye populated by several "MAIL_HEADER" properties (to be used later by org-mime) and a blank grading template, and the todo-keyword property will be set to "TODO".
+To begin with, we have to tell ~org-lms~ a few things about the course and its assignments. This will allows us to talk to the Canvas instance via its API and associate the local info with the hidden keys that the API uses to ingerpret requests.
 
-Once grading for that student has been completed, and optionally a marked-up student paper attached to the subtree, the subtree should be manually marked as "READY".  Calling ~org-marking-mail-all~ will parse the buffer, looking for all READY trees, and send out all the mail that's ready to go, then mark those headlines as SENT. This allows the user to keep track of student progress, unsent messages, etc., with sparse trees. 
+The following code does a few things:
 
-#+BEGIN_SRC emacs-lisp :results silent
-  (let (
-        (students (parse-csv-file "./students.csv"))
-        (assignments
-         '((Definition . "
-  - Organization ::
-  - Clarity of Thesis ::
-  - Presentation of Evidence ::
-  - Grammar and Spelling ::
-  - Style ::
-  - Citations ::
-  - Further Comments ::
-  - Grade ::"))))
-    (org-marking-make-headings assignments students)
-       )
+- sets the base URL for all API requests
+- retrieves the token from its storage place (probably best to use some other store, but this is the one I was able to get working!)
+- sets up the global ~org-lms-courses~ variable, which probably should be stored more centrally somehow.
+- gets the local assignment definition, and merges them with the assignments on Canvas
+- retrieves the student list from Canvas, and checks for a locally stored student list that may contain extra information (e.g., github logins and nicknames,, often important for Asian students especially)
+- generates a table with a number of org-mode links that allow you to interact with the API and also to generate grading subtrees for each assignment
+#+begin_src emacs-lisp
+  (make-local-variable 'org-use-property-inheritance)
+  (setq 'org-use-property-inheritance t)
+  (setq org-lms-baseurl "https://q.utoronto.ca/api/v1/")
+  (setq org-lms-token (password-store-get "q.utoronto.ca"))
 
-#+END_SRC
+  (setq org-lms-courses
+        '(
+          (wildwater .
+                     (:shortname "Wild Waters"
+                                 :coursenum "NEW271"
+                                 :semester "20189"
+                                 ))))
+  (setq org-lms-course (org-lms-get-courseid (alist-get 'wildwater  org-lms-courses)))
+  (setq org-lms-local-assignments
+        '(
+          (darwin .
+                  (:name "Response Paper 1"
+                         :directory "response-paper-1"
+                         :weight 0.10
+                         :grade-type "letter"
+                         :submisison-type "email"
+                         :rubric-list ("Organization" "Clarity of Argument"
+                                       "Grammar and Spelling" "Grade"
+                                       "See Attached Paper for further Comments")
+                         ))
+          (test .
+                (:name "Test Assignment"
+                       :directory "response-paper-1"
+                       :weight 0.10
+                       :grade-type "letter"
+                       :submisison-type "canvas"
+                       :rubric-list ("Organization" "Clarity of Argument"
+                                     "Grammar and Spelling" "Grade"
+                                     "See Attached Paper for further Comments")
+                       ))))
+  (org-lms-setup)
+  ;;(org-lms-merge-assignment-values)
+  ;; (org-lms-merge-student-lists)
+  ;;(org-lms-get-students)
+        ;;; (org-lms-get-courseid org-lms-course)
+  ;; (org-lms-merge-student-lists)
+  ;; (org-lms-get-students)
+  ;;(setq org-lms-merged-students (org-lms-merge-student-lists))
+  ;;(setq org-lms-merged-assignments (org-lms-merge-assignment-values))
+  ;; (org-lms-assignments-table org-lms-merged-assignments org-lms-merged-students)
+#+end_src
+
+#+RESULTS:
+| Name (upload here) | Download URL         | Inspect               | Make Headers   |
+|--------------------+----------------------+-----------------------+----------------|
+| [[https://q.utoronto.ca/courses/64706/assignments/88373][Test Assignment]]    | [[https://q.utoronto.ca/courses/64706/assignments/88373/submissions?zip=1][Download Submissions]] | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/88373")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'test org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+| Response Paper 1   |                      |                       | [[elisp:(org-lms-make-headings (alist-get 'darwin org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+
+
 
