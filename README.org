@@ -1,13 +1,233 @@
-#+TITLE Org Marking Mode
-
-* What is this?
-This is an Emacs minor mode I use to make marking student papers just a little easier and more convenient for myself.
+#+TITLE Org-Mode Marking & Integrations for the Canvas LMS
 
 * Requirements
 This mode relies on org, org-babel, and org-attach, and also loads cl just in case.
 
-* How do you use it?
+* org-lms
 
-~org-marking-mode.el~ defines a few functions for parsing csv files, and using that output to populate an org-mode file with a series of subtrees. It als oprovides functions for mailing comments out to students, in bulk.  ~Grading-template.org~ shows how one might use marking mode in a more-or-less real-world situation.
+~org-lms~ is a rewrite of org-grading, which is still in the repo. It will probably be merged back into org-grading when I'm ready. Using a different namespace to avoid running into bugs because of any weird mistakes I might have made.  It's changing a lot but is somewhat more robust than my old system and fixes a bunch of issues.  
 
-This README is just a stub, and the mode is not really flexible enough for other people to use just yet.  But I hope it eventually will be.  
+** Initial Setup 
+See [[./Grading-template.org]] for an example of how to initialize the system. 
+
+- first you will need to define ~org-lms-baseurl~, which is the URL from which all Canvas API calls will be built.  This will look something like ~https://my.university.canvas.system/api/v1/~.
+- Then you'll create and store an oauth token; you can get this by navigating to ~Account~ \rarr ~Settings~ \rarr ~New Access Token~ in the Canvas API. Don't store it in version-control! I am using [[https://www.passwordstore.org/][pass]] and [[https://git.zx2c4.com/password-store/about/][password-store]] but I'm not sure it's a great solution.
+- You will need to define a list of courses, each of which is a simple alist with a symbol as ~car~ and plist of course properties as ~cdr~. ~org-lms~ also lets you define your assignments locally and allows you to maintain a CSV file with additional student information (e.g., nicknames and github handles). See [[./students.csv]] for the expected format. *I'm trying to move away from this format but having a little difficulty!*
+- In a given page, *set the current course* with ~org-lms-course~ and set up the properties with ~org-lms-setup~. This will generate a table with links to some of the other functions. 
+
+So, for instance, here is my tst setup:
+
+#+begin_src emacs-lisp
+    (setq org-lms-baseurl "https://q.utoronto.ca/api/v1/")
+    (setq org-lms-token (password-store-get "q.utoronto.ca"))
+    (setq org-lms-courses
+          '(
+            (wildwater .
+                       (:shortname "Wild Waters"
+                                   :coursenum "NEW271"
+                                   :semester "20189"
+                                   ))))
+    (setq org-lms-course (org-lms-get-courseid (alist-get 'wildwater  org-lms-courses)))
+      (setq org-lms-local-assignments
+          '(
+            (darwin .
+                    (:name "Response Paper 1"
+                           :directory "response-paper-1"
+                           :weight 0.10
+                           :grade-type "letter"
+                           :submisison-type "email"
+                           :rubric-list ("Organization" "Clarity of Argument"
+                                         "Grammar and Spelling" "Grade"
+                                         "See Attached Paper for further Comments")
+                           ))
+            (test .
+                  (:name "Test Assignment"
+                         :directory "response-paper-1"
+                         :weight 0.10
+                         :grade-type "letter"
+                         :submisison-type "canvas"
+                         :rubric-list ("Organization" "Clarity of Argument"
+                                       "Grammar and Spelling" "Grade"
+                                       "See Attached Paper for further Comments")
+                         ))))
+    (org-lms-setup)
+#+end_src
+
+
+** Posting Announcements
+I've added a method to export subtrees as HTML announcements.  This saves me having to compose in the web interface (finally!).  Just call ~org-lms-headline-to-announcement~ from the right subtree (sorry, it won't traverse up the tree like ~ox-hugo's~ "dwim" scope -- haven't programmed that yet!). A successful post will set the ~ORG_LMS_ANNOUNCEMENT_ID~ property, and the next time you call from this subtree, the existing announcement will be updated (that is, no new announcement will be posted). Also, the ~ORLG_LMS_ANNOUNCEMENT_URL~ property will be set, and a new browser tab will open up with the announcement page. 
+
+*TODO* -- is this the right UI? 
+
+** Assignments and Marking
+*** The Assignments Object
+Each Assignment has as its cdr a plist which will be used to construct the grading document & to handle a variety of grading-related tasks. Here is the initial structure of an assignment: 
+#+begin_src emacs-lisp
+(test .
+                  (:name "Test Assignment"
+                         :directory "response-paper-1"
+                         :weight 0.10
+                         :grade-type "letter"
+                         :submission-type "canvas"
+                         :rubric-list ("Organization" "Clarity of Argument"
+                                       "Grammar and Spelling" "Grade"
+                                       "See Attached Paper for further Comments")
+                         ))
+
+#+end_src
+- :name :: used both to construct the headline for the assignment, and to associate the local assignment with a Canvas assignment object
+- :directory :: local storage of student work
+- :weight :: used in constructing final grades (not implemented)
+- :grade-type :: one of "letter", "number", or "passfail" -- but not yet implemented properly
+- :submission-type :: one of "email" "github", or "canvas". Should be used in the future for handling (a) attachment of student files and (b) return of student works. Right now there's no canvas implementation.
+- :rubric-list ::  This is what I started with -- My grading rubrics are all definition lists, with comments entered at the end of the list entry. 
+
+Run ~org-lms-merge-assignments~ to add a few extra properties from an associated Canvas assignment. I'm not yet able to automate the creation of these assignments, though that should be possible.    
+
+*** Collecting Student work
+I have two existing systems for marking student work:
+- students email me their papers or submit via Dropbox. I collect the papers in a single directory.
+- Students submit work via Github Classroom. I bulk-clone their repos and mark via PR comments
+
+It would be nice to replace the first of these with a system for downloading papers directly from Canvas.  I'm working on that right now.  
+
+*** Creating Grading Trees
+
+Running ~(org-lms-make-headings assignment-name)~ will generate org heading trees with the following structure:
+- Assignment Name
+  - Student Name 1
+  - Student Name 2
+  - etc
+Each headline will have a number of properties set to make marking easier. Existing student papers will be attached to the grading subtree and can be quickly opened with ~C-c C-a o~. I find the workflow very quick and easy.  I have libreoffice configured with a few shortcuts for commonly used editing markup (checkmarks, smileyfaces, paragraph marks, and expansion shortcuts for "wrong word" and "awkward"). PDFs are much slower for me to mark, as neither pdf-view nor evince has really excellent text annotation UI. TThis may be a limitation of the PDF annotation standards. For github repos, the PR interface is quite rich for code; for text work it's a little bit clumsier, but I don't have a solution for that yet.  
+
+
+*** Returning student work
+Right now I run ~org-lms-mail-all~ to mail out all subtrees marked with a ~READY~ org-todo state. This is generally *fairly* reliable, though sometimes there are issues with the message queue.  
+
+*NEW*: I have written ~org-lms-put-single-submission-from-headline~ which half-works and is ready for testing. 
+* Development
+These are mostly some random notes about things I did during development
+
+
+** Talking to canvas with an auth token
+trying to understand the API using cURL
+#+begin_src sh :tangle curlscript.sh
+  . ./.env.sh
+
+  export AUTH="-H \"Authorization: Bearer $OAUTHTOKEN\" "
+
+  # get courses 
+
+  curl $AUTH $CANVASBASE/courses/ > qcourses.json
+  curl $AUTH $CANVASBASE/courses/64706/students > qstudents.json
+  curl $AUTH $CANVASBASE/courses/64706/assignments > qassignments.json
+  curl $AUTH $CANVASBASE/courses/64706/submissions > qsubmissions.json
+
+  # get users
+
+  # 
+
+#+end_src
+
+tryng to understand the structure of the json response
+#+RESULTS:b
+#+begin_src emacs-lisp value raw
+
+  (let* ((json-array-type 'list)
+           (students (json-read-file "qstudents.json"))
+           (returnval ""))
+  ;; (message studne)
+    (dolist (s students returnval)
+    (message "%s" s)
+    ;; (prin1 (assoc 'id s)
+    (setq returnval (concat returnval (number-to-string (alist-get 'id s))))
+
+    ) ;;students ;; students )
+  )
+#+end_src
+
+#+RESULTS:
+
+
+
+** Building a usable course object in lisp
+Thesewre my first experiments making a lisp data structure. It's a bit ugly.
+#+begin_src emacs-lisp
+  (let*
+      ((students (org-lms~parse-plist-csv-file "./students.csv"))
+      (darwin
+        '((name . "Response Paper 1" )
+          (directory . "response-paper-1")
+          (weight . 0.10)
+          (type . "letter")
+          (rubric-list . ("Organization" "Clarity of Argument"
+                           "Grammar and Spelling" "Grade"
+                           "See Attached Paper for further Comments"))))
+          (atitle (alist-get 'name darwin))
+          (rubric-list (alist-get 'rubric-list darwin))
+          (value "")
+       )
+    ;;(prin1 rubric-list)
+    (setq fakevar (dolist (item  rubric-list value)
+      ;;(prin1 item)
+     ;;(setq value "hello")
+(message "value is %s" value)
+      (setq value (concat value (format "- %s \n" item)))))
+(message "%s" fakevar)
+value
+       ;; (dolist (item rubric-list)
+       ;; (message "%s" item))
+     
+     (org-lms-make-headings darwin students)
+  )
+
+
+#+end_src
+
+#+RESULTS:
+: - Organization 
+: - Clarity of Argument 
+: - Grammar and Spelling 
+: - Grade 
+: - See Attached Paper for further Comments 
+
+
+* Plans (see issues in GH as well)
+** STARTED Integrate with Canvas API
+
+The Canvas API is described [[https://canvas.instructure.com/doc/api/file.object_ids.html][in the offocial docs]], which lives in a different form [[https://canvas.instructure.com/doc/api/live#!/courses.json/list_users_in_course_search_users_get_6][here]]. Here is a [[https://community.canvaslms.com/groups/canvas-developers/blog/2016/09/11/api-testing-postman][tutorial on using Postman to test canvas lms]], and an [[https://community.canvaslms.com/docs/DOC-14390-canvas-apis-getting-started-the-practical-ins-and-outs-gotchas-tips-and-tricks][official Getting Started guide]]. Here's a similar resouce [[https://canvas.instructure.com/courses/785215/pages/getting-started-with-the-api][organized as a course]]. Examples in these docs mostly use cURL. Instead we are using [[https://tkf.github.io/emacs-request/manual.html][request.el]] ([[https://github.com/tkf/emacs-request][github]]) and [[https://jakemccrary.com/blog/2014/07/04/using-emacs-to-explore-an-http-api/][restclient]]  ([[https://github.com/pashky/restclient.el][github]]) (where appropriate) for inspecting api requests. [[https://emacs.stackexchange.com/questions/2427/how-to-test-rest-api-with-emacs][helpful stackexchange intor to restclient]]. [[https://vxlabs.com/tag/request-el/][some advanced org-mode restclient shit]] to aspire to.
+
+  I have had a hell of a time parsing api results; important to always set ~json-key-type~, ~json-object-type~, and ~json-array-type~ before invoking ~json-read~. In request this has to be done in the parser declaration which is a pain. Otherwise lists end up as vectors, which sucks b/c I don't knw how to use vectors in lisp!
+
+Anyway, some progress being made in sample code in [[./Grading-template.org]], but still have abunch of progress to make on this front!!  
+
+In case I forget, you [[https://community.canvaslms.com/docs/DOC-10806-4214724194][gneerate oauth tkens in the settings pane on quercus]]. 
+
+** ACTION elimate remaining cruft
+
+There's still some shitty junk in here 
+
+** ACTION write tests
+THis is abig one -- not sure how to do this!!
+
+** DONE Set a "docroot" property i n the parent to make it eadier to find papers in the directory 
+also makes it easier to give the directory w/ student papers & the headline different names
+
+** ACTION generate tables that can be fed back into canvas
+this would e nice!
+
+** STARTED add in letter/numbber grade conversion
+a little bit difficult
+
+** DONE make it easier to make a template
+generating assignments is too finicky right now. I'd like to be able to do it form the Assignments page (!!)
+
+** ACTION Add some CSS
+WOuld be nice if the marks were a bit easier to read in email clients
+
+** WON'T DO Write a script to grab user.csv
+and move it to the right place. But this in each repo or maybe just run from repo. 
+
+** ACTION Make default messages for github assignments more comprehensible
+Shouldn't be so har.d Also add all comments PRs if you can. 
+Hig
