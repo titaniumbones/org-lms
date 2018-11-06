@@ -76,7 +76,11 @@ but works."
             (while (< count (length line))
               (print (nth count header-props))
               (print (nth count line))
-              (setq new-plist (plist-put new-plist  (intern (nth count header-props)) (nth count line)))
+              (setq new-plist (plist-put new-plist  (intern (nth count header-props))
+                                         (if (not (equal (nth count line) "false"))
+                                             (nth count line)
+                                           (message (nth count line))
+                                           "")))
               (setq count (1+ count)))
             (push  new-plist result)
             (forward-line 1))))
@@ -111,14 +115,17 @@ but works."
   (interactive)
   (org-mark-subtree)
   (let ((attachments (o-g-attachment-list))
-        (subject  (mwp-org-get-parent-headline)))
-    (org-mime-send-subtree)
-    (insert "\nBest,\nMP.\n")
-    (message-goto-body)
-    (insert "Hello,\n\nAttached are the comments from your assignment.\n")
-    (org-mime-htmlize)
-    (dolist (a attachments)  (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
-    (message-goto-to)
+        ;; (subject  (mwp-org-get-parent-headline))
+        )
+    (save-excursion
+      (org-grading-mime-org-subtree-htmlize attachments))
+    ;; (org-mime-send-subtree)
+    ;; (insert "\nBest,\nMP.\n")
+    ;; (message-goto-body)
+    ;; (insert "Hello,\n\nAttached are the comments from your assignment.\n")
+    ;; (org-mime-htmlize)
+    ;; (message-goto-to)
+    ;;(message-send-and-exit)
     ))
 
 
@@ -149,9 +156,11 @@ but works."
 Assumes that the parent headline is the name of a subdirectory,
 and that the current headline is the name of a student. Speeds up file choice."
   (interactive)
-  (org-attach-attach (read-file-name
-                      (concat  "File for student " (nth 4 (org-heading-components)) ":")
-                      (o-g-get-parent-headline) )))
+  (if (file-exists-p o-g-get-parent-headline )
+      (org-attach-attach (read-file-name
+                          (concat  "File for student " (nth 4 (org-heading-components)) ":")
+                          (o-g-get-parent-headline) ))
+    (message "Warning: no such directory %s; not attaching file" o-g-get-parent-headline)))
 (defun org-grading-attach ())
 
 ;; Used to create grading headlines for each assignment & student
@@ -171,12 +180,13 @@ student email."
               (let ((assignment (car x))
                     (template (cdr x)))
                 (insert (format "\n* %s :ASSIGNMENT:" assignment))
-                (let (( afiles (directory-files assignment  nil )))
+                (let (( afiles (if (file-exists-p assignment)  (directory-files assignment  nil ) nil)))
                   (mapcar (lambda (stu)
                             (let* ((fname (plist-get stu 'First))
                                    (lname (plist-get stu 'Last))
-                                   (nname (or  (plist-get stu 'Nickname) fname))
+                                   (nname (or  (unless (equal  (plist-get stu 'Nickname) nil) (plist-get stu 'Nickname)) fname))
                                    (email (plist-get stu 'Email))
+                                   (github (plist-get stu 'github))
                                    )
                               ;;(message  "pliste gets:%s %s %s %s" fname lname nname email)
                               (insert (format "\n** %s %s" nname lname))
@@ -185,7 +195,10 @@ student email."
                               (org-set-property "GRADE" "0")
                               (org-set-property "CHITS" "0")
                               (org-set-property "NICKNAME" nname)
+                              (org-set-property "FIRSTNAME" fname)
+                              (org-set-property "LASTNAME" lname)
                               (org-set-property "MAIL_TO" email)
+                              (org-set-property "GITHUB" github)
                               ;; (org-set-property "MAIL_CC" "matt.price@utoronto.ca")
                               (org-set-property "MAIL_REPLY" "matt.price@utoronto.ca")
                               (org-set-property "MAIL_SUBJECT"
@@ -194,35 +207,166 @@ student email."
                               ;; try to attach files, if possible
                               (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
                                      (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
-                                (message "fullnamefiles is: %s" fullnamefiles)
+                                ;;(message "fullnamefiles is: %s" fullnamefiles)
                                 (if afiles
                                     (if fullnamefiles
-                                        dolist (thisfile fullnamefiles)
-                                        (message "value of thisfile is: %s" thisfile)
-                                        (message "%s %s" (buffer-file-name) thisfile)
-omwp                                        (message "value being passed is: %s"(concat (file-name-directory (buffer-file-name)) assignment "/" thisfile) )
-                                        (org-attach-attach (concat (file-name-directory (buffer-file-name)) assignment "/" thisfile) )
-                                        (message "Attached perfect match for %s" name)
+                                        (dolist (thisfile fullnamefiles)
+                                          ;;(message "value of thisfile is: %s" thisfile)
+                                          ;;(message "%s %s" (buffer-file-name) thisfile)
+                                          ;;(message "value being passed is: %s"(concat (file-name-directory (buffer-file-name)) assignment "/" thisfile) )
+                                          (org-attach-attach (concat (file-name-directory (buffer-file-name)) assignment "/" thisfile) )
+                                          (message "Attached perfect match for %s" fname))
                                       (dolist (thisfile nicknamefiles)
                                         (if t
                                             (progn 
-                                              (org-attach-attach (concat (file-name-directory (buffer-file-name)) assignment "/" thisfile) )
+                                              (org-wattach-attach (concat (file-name-directory (buffer-file-name)) assignment "/" thisfile) )
                                               (message "No perfect match; attached likely match for %s" nname)))))
-                                  (message "No files match name of %s" nname)))
+                                  (message "No files match name of %s" nname)
+                                  (message "warning: no directory %s, not attaching anything" assignment)))
                               ;; (condition-case nil
                               
                               ;;   (error (message "Unable to attach file belonging to student %s" nname )))
                               (save-excursion
                                 (org-mark-subtree)
+                                
                                 (org-cycle nil))
-                              ))students)) ) ) assignments)))
+                              ))
+                          students)) ) )
+            assignments))
+  (org-cycle-hide-drawers 'all))
 
 
+;; stolen from xah, http://ergoemacs.org/emacs/elisp_read_file_content.html
+(defun o-g-read-lines (filePath)
+  "Return a list of lines of a file at filePath."
+  (with-temp-buffer
+    (insert-file-contents filePath)
+    (split-string (buffer-string) "\n" t)))
+
+;; org make headings, but for github assignments
+(defun org-grading-make-headings-from-github (assignments students)
+  "Create a set of headlines for grading.
+
+ASSIGNMENTS is an alist in which the key is the assignment title,
+and the value is itslef a plist with up to three elements. The
+first is the assignment base name, the second is a list of files
+to attach, and the third is the grading template. STUDENTS is now
+assumed to be a plist, usually generated by
+`o-g-parse-plist-csv-file'. Relevant field in the plist are
+First, Last, Nickname, Email, github.
+
+The main innovations vis-a-vis `org-grading-make-headings` are
+the structure of the the alist, and the means of attachment
+"
+  (message "%s" assignments)
+  (save-excursion
+    (goto-char (point-max))
+    (message "students=%s" students)
+    (mapcar (lambda (x)
+              (let* ((title (car x))
+                     (v (cdr x))
+                     (template (plist-get v :template))
+                     (basename (plist-get v :basename))
+                     (filestoget (plist-get v :files))
+                     (prs (if (plist-get v :prs)
+                              (o-g-read-lines (plist-get v :prs))
+                            nil))
+                     )
+                (insert (format "\n* %s :ASSIGNMENT:" title))
+                ;;(let (( afiles (directory-files (concat title  )   nil ))))
+                (mapcar (lambda (stu)
+                          (let* ((fname (plist-get stu 'First))
+                                 (lname (plist-get stu 'Last))
+                                 (nname (or  (plist-get stu 'Nickname) fname))
+                                 (email (plist-get stu 'Email))
+                                 (github (plist-get stu 'github))
+                                 (afiles (ignore-errors (directory-files (concat title "/" basename "-" github ))))
+                                 
+                                 )
+                            (message "afiles is: %s" afiles )
+                            ;;(message  "pliste gets:%s %s %s %s" fname lname nname email)
+                            (insert (format "\n** %s %s" (if (string= nname "")
+                                                          fname
+                                                        nname) lname))
+                            (org-todo 'todo)
+                            (insert template)
+                            (org-set-property "GRADE" "0")
+                            (org-set-property "CHITS" "0")
+                            (org-set-property "NICKNAME" nname)
+                            (org-set-property "FIRSTNAME" fname)
+                            (org-set-property "LASTNAME" lname)
+                            (org-set-property "MAIL_TO" email)
+                            (org-set-property "GITHUB" github)
+                            (org-set-property "LOCAL_REPO" (concat title "/" basename "-" github "/" ))
+                            (if prs
+                                (mapcar (lambda (url)
+                                          (message "inside lambda")
+                                          (if (string-match github url)
+                                              (progn
+                                                (message "string matched")
+                                                ;; one thought would be to add all comments PR's to this
+                                                ;; but that would ocmplicate the logic for opening the PR URL
+                                                ;; automatically
+                                                ;; (org-set-property "COMMENTS_PR"
+                                                ;;                   (concat (org-get-entry (point) "COMMENTS_PR") " " url))
+                                                (org-set-property "COMMENTS_PR" url)
+                                                (insert (concat "\nPlease see detailed comments in your github repo: " url))
+                                                )))
+                                        prs)
+                              )
+                            ;; (org-set-property "MAIL_CC" "matt.price@utoronto.ca")
+                            (org-set-property "MAIL_REPLY" "matt.price@utoronto.ca")
+                            (org-set-property "MAIL_SUBJECT"
+                                              (format "Comments on %s Assignment (%s %s)"
+                                                      (mwp-org-get-parent-headline) nname lname ))
+                            ;; try to attach files, if possible
+                            ;; (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
+                            ;;        (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
+                            ;;   ;;(message "fullnamefiles is: %s" fullnamefiles)
+                            ;;   (if afiles
+                            ;;       (if fullnamefiles
+                            ;;           (dolist (thisfile fullnamefiles)
+                            ;;             ;;(message "value of thisfile is: %s" thisfile)
+                            ;;             ;;(message "%s %s" (buffer-file-name) thisfile)
+                            ;;             ;;(message "value being passed is: %s"(concat (file-name-directory (buffer-file-name)) title "/" thisfile) )
+                            ;;             (org-attach-attach (concat (file-name-directory (buffer-file-name)) title "/" thisfile) )
+                            ;;             (message "Attached perfect match for %s" name))
+                            ;;         (dolist (thisfile nicknamefiles)
+                            ;;           (if t
+                            ;;               (progn 
+                            ;;                 (org-attach-attach (concat (file-name-directory (buffer-file-name)) title "/" thisfile) )
+                            ;;                 (message "No perfect match; attached likely match for %s" nname)))))
+                            ;;     (message "No files match name of %s" nname)))
+                            ;; (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
+                            ;;        (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
+                            ;;   ;;(message "fullnamefiles is: %s" fullnamefiles)
+                            ;;   (if afiles
+                            ;;       (if fullnamefiles
+                            ;;           (dolist (thisfile fullnamefiles)
+                            ;;             ;;(message "value of thisfile is: %s" thisfile)
+                            ;;             ;;(message "%s %s" (buffer-file-name) thisfile)
+                            ;;             ;;(message "value being passed is: %s"(concat (file-name-directory (buffer-file-name)) title "/" thisfile) )
+                            ;;             (org-attach-attach (concat (file-name-directory (buffer-file-name)) title "/" thisfile) )
+                            ;;             (message "Attached perfect match for %s" name))
+                            ;;         (dolist (thisfile nicknamefiles)
+                            ;;           (if t
+                            ;;               (progn 
+                            ;;                 (org-attach-attach (concat (file-name-directory (buffer-file-name)) title "/" thisfile) )
+                            ;;                 (message "No perfect match; attached likely match for %s" nname)))))
+                            ;;     (message "No files match name of %s" nname)))
+                            ;; (condition-case nil
+                            
+                            ;;   (error (message "Unable to attach file belonging to student %s" nname )))
+                            (save-excursion
+                              (org-mark-subtree)
+                              (org-cycle nil))
+                            ))students) ) ) assignments)))
 ;; Mailing functions
 
 (defun org-grading-mail-all ()
   (interactive)
   "Mail all subtrees marked 'READY' to student recipients."
+  (message "Mailing all READY subtrees to students")
   (org-element-map (org-element-parse-buffer) 'headline
     (lambda (item)
       ;; (print (nth 0 (org-element-property :todo-keyword item)))
@@ -232,15 +376,56 @@ omwp                                        (message "value being passed is: %s"
           ;;(print "sending")
           ;;(print item)
           (save-excursion
-            (mwp-send-subtree-with-attachments)
+            (forward-char)
+            ;; (save-)
+            (o-g-send-subtree-with-attachments)
             ;; added this line
             ;; (if (fboundp 'mu4e-compose-mode)
             ;;     (mu4e-compose-mode))
-            (message-send-and-exit))
+            )
           (org-todo "SENT")
           ))
       )
+    )
+  (org-cycle-hide-drawers 'all))
+
+(defun o-g-send-subtree-with-attachments ()
+  "org-mime-subtree and HTMLize"
+  (interactive)
+  ;;(org-mark-subtree)
+  (message "starting ")
+  (let ((attachments (mwp-org-attachment-list))
+        ;; (subject  (mwp-org-get-parent-headline))
+        )
+    ;;(insert "Hello " (nth 4 org-heading-components) ",\n")
+    ;;(org-mime-subtree)
+    ;; (org-mime-send-subtree)
+    ;; (org-mime-subtree)
+    (org-grading-mime-org-subtree-htmlize)
+    ;; (insert "\nBest,\nMP.\n")
+    ;; (message-goto-body)
+    ;; (insert "Hello,\n\nAttached are the comments from your assignment.\n")
+    ;; (message "subject is" )
+    ;; (message subject)
+    ;;(message-to)
+    ;; (org-mime-htmlize)
+    ;; (mu4e-compose-mode)
+    ;; this comes from gnorb
+    ;; I will reintroduce it if I want to reinstate questions.
+    ;; (map-y-or-n-p
+    ;;  ;; (lambda (a) (format "Attach %s to outgoing message? "
+    ;;  ;;                    (file-name-nondirectory a)))
+    ;; (lambda (a)
+    ;;   (mml-attach-file a (mm-default-file-encoding a)
+    ;;                    nil "attachment"))
+    ;; attachments
+    ;; '("file" "files" "attach"))
+    ;; (message "Attachments: %s" attachments)
+    (dolist (a attachments) (message "Attachment: %s" a) (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
+    (message-goto-to)
     ))
+
+
 (defun org-grading-mail-all-undone ()
   (interactive)
   "Mail all subtrees marked 'TODO' to student recipients."
@@ -378,6 +563,7 @@ you have not received a grade for work that you have handed in,
   (org-grading-clear-overlays)
   (org-grading-overlay-headings) )
 
+
 (defun org-grading-set-all-grades ()
   "set grade property for all headings on basis of \"- Grade :: \" line.
 
@@ -393,6 +579,31 @@ you have not received a grade for work that you have handed in,
       ;;   (org-element-at-point))
       ))
   (org-grading-overlay-headings) 
+
+  )
+
+(defun org-grading-set-all-grades-boolean ()
+  "set grade property for all headings on basis of \"- Grade :: \" line.
+
+  Use with caution."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "- \\(.*\\)Grade\\(.*\\) :: \\(.+\\)" nil t )
+      (let ((grade (match-string 3)))
+        (if (string-match "pass" grade)
+            (progn (message grade)
+                   (org-set-property "GRADE" "1"))
+          )) 
+      
+      ;;(org-set-property "GRADE" (match-string 1))
+      ;; (save-excursion
+      ;;   (org-back-to-heading)
+      ;;   (org-set-property)
+      ;;   (org-element-at-point))
+      ))
+  (org-grading-overlay-headings) 
+  ;;(org-grading-overlay-headings) 
 
   )
 
@@ -472,6 +683,177 @@ Simultaneously write results to results.csv in current directory."
   (ov-clear)
   (org-grading-overlay-headings)
   )
+
+;; helper functions for github repos
+(defun o-g-open-student-repo ()
+  (interactive)
+  (find-file-other-window (org-entry-get (point) "LOCAL_REPO" )))
+(defun o-g-open-attachment-or-repo () 
+  (interactive)
+  (let* ((attach-dir (org-attach-dir t))
+         (files (org-attach-file-list attach-dir)))
+    (if (> (length files) 0 )
+        (org-attach-open)
+      (o-g-open-student-repo)
+      )))
+
+
+
+;; more helpers
+(defun org-grading-mime-org-subtree-htmlize (attachments)
+  "Create an email buffer of the current subtree.
+The buffer will contain both html and in org formats as mime
+alternatives.
+
+The following headline properties can determine the headers.
+* subtree heading
+   :PROPERTIES:
+   :MAIL_SUBJECT: mail title
+   :MAIL_TO: person1@gmail.com
+   :MAIL_CC: person2@gmail.com
+   :MAIL_BCC: person3@gmail.com
+   :END:
+
+The cursor is left in the TO field."
+  (interactive)
+  (save-excursion
+    ;; (funcall org-mime-up-subtree-heading)
+    (cl-flet ((mp (p) (org-entry-get nil p org-mime-use-property-inheritance)))
+      (let* ((file (buffer-file-name (current-buffer)))
+             (subject (or (mp "MAIL_SUBJECT") (nth 4 (org-heading-components))))
+             (to (mp "MAIL_TO"))
+             (cc (mp "MAIL_CC"))
+             (bcc (mp "MAIL_BCC"))
+             (addressee (or (mp "NICKNAME") (mp "FIRSTNAME") ) )
+             ;; Thanks to Matt Price for improving handling of cc & bcc headers
+             (other-headers (cond
+                             ((and cc bcc) `((cc . ,cc) (bcc . ,bcc)))
+                             (cc `((cc . ,cc)))
+                             (bcc `((bcc . ,bcc)))
+                             (t nil)))
+             (subtree-opts (when (fboundp 'org-export--get-subtree-options)
+			     (org-export--get-subtree-options)))
+	     (org-export-show-temporary-export-buffer nil)
+	     (org-major-version (string-to-number
+				 (car (split-string  (org-release) "\\."))))
+	     (org-buf  (save-restriction
+			   (org-narrow-to-subtree)
+			   (let ((org-export-preserve-breaks org-mime-preserve-breaks)
+                                 )
+			     (cond
+			      ((= 8 org-major-version)
+			       (org-org-export-as-org
+			        nil t nil
+			        (or org-mime-export-options subtree-opts)))
+			      ((= 9 org-major-version)
+			       (org-org-export-as-org
+			        nil t nil t
+			        (or org-mime-export-options subtree-opts)))))))
+	     (html-buf (save-restriction
+			 (org-narrow-to-subtree)
+			 (org-html-export-as-html
+			  nil t nil t
+			  (or org-mime-export-options subtree-opts))))
+	     ;; I wrap these bodies in export blocks because in org-mime-compose
+	     ;; they get exported again. This makes each block conditionally
+	     ;; exposed depending on the backend.
+	     (org-body (prog1
+			   (with-current-buffer org-buf
+			     ;; (format "#+BEGIN_EXPORT org\n%s\n#+END_EXPORT"
+				   ;;   (buffer-string))
+           (buffer-string))
+			 (kill-buffer org-buf)))
+	     (html-body (prog1
+			    (with-current-buffer html-buf
+			      (format "#+BEGIN_EXPORT html\n%s\n#+END_EXPORT"
+				      (buffer-string))
+            ;; (buffer-string)
+            )
+			  (kill-buffer html-buf)))
+	     ;; (body (concat org-body "\n" html-body))
+       (body org-body))
+	(save-restriction
+	  (org-narrow-to-subtree)
+	  (org-grading-mime-compose body file to subject other-headers
+			            (or org-mime-export-options subtree-opts)
+                                    addressee))
+        (if (eq org-mime-library 'mu4e)
+        (advice-add 'mu4e~switch-back-to-mu4e-buffer :after
+                    `(lambda ()
+                       (switch-to-buffer (get-buffer ,(buffer-name) ))
+                       (advice-remove 'mu4e~switch-back-to-mu4e-buffer "om-temp-advice"))
+                    '((name . "om-temp-advice"))))
+        (dolist (a attachments)  (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
+
+	(message-goto-to)
+        (message-send-and-exit)
+        ))))
+
+(defun org-grading-mime-compose (body file &optional to subject headers opts addressee)
+  "Create mail BODY in FILE with TO, SUBJECT, HEADERS and OPTS."
+  (when org-mime-debug (message "org-mime-compose called => %s %s" file opts))
+  (setq body (format "Hello%s, \n\nAttached are the comments from your assignment.\n%s\nBest,\nMP.\n----------\n" (if addressee (concat " " addressee) "")  (replace-regexp-in-string "\\`\\(\\*\\)+.*$" "" body)))
+  (let* ((fmt 'html)
+	 ;; we don't want to convert org file links to html
+	 (org-html-link-org-files-as-html nil)
+	 ;; These are file links in the file that are not images.
+	 (files
+	  (if (fboundp 'org-element-map)
+	      (org-element-map (org-element-parse-buffer) 'link
+		(lambda (link)
+		  (when (and (string= (org-element-property :type link) "file")
+			     (not (string-match
+				   (cdr (assoc "file" org-html-inline-image-rules))
+				   (org-element-property :path link))))
+		    (org-element-property :path link))))
+	    (message "Warning: org-element-map is not available. File links will not be attached.")
+	    '())))
+    (unless (featurep 'message)
+      (require 'message))
+    (cl-case org-mime-library
+      (mu4e
+       (mu4e~compose-mail to subject headers nil))
+      (t
+       (message-mail to subject headers nil)))
+    (message-goto-body)
+    (cl-labels ((bhook (body fmt)
+		       (let ((hook 'org-mime-pre-html-hook))
+			 (if (> (eval `(length ,hook)) 0)
+			     (with-temp-buffer
+			       (insert body)
+			       (goto-char (point-min))
+			       (eval `(run-hooks ',hook))
+			       (buffer-string))
+			   body))))
+      (let* ((org-link-file-path-type 'absolute)
+	     (org-export-preserve-breaks org-mime-preserve-breaks)
+	     (plain (org-mime--export-string body 'org))
+	     ;; this makes the html self-containing.
+	     (org-html-htmlize-output-type 'inline-css)
+	     ;; this is an older variable that does not exist in org 9
+	     (org-export-htmlize-output-type 'inline-css)
+	     (html-and-images
+	      (org-mime-replace-images
+	       (org-mime--export-string (bhook body 'html) 'html opts)
+	       file))
+	     (images (cdr html-and-images))
+	     (html (org-mime-apply-html-hook (car html-and-images))))
+	;; If there are files that were attached, we should remove the links,
+	;; and mark them as attachments. The links don't work in the html file.
+	(mapc (lambda (f)
+		(setq html (replace-regexp-in-string
+			    (format "<a href=\"%s\">%s</a>"
+				    (regexp-quote f) (regexp-quote f))
+			    (format "%s (attached)" (file-name-nondirectory f))
+			    html)))
+	      files)
+	(insert (org-mime-multipart plain html)
+		(mapconcat 'identity images "\n"))
+	;; Attach any residual files
+	(mapc (lambda (f)
+		(when org-mime-debug (message "attaching: %s" f))
+		(mml-attach-file f))
+	      files)))))
 
 (provide 'org-grading)
 ;;; org-grading ends here
