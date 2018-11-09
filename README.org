@@ -1,4 +1,4 @@
-#+TITLE Org-Mode Marking & Integrations for the Canvas LMS
+#+TITLE: Org-Mode Marking & Integrations for the Canvas LMS
 
 * Requirements
 This mode relies on org, org-babel, and org-attach, and also loads cl just in case.
@@ -89,7 +89,7 @@ I have two existing systems for marking student work:
 - students email me their papers or submit via Dropbox. I collect the papers in a single directory.
 - Students submit work via Github Classroom. I bulk-clone their repos and mark via PR comments
 
-It would be nice to replace the first of these with a system for downloading papers directly from Canvas.  I'm working on that right now.  
++It would be nice to replace the first of these with a system for downloading papers directly from Canvas.  I'm working on that right now.+  This is now *implemented!* Use ~org-lms-get-canvas-attachments~ to getthese. Now I need to hook it up to ~org-lms-make-headinges~.  
 
 *** Creating Grading Trees
 
