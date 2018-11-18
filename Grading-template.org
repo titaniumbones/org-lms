@@ -1,8 +1,28 @@
 #+TODO: TODO(t) | READY(r)  SENT (s)
 #+COURSE "RLG231"
 #+PROPERTY: GRADE 0 
-#+PROPERTY: COURSE (:name "hello" :id 2456)
-*  Set Up Course Properties                                            
+# #+PROPERTY: COURSE (:name "hello" :id 2456)
+#+ORG_LMS_COURSEID: 64706
+#+ORG_LMS_ASSIGNMENTS: ~/Wildwater/Assignments-ww1.org
+
+* Setup with new auto-generated assignments. :assignments:
+:PROPERTIES:
+:ID:       36b5a890-a3f3-426b-bf4e-5ea0ebd7b010
+:END:
+
+Grab assignments info from the pre-generated ~assignments.el~ file. 
+
+
+#+begin_src emacs-lisp
+(org-lms-setup-grading)
+#+end_src
+
+#+RESULTS:
+| Name (upload here) | Download URL | Inspect               | Make Headers   |
+|--------------------+--------------+-----------------------+----------------|
+| Response Paper 2   |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93074")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'ResponsePaper2 org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+| Tests only         |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93072342")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'Testsonly org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+
 
 To begin with, we have to tell ~org-lms~ a few things about the course and its assignments. This will allows us to talk to the Canvas instance via its API and associate the local info with the hidden keys that the API uses to ingerpret requests.
 
