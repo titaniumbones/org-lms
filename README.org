@@ -1,14 +1,154 @@
 #+TITLE: Org-Mode Marking & Integrations for the Canvas LMS
 
-* Requirements
-This mode relies on org, org-babel, and org-attach, and also loads cl just in case.
+* Intro
 
-* org-lms
+This repository includes *generic functions for interacting with the Canvas LMS* as well as *instructions for a highly individualized and specific grading setup.* Where possible I have tried to distinguish between the two but there are still places where I have not adequately separated them.  
 
-~org-lms~ is a rewrite of org-grading, which is still in the repo. It will probably be merged back into org-grading when I'm ready. Using a different namespace to avoid running into bugs because of any weird mistakes I might have made.  It's changing a lot but is somewhat more robust than my old system and fixes a bunch of issues.  
+Also, this package is fairly unstable due to the low quality of the code :-/. Expect API's to continue to change.
+
+* Installation
+
+This package  is developed with emacs 27.0.50 and org-mode from git; there's no guarantee it will work with other versions, sorry :-(. 
+
+It also depends on [[https://github.com/tkf/emacs-request][request.el]] and [[https://github.com/org-mime/org-mime][org-mime]], both of which can be downloaded from MELPA. 
+
+then simply  
+
+- clone this repository
+- add the directory to your load-path
+- require org-lms
+
+This is my use-package declaration; you'll have to adjust the path of course:
+
+#+begin_src emacs-lisp
+(use-package org-lms
+:load-path "/home/matt/src/org-grading"
+:pin manual
+:after (org)
+:commands (org-lms-setup org-lms-get-courseid)
+:config 
+;; nothing yet
+)
+#+end_src
+
+* Usage
+
+** The Canvas API
+Canvas has a rich [[https://canvas.instructure.com/doc/api][RESTful API]], which accepts and returns JSON representations of many kinds of course-related objects, including students, assignments, announcements, and pages.  A basic function, ~org-lms-canvas-request~, uses Emacs's built-in [[https://www.google.com/search?client=firefox-b-ab&q=emacs+json.el][JSON.el]] and the powerful [[https://github.com/tkf/emacs-request][request.el]] library to standardize the formats of requests and responses.  Then, for each supported API endpoint, ~org-lms~ has a set of convenience functions:
+- one or more *getters* for retrieving data from Canvas, usually named ~org-lms-get-*~
+- one or more *setters* for posting or modifying data to Canvas, usually named ~org-lms-post-*~
+- one or more *transformers* for modidying the data provided by canvas into a form that's useful for local use. Some of these may become less necessary as I adapt my local schema to come into closer alignment with Canvas, but there will always be extra information that Canvas cannot easily store (Github ID's, nicknames, etc.).
+
+At present, this package provides only a very limited set of functions related to these categories: 
+- *courses*
+- *students*
+- *assignments*
+- *announcements*
+
+In order to use them, you'll first need to set the following variables:
+- ~org-lms-baseurl~, a system-wide variablethat represents your institution's Canvas API URL
+- ~org-lms-token~, your [[https://community.canvaslms.com/docs/DOC-10806-4214724194][secret API token]], which you can acces svia the Canvas web interface (follow the link for details)
+- ~ORG_LMS_COURSEID~, set either as a file-wide keyword or a headline-level org property. You can use ~org-lms-get-courses~ to retrieve all the course objects and their ~:id~ properties.
+- other ID's for individual students, assignments, submissions, announcements, etc; the higher-level functions here will retrieve those values and store them in headline-level properties.  
 
 ** Initial Setup 
-See [[./Grading-template.org]] for an example of how to initialize the system. 
+
+Create a course-specific directory containing your org-mode source files.  In each file, add the ~#+ORG_LMS_COURSEID:~ value specific to your course. This will have to be set each year, since the course ids will change.
+
+Write your announcements and assignments as org-mode subtrees, and then post them to canvas with the appropriate convenience functions.  Hopefully the most important information from the API response will then be recorded in the headlines. 
+
+See [[./Grading-template.org]] for some examples.
+
+** Posting Announcements
+I've added a method to export subtrees as HTML announcements.  This saves me having to compose in the web interface (finally!).  Just call ~org-lms-headline-to-announcement~ from the right subtree (sorry, it won't traverse up the tree like ~ox-hugo's~ "dwim" scope -- haven't programmed that yet!). A successful post will set the ~ORG_LMS_ANNOUNCEMENT_ID~ property, and the next time you call from this subtree, the existing announcement will be updated (that is, no new announcement will be posted). Also, the ~ORLG_LMS_ANNOUNCEMENT_URL~ property will be set, and a new browser tab will open up with the announcement page. 
+
+** STARTED Assignments and Marking
+Marking is the bulk of the work associated with an LMS and the most complex part of the workflow this package is designed for.  These instructions may not be up to date and may also besomewhat idiosyncratic.  
+
+See ~Grading-template.org~  and ~Assignments.org~ for an example of how to set up assignments.  The functions defined here expect each assignment to be a subtree. They will look for a number of headline properties and file-wide keyword values before making the API call; the example assignments are the bet bet right now, but basically:
+
+- set the courseid
+- write the assignments and use the included functions to post them to Canvas
+- write the assignment data to a file (thesee two can be done in one step)
+- When you're ready to grade, switch to your grading template
+- Having set the courseid and the location of the assignments source file or the assignments.el files.
+- run ~org-lms-setup-grading~ to generate 
+- grab the current list of students
+- 
+
+There's an awful lot of churn here, as I try to adjust my old, creaky workflow into something with less friction. There are at least three different definitions of "assignment" here: 
+- A local org-mode source file or subtree containing the text of the assignment and media accompaniments of one kind or another (images, code blocks, etc.)
+- A lisp alist object with a mnemonic symbol as ~car~ and a ~cdr~ in plist form. This object is used for generating marking schemes, which I describe more below. 
+- A Canvas object which contains the same text as the local source file, and is identified by a unique ID as well as several URL's and a substantial number of properties, most of which any given user will be unconcerned with.
+
+Ideally, all three of these entities would be co-ordinated in an entirely automated and error-free way. However, right now the connections between them are somewhat tenuous. Here's what I can do:
+- *post* a local assignment to Canvas, and record the Canvas ID and other data as properties of the subtreee that was just posted
+- *get* a list of Canvas assignments and *extract* an assignment ID from a matching assignment.
+- *write* and *read* an elisp object to a file e.g. ~assignments.el~ and use that to gneerate headings.
+
+*** Ideal Workflow
+- [X] Write assignment(s) in ~Assignments.org~ (see template)
+- [X] generate an ~assignments.el~ file from the WIM contents of ~Assignments.org~, and ideally
+- [X] automaticlaly write to this file every time I upload an assignment
+- [X] inside the grading template,
+  - [X] having set the location of ~assignments.el~ as a file-level keyword variable,
+  - [X] read its contents and
+  - [X] use them to generate headlines.  
+
+So, this is roughly finished. Now just need to add a few more keywords to make everything run smmmoooooottthh as butter. 
+ 
+*** The Assignments Object
+Each local assignment has as its cdr a plist which will be used to construct the grading document & to handle a variety of grading-related tasks. Here is the initial structure of an assignment: 
+#+begin_src emacs-lisp
+(test .
+                  (:name "Test Assignment"
+                         :directory "response-paper-1"
+                         :weight 0.10
+                         :grade-type "letter"
+                         :submission-type "canvas"
+                         :rubric-list ("Organization" "Clarity of Argument"
+                                       "Grammar and Spelling" "Grade"
+                                       "See Attached Paper for further Comments")
+                         ))
+
+#+end_src
+- :name :: used both to construct the headline for the assignment, and to associate the local assignment with a Canvas assignment object
+- :directory :: local storage of student work
+- :weight :: used in constructing final grades (not implemented)
+- :grade-type :: one of "letter", "number", or "passfail" -- but not yet implemented properly
+- :submission-type :: one of "email" "github", or "canvas". Should be used in the future for handling (a) attachment of student files and (b) return of student works. Right now there's no canvas implementation.
+- :rubric-list ::  This is what I started with -- My grading rubrics are all definition lists, with comments entered at the end of the list entry. 
+
+Run ~org-lms-merge-assignments~ to add a few extra properties from an associated Canvas assignment. I'm not yet able to automate the creation of these assignments, though that should be possible.    
+*** Creating Assignments
+There is now preliminary support for uploading assignments to a course. This is very much a work in progress.
+*** Collecting Student work
+I have two existing systems for marking student work:
+- students email me their papers or submit via Dropbox. I collect the papers in a single directory.
+- Students submit work via Github Classroom. I bulk-clone their repos and mark via PR comments
+
++It would be nice to replace the first of these with a system for downloading papers directly from Canvas.  I'm working on that right now.+  This is now *implemented!* Use ~org-lms-get-canvas-attachments~ to getthese. Now I need to hook it up to ~org-lms-make-headinges~.  
+
+*** Creating Grading Trees
+
+Running ~(org-lms-make-headings assignment-name)~ will generate org heading trees with the following structure:
+- Assignment Name
+  - Student Name 1
+  - Student Name 2
+  - etc
+Each headline will have a number of properties set to make marking easier. Existing student papers will be attached to the grading subtree and can be quickly opened with ~C-c C-a o~. I find the workflow very quick and easy.  I have libreoffice configured with a few shortcuts for commonly used editing markup (checkmarks, smileyfaces, paragraph marks, and expansion shortcuts for "wrong word" and "awkward"). PDFs are much slower for me to mark, as neither pdf-view nor evince has really excellent text annotation UI. TThis may be a limitation of the PDF annotation standards. For github repos, the PR interface is quite rich for code; for text work it's a little bit clumsier, but I don't have a solution for that yet.  
+
+*** Returning student work
+Right now I run ~org-lms-mail-all~ to mail out all subtrees marked with a ~READY~ org-todo state. This is generally *fairly* reliable, though sometimes there are issues with the message queue.  
+
+*NEW*: I have written ~org-lms-put-single-submission-from-headline~ which half-works and is ready for testing. 
+* Development
+
+I'm experimenting with using literate programming and ~org-babel-tangle~ as my main development modality. It's convenient to navigate the various parts of the code, etc.  But it may be hard to submit PR's etc. 
+
+* COMMENT old cruft to delete later 
+
+It's also possible to store some data structures either as JSON files or ~.el~ files which can be accessed later on by some of the helper functions.  
 
 - first you will need to define ~org-lms-baseurl~, which is the URL from which all Canvas API calls will be built.  This will look something like ~https://my.university.canvas.system/api/v1/~.
 - Then you'll create and store an oauth token; you can get this by navigating to ~Account~ \rarr ~Settings~ \rarr ~New Access Token~ in the Canvas API. Don't store it in version-control! I am using [[https://www.passwordstore.org/][pass]] and [[https://git.zx2c4.com/password-store/about/][password-store]] but I'm not sure it's a great solution.
@@ -27,7 +167,7 @@ So, for instance, here is my tst setup:
                                    :coursenum "NEW271"
                                    :semester "20189"
                                    ))))
-    (setq org-lms-course (org-lms-get-courseid (alist-get 'wildwater  org-lms-courses)))
+    (setq org-lms-course (org-lms-infer-course (alist-get 'wildwater  org-lms-courses)))
       (setq org-lms-local-assignments
           '(
             (darwin .
@@ -54,103 +194,11 @@ So, for instance, here is my tst setup:
 #+end_src
 
 
-** Posting Announcements
-I've added a method to export subtrees as HTML announcements.  This saves me having to compose in the web interface (finally!).  Just call ~org-lms-headline-to-announcement~ from the right subtree (sorry, it won't traverse up the tree like ~ox-hugo's~ "dwim" scope -- haven't programmed that yet!). A successful post will set the ~ORG_LMS_ANNOUNCEMENT_ID~ property, and the next time you call from this subtree, the existing announcement will be updated (that is, no new announcement will be posted). Also, the ~ORLG_LMS_ANNOUNCEMENT_URL~ property will be set, and a new browser tab will open up with the announcement page. 
-
-*TODO* -- is this the right UI? 
-
-** Assignments and Marking
-*** The Assignments Object
-Each Assignment has as its cdr a plist which will be used to construct the grading document & to handle a variety of grading-related tasks. Here is the initial structure of an assignment: 
-#+begin_src emacs-lisp
-(test .
-                  (:name "Test Assignment"
-                         :directory "response-paper-1"
-                         :weight 0.10
-                         :grade-type "letter"
-                         :submission-type "canvas"
-                         :rubric-list ("Organization" "Clarity of Argument"
-                                       "Grammar and Spelling" "Grade"
-                                       "See Attached Paper for further Comments")
-                         ))
-
-#+end_src
-- :name :: used both to construct the headline for the assignment, and to associate the local assignment with a Canvas assignment object
-- :directory :: local storage of student work
-- :weight :: used in constructing final grades (not implemented)
-- :grade-type :: one of "letter", "number", or "passfail" -- but not yet implemented properly
-- :submission-type :: one of "email" "github", or "canvas". Should be used in the future for handling (a) attachment of student files and (b) return of student works. Right now there's no canvas implementation.
-- :rubric-list ::  This is what I started with -- My grading rubrics are all definition lists, with comments entered at the end of the list entry. 
-
-Run ~org-lms-merge-assignments~ to add a few extra properties from an associated Canvas assignment. I'm not yet able to automate the creation of these assignments, though that should be possible.    
-
-*** Collecting Student work
-I have two existing systems for marking student work:
-- students email me their papers or submit via Dropbox. I collect the papers in a single directory.
-- Students submit work via Github Classroom. I bulk-clone their repos and mark via PR comments
-
-+It would be nice to replace the first of these with a system for downloading papers directly from Canvas.  I'm working on that right now.+  This is now *implemented!* Use ~org-lms-get-canvas-attachments~ to getthese. Now I need to hook it up to ~org-lms-make-headinges~.  
-
-*** Creating Grading Trees
-
-Running ~(org-lms-make-headings assignment-name)~ will generate org heading trees with the following structure:
-- Assignment Name
-  - Student Name 1
-  - Student Name 2
-  - etc
-Each headline will have a number of properties set to make marking easier. Existing student papers will be attached to the grading subtree and can be quickly opened with ~C-c C-a o~. I find the workflow very quick and easy.  I have libreoffice configured with a few shortcuts for commonly used editing markup (checkmarks, smileyfaces, paragraph marks, and expansion shortcuts for "wrong word" and "awkward"). PDFs are much slower for me to mark, as neither pdf-view nor evince has really excellent text annotation UI. TThis may be a limitation of the PDF annotation standards. For github repos, the PR interface is quite rich for code; for text work it's a little bit clumsier, but I don't have a solution for that yet.  
-
-
-*** Returning student work
-Right now I run ~org-lms-mail-all~ to mail out all subtrees marked with a ~READY~ org-todo state. This is generally *fairly* reliable, though sometimes there are issues with the message queue.  
-
-*NEW*: I have written ~org-lms-put-single-submission-from-headline~ which half-works and is ready for testing. 
-* Development
+** Development
 These are mostly some random notes about things I did during development
 
 
-** Talking to canvas with an auth token
-trying to understand the API using cURL
-#+begin_src sh :tangle curlscript.sh
-  . ./.env.sh
-
-  export AUTH="-H \"Authorization: Bearer $OAUTHTOKEN\" "
-
-  # get courses 
-
-  curl $AUTH $CANVASBASE/courses/ > qcourses.json
-  curl $AUTH $CANVASBASE/courses/64706/students > qstudents.json
-  curl $AUTH $CANVASBASE/courses/64706/assignments > qassignments.json
-  curl $AUTH $CANVASBASE/courses/64706/submissions > qsubmissions.json
-
-  # get users
-
-  # 
-
-#+end_src
-
-tryng to understand the structure of the json response
-#+RESULTS:b
-#+begin_src emacs-lisp value raw
-
-  (let* ((json-array-type 'list)
-           (students (json-read-file "qstudents.json"))
-           (returnval ""))
-  ;; (message studne)
-    (dolist (s students returnval)
-    (message "%s" s)
-    ;; (prin1 (assoc 'id s)
-    (setq returnval (concat returnval (number-to-string (alist-get 'id s))))
-
-    ) ;;students ;; students )
-  )
-#+end_src
-
-#+RESULTS:
-
-
-
-** Building a usable course object in lisp
+*** Building a usable course object in lisp
 Thesewre my first experiments making a lisp data structure. It's a bit ugly.
 #+begin_src emacs-lisp
   (let*

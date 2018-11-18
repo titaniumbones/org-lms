@@ -20,7 +20,7 @@
 (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
     'org-lms~send-subtree-with-attachments)
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
-    'org-lms-mail-all instead)
+    'org-lms-mail-all)
 
 ;; variables
 ;; most of these are used for canvas interactions...
@@ -71,6 +71,16 @@ to match the local definition with the courses on canvas:
   "Buffer-local plist of students in this course, merging cnavas and local info. 
 
   Intended to be set automatically. Should always be buffer-local")
+
+(defun org-lms-global-props (&optional property buffer)
+  "Get the plists of global org properties of current buffer."
+  (unless property (setq property "PROPERTY"))
+  (with-current-buffer (or buffer (current-buffer))
+    (org-element-map (org-element-parse-buffer) 'keyword (lambda (el) (when (string-match property (org-element-property :key el)) el)))))
+
+(defun org-lms-global-prop-value (key)
+  "Get global org property KEY of current buffer."
+  (org-element-property :value (car (org-lms-global-props key))))
 
 ;; Helper Functions
 
@@ -203,7 +213,9 @@ but works."
     ;;(nth 4 (org-heading-components))
     ))
 (defun org-lms-safe-pget (list prop)
+
   (if (plist-get list prop)
+       
       (plist-get list prop)
     ""))
 
@@ -267,6 +279,59 @@ default values are:
   (with-temp-buffer
     (insert-file-contents filePath)
     (split-string (buffer-string) "\n" t)))
+
+;; john kitchin's version
+(defun org-lms-get-keyword (key)
+  (org-element-map (org-element-parse-buffer) 'keyword
+    (lambda (k)
+      (when (string= key (org-element-property :key k))
+        (org-element-property :value k))) 
+    nil t))
+
+;; nicolas g's version
+(defun org-lms-get-keyword (key)
+  "Get value of keyword, whether or not it's been defined by org. 
+
+Look for a keyword statement of the form 
+#+KEYWORD: 
+
+and return either the last-declared value of the keyword, or the
+value of the current headline's property of the same name."
+
+  (let ((case-fold-search t)
+        (regexp (format "^[ \t]*#\\+%s:" key))
+        (result nil))
+    (org-with-point-at 1
+      (while (re-search-forward regexp nil t)
+        (let ((element (org-element-at-point)))
+          (when (eq 'keyword (org-element-type element))
+            (push (org-element-property :value element) result)))))
+    (or (org-entry-get nil key) (car result)))
+  )
+
+
+
+(defun org-lms-set-keyword (tag value)
+  "Set filetag TAG to VALUE.
+        If VALUE is nil, remove the filetag."
+  (save-excursion
+    (goto-char (point-min))
+    (if (re-search-forward (format "#\\+%s:" tag) (point-max) 'end)
+        ;; replace existing filetag
+        (progn
+          (beginning-of-line)
+          (kill-line)
+          (when value
+            (insert (format "#+%s: %s" tag value))))
+      ;; add new filetag
+      (if (looking-at "^$") 		;empty line
+          ;; at beginning of line
+          (when value
+            (insert (format "#+%s: %s" tag value)))
+        ;; at end of some line, so add a new line
+        (when value
+          (insert (format "\n#+%s: %s" tag value)))))))
+
 
 ;; stolen from gnorb, but renamed to avoid conflicts
 (defun org-lms~attachment-list (&optional id)
@@ -607,10 +672,16 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (grade-type (plist-get body :grade-type ))
            (submission-type (plist-get body :submission-type))
            (repo-basename (or  (plist-get body :repo-basename) ""))
-           (template (let ((output ""))
-                       (dolist (item  (plist-get body :rubric-list) output)
-                         (setq output (concat output
-                                              (format "- *%s* :: \n" item))))))
+           (courseid (or (plist-get body :courseid) (org-lms-get-keyword "ORG_LMS_COURSEID")) 
+                     ;; (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
+                     ;;     (number-to-string (plist-get org-lms-course :id))
+                     ;;   nil)
+                     )
+           (template (plist-get body :rubric))
+           ;; (template (let ((output ""))
+           ;;             (dolist (item  (plist-get body :rubric-list) output)
+           ;;               (setq output (concat output
+           ;;                                    (format "- *%s* :: \n" item))))))
            ;; (template (plist-get 'rubric-list body))
            )
       ;; (message "BODY:\n%s\n%s\n%s\n%s/BODY" body atitle directory weight)
@@ -632,9 +703,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                          (coursenum (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
                                         (plist-get org-lms-course :coursenum)
                                       nil))
-                         (courseid (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
-                                       (number-to-string (plist-get org-lms-course :id))
-                                     nil))
+
                          (github (or  (plist-get stu :github) ""))
                          (id (or (number-to-string (plist-get stu :id)) ""))
                          (props 
@@ -664,8 +733,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                     (insert (format "\n** %s %s\n" nname lname))
                     (org-todo 'todo)
                     (insert template)
-                    (insert (format "This assignment is worth *%s percent* of your mark and is graded as a letter grade. Please see ... for more details.\n"
-                                    (* 100  weight)))
+                    (if weight (insert (format "This assignment is worth *%s percent* of your mark and is graded as a letter grade. Please see ... for more details.\n"
+                                               (* 100  weight))))
                     (dolist (p props)
                       (org-set-property (car p ) (cdr p)))
 
@@ -1004,122 +1073,69 @@ Simultaneously write results to results.csv in current directory."
       )))
 
 ;; talking to canvas via API v1: https://canvas.instructure.com/doc/api/ 
-;; two behind-the-scenes functions `org-lms-canvas-request' and
-;; `org-lms-canvas-son-request' do most of the work.
-;; the rest are convenience functions for specific queries
-;; of which there are many!!
-(defun org-lms-canvas-request (query &optional request-type request-params)
-  "Send QUERY to `org-lms-baseurl' with http request type `type', using `org-lms-token' to authenticate.
+  ;; two behind-the-scenes functions `org-lms-canvas-request' and
+  ;; `org-lms-canvas-son-request' do most of the work.
+  ;; the rest are convenience functions for specific queries
+  ;; of which there are many!!
+  (defun org-lms-canvas-request (query &optional request-type request-params file)
+    "Send QUERY to `org-lms-baseurl' with http request type REQUEST-TYPE.
+Optionally send REQUEST-PARAMS as JSON data, and write results to FILE, which should be a full path.  
 
-Return an error if `org-lms-oauth' is unset. Otherwise return a list whose car is a parsed json
-payload and whose cdr is an error message. The data payload will be a list, produced by `json-read' 
-with thefollowing settings:
+Returns a user-error if `org-lms-token' is unset, or if data payload is nil. Otherwise return a parsed json data payload, with the following settings wrapping `json-read':
 
-`json-array-type' 'list
-`json-object-type' 'plist
-`json-key-type' 'symbol
+  `json-array-type' 'list
+  `json-object-type' 'plist
+  `json-key-type' 'symbol
+  maybe key-type needs to be keyword though! Still a work in progress.
+  "
+    (unless request-type (setq request-type "GET"))
+    (let ((canvas-payload nil)
+          (canvas-err nil)
+          (canvas-status nil))
+      (message (concat org-lms-baseurl query "   " request-type))
+      ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
+      (if org-lms-token
+          (progn (setq thisrequest
+                  (request
+                   (concat org-lms-baseurl query)
+                   :type request-type
+                   :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)))
+                   :sync t
+                   :data (if  request-params request-params nil)
+                   :parser (lambda ()
+                             (if file(write-region (buffer-string) nil file))
+                             (ol-jsonwrapper json-read))
+                   :success (cl-function
+                             (lambda (&key data &allow-other-keys)
+                               (setq canvas-payload data)
+                               (message "SUCCESS")
+                               ))
+                   :error (cl-function (lambda ( &key error-thrown data status &allow-other-keys )
+                                         (setq canvas-err error-thrown)
+                                         (message "ERROR: %s" error-thrown)))))
+            (if (request-response-data thisrequest)                                   
+                ;;(request-response-data thisrequest)
+                 canvas-payload
+              (user-error (format "NO PAYLOAD: %s" canvas-err))))
+        (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 
-maybe key-type needs to be keyword though! Still a work in progress.
-"
-  (unless request-type
-    (setq request-type "GET"))
-  (let ((canvas-payload nil)
-        (canvas-err nil)
-        (canvas-status nil)
+(defun org-lms-get-courses (&optional file) 
+  "Get full list of JSON courses, optionally writing to FILE."
+  (org-lms-canvas-request "courses" "GET" nil (if file (expand-file-name file))))
 
-        )
-    (message (concat org-lms-baseurl query))
-    (message (concat "Bearer " org-lms-token))
-    (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
-    (if org-lms-token
-        (progn
-          (setq thisrequest
-                (request
-                 (concat org-lms-baseurl query)
-                 :type request-type
-                 :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)))
-                 :sync t
-                 :params (if  request-params request-params nil)
-                 :parser (lambda ()
-                           (ol-jsonwrapper json-read))
-                 :success (cl-function
-                           (lambda (&key data &allow-other-keys)
-                             (setq canvas-payload data)
-                             ))
-                 :error (cl-function (lambda ( &key error-thrown &allow-other-keys )
-                                       (setq canvas-err error-thrown)
-                                       (message "ERROR: %s" error-thrown)))
-                 :complete (cl-function
-                            (lambda (&key data &key error-thrown &key symbol-status &key response)
-                              (message "RESPONSE: %s" response)
-                              (message "data: %s" data)
-                              (message "STATUS: %s" symbol-status))) ))
-          ;; (message "pPAYLOAD: %s" canvas-payload)
-          (if (request-response-data thisrequest)                                   
-              canvas-payload
-            (user-error (format "NO PAYLOAD: %s" canvas-err))))
-      (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
+(defun org-lms-get-single-course (id)
+  "Get the current Canvas JSON object representing the coures with id ID."
+  (org-lms-canvas-request (format "courses/%s" id) "GET"))
 
-(defun org-lms-canvas-json-request (query &optional request-type request-data)
-  "Send QUERY to `org-lms-baseurl' with http request type `type', using `org-lms-token' to authenticate.
-
-Return an error if `org-lms-oauth' is unset. Otherwise return a list whose car is a parsed json
-payload and whose cdr is an error message. The data payload will be a list, produced by `json-read' 
-with thefollowing settings:
-
-`json-array-type' 'list
-`json-object-type' 'plist
-`json-key-type' 'symbol
-
-maybe key-type needs to be keyword though! Still a work in progress.
-"
-  (unless request-type
-    (setq request-type "GET"))
-  (let ((canvas-payload nil)
-        (canvas-err nil)
-        (canvas-status nil)
-
-        )
-    (message (concat org-lms-baseurl query))
-    (prin1 request-data)
-    ;; (message (concat "Bearer " org-lms-token))
-    ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
-    (if org-lms-token
-        (progn
-          (setq thisrequest
-                (request
-                 (concat org-lms-baseurl query)
-                 :type request-type
-                 :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)) ("Content-Type" . "application/json"))
-                 :sync t
-                 :data (json-encode  request-data)
-                 :parser (lambda ()
-                           (ol-jsonwrapper json-read) )
-                 :success (cl-function
-                           (lambda (&key data &allow-other-keys)
-                             (setq canvas-payload data)
-                             ))
-                 :error (cl-function (lambda (&rest args  &key error-thrown &allow-other-keys)
-                                       (setq canvas-err error-thrown)
-                                       (message "ERROR: %s" error-thrown)))
-                 :complete (cl-function
-                            (lambda (&key data &key error-thrown &key symbol-status &key response)
-                              (message "RESPONSE: %s" response)
-                              (message "data: %s" data)
-                              (message "STATUS: %s" symbol-status))) ) )
-          (message "pPAYLOAD: %s" canvas-payload)
-          (if (request-response-data thisrequest)
-              canvas-payload
-            (user-error (format "NO PAYLOAD: %s" canvas-err)))
-          ) 
-      (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
-
-(defun org-lms-get-courses ()
-  (org-lms-canvas-request "courses" "GET"))
-
-(defun org-lms-get-courseid (&optional course)
+(defun org-lms-infer-course (&optional course recordp)
+  "Attempt to infer Canvas ID of a local COURSE and return that object.
+\(using the information we already have.\)
+Optionally RECORDP the keyword.
+But RECORDP isn't actually implemented yet and for some reason 
+this fn returns a course object not a ocursid!"
   (unless course
     (setq course org-lms-course))
+
   (let ((canvas-courses (org-lms-get-courses))
         (coursenum (plist-get course :coursenum))
         (shortname (plist-get course :shortname))
@@ -1128,9 +1144,9 @@ maybe key-type needs to be keyword though! Still a work in progress.
         )
     (loop for can in-ref canvas-courses
           do
-          (prin1 can)
+          ;;(prin1 can)
           (let ((course-code (plist-get can :sis_course_id)))
-            (message "COURSECODE %s" course-code)
+            ;; (message "COURSECODE %s" course-code)
             (if (and
                  course-code
                  (string-match coursenum  course-code )
@@ -1140,46 +1156,82 @@ maybe key-type needs to be keyword though! Still a work in progress.
                              shortname)
                   (plist-put can :coursenum coursenum)
                   (plist-put can :semester semester)
-                  (setq result can)))))
-    result))
+                  (setq result can)
+                  (org-lms-set-keyword "ORG_LMS_COURSE" (plist-get result :id))))))
+    (or result
+        (user-error "No course in Canvas matches definition of %s" course))))
 
-(defun org-lms-get-students (&optional course)
-  (unless course
-    (setq course org-lms-course))
-  (let* ((courseid (plist-get course :id))
-         (result
-         (org-lms-canvas-request (format "courses/%s/users" courseid) "GET"
-                                 '(("enrollment_type[]" . "student")
-                                   ("include[]" . "email")))))
-    (message "RESULTS")
-    ;;(with-temp-file "students-canvas.json" (insert result))
-    (loop for student in-ref result
-          do
-          (if (string-match "," (plist-get student :sortable_name))
-              (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
-                (plist-put student :lastname (car namelist) )
-                (plist-put student :firstname (cadr namelist)))))
-    result))
+(defun org-lms-get-students (&optional courseid)
+    "Retrieve Canvas student data for course with id COUSEID"
+    ;; (unless course
+    ;;   (setq course org-lms-course))
+    
+    (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+;; (courseid (plist-get course :id))
+           (result
+            (org-lms-canvas-request (format "courses/%s/users" courseid) "GET"
+                                    '(("enrollment_type[]" . "student")
+                                      ("include[]" . "email")))))
+      (message "RESULTS")
+      ;;(with-temp-file "students-canvas.json" (insert result))
+      (loop for student in-ref result
+            do
+            (if (string-match "," (plist-get student :sortable_name))
+                (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
+                  (plist-put student :lastname (car namelist) )
+                  (plist-put student :firstname (cadr namelist)))))
+      result))
 
-(defun org-lms-get-all-users (&optional course)
-  ;; (unless course
-  ;;   (setq course org-lms-course))
-  (prin1 course)
-  (let ((courseid (plist-get course :id)))
-    (message "COUSEID %s" courseid)
-    (org-lms-canvas-request (format "courses/%s/users" courseid) "GET")))
+  (defun org-lms-get-all-users (&optional course)
+    ;; (unless course
+    ;;   (setq course org-lms-course))
+    (prin1 course)
+    (let ((courseid (plist-get course :id)))
+      (message "COUSEID %s" courseid)
+      (org-lms-canvas-request (format "courses/%s/users" courseid) "GET")))
 
-(defun org-lms-get-single-user (studentid)
-  
+  (defun org-lms-get-single-user (studentid)
+
     (org-lms-canvas-request (format "users/%s"  studentid) "GET"))
 
-(defun org-lms-find-local-user (id)
-  (let* ((result nil))
-    (cl-loop for s in org-lms-merged-students
-             if (equal id (number-to-string (plist-get s :id)))
-             do
-             (setq result s))
-    result))
+  (defun org-lms-find-local-user (id)
+    (let* ((result nil))
+      (cl-loop for s in org-lms-merged-students
+               if (equal id (number-to-string (plist-get s :id)))
+               do
+               (setq result s))
+      result))
+
+  ;; fix broken symbol not keyword assignment!!!
+  (defun org-lms-merge-student-lists (&optional local canvas)
+    "Merge student lists, optionally explicity named as LOCAL and CANVAS."
+
+    (unless local
+      (setq local (org-lms-get-local-students))
+      )
+    (unless canvas
+      (setq canvas (org-lms-get-students)))
+
+    ;;(message "%s" local)
+    (loop for c in-ref canvas
+          do (let* ((defn c)
+                    (email (plist-get defn :email)))
+               (dolist (l  local)
+                 (if (equal
+                      email  (plist-get l :email))
+                     (progn 
+                       (plist-put defn 'github (plist-get l 'github))
+                       (if (plist-get l :nickname)
+                           (progn
+                             (plist-put defn :nickname (plist-get l :nickname))
+                             (plist-put defn :short_name (plist-get l :nickname))))
+                       (unless (plist-get c :firstname)
+                         (plist-put defn :firstname (plist-get l :firstname)))
+                       (unless (plist-get c :lastname)
+                         (plist-put defn :lastname (plist-get l :lastname)))
+                       )))))
+    (with-temp-file "students-merged.json" (insert  (ol-write-json-plists canvas)))
+    canvas)
 
 (defun org-lms-get-assignments (&optional course)
   (unless course
@@ -1187,13 +1239,48 @@ maybe key-type needs to be keyword though! Still a work in progress.
   (let ((courseid (plist-get course :id)))
     (org-lms-canvas-request (format "courses/%s/assignments" courseid) "GET")))
 
+(defun org-lms-merge-assignment-values (&optional local canvas)
+  (unless local
+    (setq local org-lms-local-assignments ))
+  (unless canvas
+    (setq canvas (org-lms-get-assignments)))
+  (message "LOCALLLLL")
+  (prin1 local)
+  ;; (prin1 canvas)
+  (let ((result '()))
+    (loop for l in-ref local
+          do (let* ((defn (cdr l))
+                    (name (plist-get defn :name)))
+               (message "LLLLLLLLL")
+               ;; (prin1 l)
+               ;; (prin1 (plist-get (cdr l) :name))
+               ;; (prin1 name)
+               (dolist (c canvas)
+                 (message "CCCCCCCC")
+                 (message "Printing canvas defn of %s" (plist-get c :name))
+                 ;;(prin1 c)
+                 (if (equal
+                      name  (plist-get c :name))
+                     (progn
+                       (message "MADE ITI N")
+                       (plist-put defn :canvasid (plist-get c :id))
+                       (plist-put defn :html_url (plist-get c :html_url))
+                       (plist-put defn :submissions_download_url (plist-get c :submissions_download_url))
+                       (message "DEFN")
+                       (prin1 defn)
+
+                       (add-to-list 'result `(,(car l) .  ,defn)))))))
+    result))
+
 (defun org-lms-get-submissions (&optional course)
+  "get all submisisons in a COUSE (rarely used)."
   (unless course
     (setq course org-lms-course))
   (let ((courseid (plist-get course :id)))
     (org-lms-canvas-request (format "courses/%s/students/submissions" courseid) "GET")))
 
 (defun org-lms-get-assignment-submissions ( assignmentid &optional course)
+  "Get all submisisons belonging to ASSIGNMENTID in optional COURSE."
   (unless course
     (setq course org-lms-course))
   (let ((courseid (plist-get course :id)))
@@ -1253,6 +1340,59 @@ maybe key-type needs to be keyword though! Still a work in progress.
                  (message "Cleaning up attach...")))))
   )
 
+;; assignments
+
+(defun org-lms-create-assignment (assignment-data &optional course)
+  "Create assignment in course."
+  (unless course
+    (setq course org-lms-course))
+  (org-lms-canvas-json-request (format  "courses/%s/assignments" (plist-get course :id))
+                          "POST"
+                          assignment-data)
+  )
+
+(defun org-lms-parse-assignment ()
+    "Extract assignment data from HEADLINE.
+  HEADLINE is an org-element object."
+    (interactive)
+    (let* ((canvasid (org-entry-get nil "CANVASID"))
+           (duedate (org-entry-get nil "DUE_AT"))
+           (publish (org-entry-get nil "OL_PUBLISH")))
+      (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
+      (prin1 canvasid)
+      (let ((response
+             (org-lms-canvas-request (format "courses/%s/assignments%s"
+                                             (plist-get org-lms-course :id)
+                                             (if canvasid
+                                                 (format  "/%s" canvasid) "")
+                                             )
+                                     (if canvasid "PUT" "POST")
+                                     `(("assignment[name]" .  ,(nth 4 (org-heading-components)) )
+                                       ,(if duedate
+                                            '("assignment[due_at]" . (concat duedate  "T23:59:59-05:00")))
+                                       ,if ("assignment[submission_types]" . "online_upload")
+                                       ("assignment[grading_type]" . "letter_grade")
+                                       ("assignment[points_possible]" . ,(org-entry-get nil "POINTS_POSSIBLE"))
+                                       ,(if publish '("assignment[published]" . t )
+                                         '("assignment[published]" . nil ))
+                                       ("assignment[description]" . ,(org-export-as 'html t nil t))
+                                       )
+                                     )))
+        (if (plist-get response :id)
+            (progn
+              (org-set-property "CANVASID" (format "%s"(plist-get response :id)))
+              (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response :html_url)))
+              (org-set-property "CANVAS_SUBMISSION_URL" (format "%s" (plist-get response :submission_url)))
+              (org-set-property "SUBMISSIONS_DOWNLOAD_ID" (format "%s"(plist-get response :submissions_download_id)))
+              (org-set-property "" (format "%s"(plist-get response :id)))
+              (org-set-property "CANVASID" (format "%s"(plist-get response :id)))
+
+) )
+        ;;(message "RESPONSE IS %s" response)
+        response)))
+
+org-lms-parse-assignment
+
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid  course)
   "Get comments from student headline and post to Canvas LMS.
 
@@ -1262,7 +1402,7 @@ commented out `dolist' macro, which will upload attachments to
 cnavas. THis process is potentially buggy and seems likely to
 lead to race conditions and duplicated uploadsand comments. Still
 working on this."
-  
+
   ;; set up default arg values
   (unless course
     (setq course org-lms-course))
@@ -1315,7 +1455,7 @@ working on this."
           ;;(prin1 curlres)
           (setq returnval (add-to-list 'returnval
                                        (alist-get 'id (json-read-from-string curlres))))
-          
+
           ;; (request
           ;;  (plist-get fileinfo :upload_url)
           ;;  :params al
@@ -1334,209 +1474,16 @@ working on this."
   )
 ;;oops!  what's this for? 
 (defun org-lms-canvas-file-upload (url params)
-  
+
   )
 
-(defun org-lms-post-announcement (payload &optional course)
-  (unless course
-    (setq course org-lms-course))
-  (let ((courseid (plist-get course :id)))
-    (org-lms-canvas-request (format "courses/%s/discussion_topics" courseid) "POST" payload))
-  )
-
-(defun org-lms-inspect-object (method url headers)
-    (restclient-http-do method url headers
-     ))
-
-
-
-(defun org-lms-canvas-inspect (query &optional request-type request-params)
-  "Send QUERY to `org-lms-baseurl' with http request type `type', using `org-lms-token' to authenticate.
-
-Return an error if `org-lms-oauth' is unset. Otherwise return a list whose car is a parsed json
-payload and whose cdr is an error message. The data payload will be a list, produced by `json-read' 
-with thefollowing settings:
-
-`json-array-type' 'list
-`json-object-type' 'plist
-`json-key-type' 'symbol
-
-maybe key-type needs to be keyword though! Still a work in progress.
-"
-  (unless request-type
-    (setq request-type "GET"))
-  (let ((canvas-payload nil)
-        (canvas-err nil)
-        (canvas-status nil)
-
-        )
-    ;; (message (concat org-lms-baseurl query))
-    ;; (message (concat "Bearer " org-lms-token))
-    ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
-    (if org-lms-token
-        (progn
-          (setq thisrequest
-                (request
-                 (concat org-lms-baseurl query)
-                 :type request-type
-                 :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)))
-                 :sync t
-                 :params (if  request-params request-params nil)
-                 :parser 'buffer-string
-                 :success (cl-function
-                           (lambda (&key data &allow-other-keys)
-                             (setq canvas-payload data)
-                             (when data
-                               (with-current-buffer (get-buffer-create "*request demo*")
-                                 (erase-buffer)
-                                 (insert data)
-                                 (pop-to-buffer (current-buffer))
-                                 (json-mode)
-                                 (json-mode-beautify))))
-                           )
-                 :error (cl-function (lambda (&rest args  &key error-thrown &allow-other-keys)
-                                       (setq canvas-err error-thrown)
-                                       (message "ERROR: %s" error-thrown)))
-                 ))
-          ;; (message "pPAYLOAD: %s" canvas-payload)
-          (if (request-response-data thisrequest)
-              canvas-payload
-            (error (format "NO PAYLOAD: %s" canvas-err)))
-          ) 
-      (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
-
-(defun org-lms-merge-assignment-values (&optional local canvas)
-  (unless local
-    (setq local org-lms-local-assignments ))
-  (unless canvas
-    (setq canvas (org-lms-get-assignments)))
-  ;; (message "LOCALLLLL")
-  ;; (prin1 local)
-  ;; (prin1 canvas)
-  (let ((result '()))
-    (loop for l in-ref local
-          do (let* ((defn (cdr l))
-                    (name (plist-get defn :name)))
-               ;; (message "LLLLLLLLL")
-               ;; (prin1 l)
-               ;; (prin1 (plist-get (cdr l) :name))
-               ;; (prin1 name)
-               (dolist (c canvas)
-                 (message "CCCCCCCC")
-                 (prin1 (plist-get c :name))
-                 (prin1 c)
-                 (if (equal
-                      name  (plist-get c :name))
-                     (progn
-                       (message "MADE ITI N")
-                       (plist-put defn :canvasid (plist-get c :id))
-                       (plist-put defn :html_url (plist-get c :html_url))
-                       (plist-put defn :submissions_download_url (plist-get c :submissions_download_url))
-                       (message "DEFN")
-                       (prin1 defn)
-                       )))
-               (add-to-list 'result `(,(car l) .  ,defn))))
-    result))
-
-;; fix broken symbol not keyword assignment!!!
-(defun org-lms-merge-student-lists (&optional local canvas)
-  "Merge student lists, optionally explicity named as LOCAL and CANVAS."
-  
-  (unless local
-    (setq local (org-lms-get-local-students))
+;; huh is this deprecated? 
+  (defun org-lms-post-announcement (payload &optional course)
+    (unless course
+      (setq course org-lms-course))
+    (let ((courseid (plist-get course :id)))
+      (org-lms-canvas-request (format "courses/%s/discussion_topics" courseid) "POST" payload))
     )
-  (unless canvas
-    (setq canvas (org-lms-get-students)))
-  
-  ;;(message "%s" local)
-  (loop for c in-ref canvas
-        do (let* ((defn c)
-                  (email (plist-get defn :email)))
-             (dolist (l  local)
-               (if (equal
-                    email  (plist-get l :email))
-                   (progn 
-                     (plist-put defn 'github (plist-get l 'github))
-                     (if (plist-get l :nickname)
-                         (progn
-                           (plist-put defn :nickname (plist-get l :nickname))
-                           (plist-put defn :short_name (plist-get l :nickname))))
-                     (unless (plist-get c :firstname)
-                       (plist-put defn :firstname (plist-get l :firstname)))
-                     (unless (plist-get c :lastname)
-                       (plist-put defn :lastname (plist-get l :lastname)))
-                     )))))
-  (with-temp-file "students-merged.json" (insert  (ol-write-json-plists canvas)))
-  canvas)
-
-(defun org-lms-assignments-table (&optional assignments students)
-  "Return a 2-dimensional list suitable whose contents are org-mode table cells.
-
-Intnded to be used in a simpe src block with :results header `value raw table'. 
-Resultant links allow quick access to the canvas web interface as well as the make-headings
-commangs."
-  (unless assignments
-    (setq assignments org-lms-merged-assignments))
-  (unless students
-    (setq students org-lms-merged-students))
-  (message "MERGED ASSIGNMENTS")
-  (prin1 assignments)
-  (let* ((cid (plist-get org-lms-course :id))
-         (make-headlines-string "")
-         (table-header '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline))
-         )
-    (append '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline)
-            (cl-loop for i in assignments
-                     collect `( ,(format "%s"
-                                         (if (plist-get (cdr i) :html_url)
-                                             (concat "[[" (org-lms-safe-pget (cdr i) :html_url) "][" (org-lms-safe-pget (cdr i) :name) "]]")
-                                           (org-lms-safe-pget (cdr i) :name)) ) 
-                                ,(format "%s"
-                                         (if (plist-get (cdr i) :submissions_download_url)
-                                             (concat "[[" (org-lms-safe-pget (cdr i) :submissions_download_url) "][Download Submissions]]")
-                                           " ")
-                                         )
-                                ,(format
-                                  "%s"
-                                  (if (plist-get (cdr i) :canvasid)
-                                      (concat  "[[elisp:(org-lms-canvas-inspect \"courses/"
-                                               (number-to-string cid)
-                                               "/assignments/"
-                                               (number-to-string (org-lms-safe-pget (cdr i) :canvasid))
-                                               "\")][Inspect Original JSON]]")
-                                    " "))
-                                                                  ;; "[[elisp:(org-lms-canvas-inspect \"courses/%s/assignments/%s\") ][%s]]"
-                                  ;; cid
-                                  ;; (org-lms-safe-pget (cdr i) :canvasid)
-                                  ;; "courses/64706/assignments/88373"
-                                  ;; (org-lms-safe-pget
-                                  ;; org-lms-course
-                                  ;; :canvasid)
-                                ;; "Inspect Original JSON"
-                                ,(format "[[%s][%s]]"
-                                         (concat "elisp:(org-lms-make-headings (alist-get '"
-                                                 (symbol-name (car i))
-                                                 " org-lms-merged-assignments) org-lms-merged-students)"
-                                                 ) 
-                                         "Make Headlines"))))
-
-    ))
-
-(defun org-lms-setup ()
-  "Merge  defs and students lists, and create table for later use.
-
-`org-lms-course', `org-lms-local-assignments' and other org-lms
-variables must be set or errors wil lresult."
-  (setq org-lms-merged-students (org-lms-merge-student-lists))
-  (setq org-lms-merged-assignments (org-lms-merge-assignment-values))
-  (org-lms-assignments-table org-lms-merged-assignments)
-  )
-
-(defun org-lms-get-local-students (&optional csv)
-  (unless csv
-    (setq csv "./students.csv"))
-  (org-lms~parse-plist-symbol-csv-file csv)
-  )
 
 ;; announcements
 
@@ -1592,15 +1539,127 @@ variables must be set or errors wil lresult."
       (browse-url (plist-get response :url))
       response)))
 
-;; assignments
+(defun org-lms-inspect-object (method url headers)
+    (restclient-http-do method url headers
+     ))
 
-(defun org-lms-create-assignment (assignment-data &optional course)
-  "Create assignment in course."
-  (unless course
-    (setq course org-lms-course))
-  (org-lms-canvas-json-request (format  "courses/%s/assignments" (plist-get course :id))
-                          "POST"
-                          assignment-data)
+
+
+(defun org-lms-canvas-inspect (query &optional request-type request-params)
+  "Send QUERY to `org-lms-baseurl' with http request type `type', using `org-lms-token' to authenticate.
+
+Return an error if `org-lms-oauth' is unset. Otherwise return a list whose car is a parsed json
+payload and whose cdr is an error message. The data payload will be a list, produced by `json-read' 
+with thefollowing settings:
+
+`json-array-type' 'list
+`json-object-type' 'plist
+`json-key-type' 'symbol
+
+maybe key-type needs to be keyword though! Still a work in progress.
+"
+  (unless request-type
+    (setq request-type "GET"))
+  (let ((canvas-payload nil)
+        (canvas-err nil)
+        (canvas-status nil)
+
+        )
+    ;; (message (concat org-lms-baseurl query))
+    ;; (message (concat "Bearer " org-lms-token))
+    ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
+    (if org-lms-token
+        (progn
+          (setq thisrequest
+                (request
+                 (concat org-lms-baseurl query)
+                 :type request-type
+                 :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)))
+                 :sync t
+                 :data (if  request-params request-params nil)
+                 :parser 'buffer-string
+                 :success (cl-function
+                           (lambda (&key data &allow-other-keys)
+                             (setq canvas-payload data)
+                             (when data
+                               (with-current-buffer (get-buffer-create "*request demo*")
+                                 (erase-buffer)
+                                 (insert data)
+                                 (pop-to-buffer (current-buffer))
+                                 (json-mode)
+                                 (json-mode-beautify))))
+                           )
+                 :error (cl-function (lambda (&rest args  &key error-thrown &allow-other-keys)
+                                       (setq canvas-err error-thrown)
+                                       (message "ERROR: %s" error-thrown)))
+                 ))
+          ;; (message "pPAYLOAD: %s" canvas-payload)
+          (if (request-response-data thisrequest)
+              canvas-payload
+            (error (format "NO PAYLOAD: %s" canvas-err)))
+          ) 
+      (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
+
+(defun org-lms-assignments-table (&optional assignments students)
+  "Return a 2-dimensional list suitable whose contents are org-mode table cells.
+
+Intnded to be used in a simpe src block with :results header `value raw table'. 
+Resultant links allow quick access to the canvas web interface as well as the make-headings
+commangs."
+  (unless assignments
+    (setq assignments org-lms-merged-assignments))
+  (unless students
+    (setq students org-lms-merged-students))
+  (message "MERGED ASSIGNMENTS")
+  (prin1 assignments)
+  (let* ((cid (org-lms-get-keyword "ORG_LMS_COURSEID"))
+         (make-headlines-string "")
+         (table-header '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline))
+         )
+    (append '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline)
+            (cl-loop for i in assignments
+                     collect `( ,(format "%s"
+                                         (if (plist-get (cdr i) :html_url)
+                                             (concat "[[" (org-lms-safe-pget (cdr i) :html_url) "][" (org-lms-safe-pget (cdr i) :name) "]]")
+                                           (org-lms-safe-pget (cdr i) :name)) ) 
+                                ,(format "%s"
+                                         (if (plist-get (cdr i) :submissions_download_url)
+                                             (concat "[[" (org-lms-safe-pget (cdr i) :submissions_download_url) "][Download Submissions]]")
+                                           " ")
+                                         )
+                                ,(format
+                                  "%s"
+                                  (if (plist-get (cdr i) :canvasid)
+                                      (concat  "[[elisp:(org-lms-canvas-inspect \"courses/"
+                                               (format "%s" cid)
+                                               "/assignments/"
+                                               (format "%s" (org-lms-safe-pget (cdr i) :canvasid))
+                                               "\")][Inspect Original JSON]]")
+                                    " "))
+                                ;; "Inspect Original JSON"
+                                ,(format "[[%s][%s]]"
+                                         (concat "elisp:(org-lms-make-headings (alist-get '"
+                                                 (symbol-name (car i))
+                                                 " org-lms-merged-assignments) org-lms-merged-students)"
+                                                 ) 
+                                         "Make Headlines"))))
+
+    ))
+
+(defun org-lms-setup ()
+  "Merge  defs and students lists, and create table for later use.
+
+`org-lms-course', `org-lms-local-assignments' and other org-lms
+variables must be set or errors wil lresult."
+  (setq org-lms-merged-students (org-lms-merge-student-lists))
+  (setq org-lms-merged-assignments (org-lms-merge-assignment-values))
+  (org-lms-assignments-table org-lms-merged-assignments)
+  )
+
+(defun org-lms-get-local-students (&optional csv)
+  (unless csv
+    (setq csv "./students.csv"))
+  (org-lms~parse-plist-symbol-csv-file csv)
   )
 
 ;; Minor mode definition. I'm not really using it right now, but it
