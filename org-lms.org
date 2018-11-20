@@ -1309,67 +1309,6 @@ Returns a user-error if `org-lms-token' is unset, or if data payload is nil. Oth
 #+RESULTS:
 : org-lms-canvas-request
 
-** WAITING DEPRECATED ~org-lms-canvas-json-request~ 
-This has basically already been integrated into the vnailla ~org-lms-canvas-request
-#+begin_src emacs-lisp :tangle no
-  (defun org-lms-canvas-json-request (query &optional request-type request-data)
-    "Send QUERY to `org-lms-baseurl' with http request type `type', using `org-lms-token' to authenticate.
-
-  Return an error if `org-lms-oauth' is unset. Otherwise return a list whose car is a parsed json
-  payload and whose cdr is an error message. The data payload will be a list, produced by `json-read' 
-  with thefollowing settings:
-
-  `json-array-type' 'list
-  `json-object-type' 'plist
-  `json-key-type' 'symbol
-
-  maybe key-type needs to be keyword though! Still a work in progress.
-  "
-    (unless request-type
-      (setq request-type "GET"))
-    (let ((canvas-payload nil)
-          (canvas-err nil)
-          (canvas-status nil)
-
-          )
-      (message (concat org-lms-baseurl query))
-      (prin1 request-data)
-      ;; (message (concat "Bearer " org-lms-token))
-      ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
-      (if org-lms-token
-          (progn
-            (setq thisrequest
-                  (request
-                   (concat org-lms-baseurl query)
-                   :type request-type
-                   :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)) ("Content-Type" . "application/json"))
-                   :sync t
-                   :data (json-encode  request-data)
-                   :parser (lambda ()
-                             (ol-jsonwrapper json-read) )
-                   :success (cl-function
-                             (lambda (&key data &allow-other-keys)
-                               (setq canvas-payload data)
-                               ))
-                   :error (cl-function (lambda (&rest args  &key error-thrown &allow-other-keys)
-                                         (setq canvas-err error-thrown)
-                                         (message "ERROR: %s" error-thrown)))
-                   :complete (cl-function
-                              (lambda (&key data &key error-thrown &key symbol-status &key response)
-                                (message "RESPONSE: %s" response)
-                                (message "data: %s" data)
-                                (message "STATUS: %s" symbol-status))) ) )
-            (message "pPAYLOAD: %s" canvas-payload)
-            (if (request-response-data thisrequest)
-                canvas-payload
-              (user-error (format "NO PAYLOAD: %s" canvas-err)))
-            ) 
-        (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
-
-#+end_src
-
-#+RESULTS:
-: org-lms-canvas-json-request
 
 ** Doc: Functions to interact with specific parts of the Canvas API
 This is a lot of the bulk of the library; these convenience functions make it easier to ask Canvas for specific, requently-requested kinds of information.
