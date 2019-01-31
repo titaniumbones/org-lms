@@ -388,6 +388,7 @@ value of the current headline's property of the same name."
       (org-lms-mime-org-subtree-htmlize attachments))
     ))
 
+;; defunkt
 (defun org-lms-send-subtree-with-attachments ()
   "org-mime-subtree and HTMLize"
   (interactive)
@@ -433,21 +434,39 @@ In that case, send all marked 'READY' or 'TODO'."
                   (string= (org-element-property :todo-keyword item) "TODO") )
            `(string= (org-element-property :todo-keyword item) "READY")
            )))
-    (org-element-map (org-element-parse-buffer) 'headline
-      (lambda (item)
-        ;; (print (nth 0 (org-element-property :todo-keyword item)))
-        (when (string= (org-element-property :todo-keyword item) "READY") ;;  send-condition ;;
-          (save-excursion
-            (goto-char (1+ (org-element-property :begin item)))
-            (when also-mail  (save-excursion
-                             (org-lms~send-subtree-with-attachments)
-                             (message-send-and-exit)))
-            (when post-to-lms (org-lms-put-single-submission-from-headline))
-            (org-todo "SENT"))))))
+    (org-map-entries 
+     #'ol-send-just-one
+      )
+    
+    ;; (org-element-map (org-element-parse-buffer) 'headline
+;;       (lambda (item)
+;;         ;; (print (nth 0 (org-element-property :todo-keyword item)))
+;;         (when (string= (org-element-property :todo-keyword item) "READY") ;;  send-condition ;;
+;;           (save-excursion
+;;             (goto-char (1+ (org-element-property :contents-begin item)))
+;;             (when also-mail  (save-excursion
+;;                                ;;(org-lms-mime-org-subtree-htmlize )
+;;                              (org-lms~send-subtree-with-attachments)
+;;                              ;; (message-send-and-exit)
+;; ))
+;;             (when post-to-lms (org-lms-put-single-submission-from-headline))
+;;             (org-todo "SENT")))))
+    )
   (org-cycle-hide-drawers 'all))
 
 
-
+(cl-defun ol-send-just-one (&optional (also-mail t) (post-to-lms nil))
+  ;; (print (nth 0 (org-element-property :todo-keyword item)))
+  (interactive)
+  (when (string= (nth 2 (org-heading-components) ) "READY")
+  (when also-mail  (save-excursion
+                     ;;(org-lms-mime-org-subtree-htmlize )
+                     (org-lms~send-subtree-with-attachments)
+                     (sleep-for 2)
+                     ;; (message-send-and-exit)
+                     ))
+  (when post-to-lms (org-lms-put-single-submission-from-headline))
+  (org-todo "SENT")))
 ;; should get rid of this & just add a flag to ~org-lms-mail-all~
 (defun org-lms-mail-all-undone ()
   (interactive)
