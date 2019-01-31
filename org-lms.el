@@ -371,7 +371,7 @@ value of the current headline's property of the same name."
 (defun org-lms~send-subtree-with-attachments ()
   "org-mime-subtree and HTMLize"
   (interactive)
-  (org-mark-subtree)
+  ;; (org-mark-subtree)
   (let ((attachments (org-lms~attachment-list)))
     (save-excursion
       (org-lms-mime-org-subtree-htmlize attachments))
