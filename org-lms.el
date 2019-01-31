@@ -367,6 +367,17 @@ value of the current headline's property of the same name."
              (org-attach-file-list attach-dir))))
       files)))
 
+;; temp fix for gh
+(defun org-lms~mail-text-only ()
+  "org-mime-subtree and HTMLize"
+  (interactive)
+  (org-mark-subtree)
+  (save-excursion
+    (org-mime-org-subtree-htmlize)
+    (message-send-and-exit)
+    )
+  )
+
 ;; mail integration. Only tested with mu4e.
 (defun org-lms~send-subtree-with-attachments ()
   "org-mime-subtree and HTMLize"
