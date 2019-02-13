@@ -139,7 +139,7 @@ coded, but works."
              (split-string  (buffer-substring-no-properties
                              (line-beginning-position) (line-end-position)) ","))
             )
-       (message "CSV PARSER: headerprops ;; %s" header-props)
+       (message "CSV PARSER: headerprops ;; %s" (buffer-string))
         (while (not (eobp))
           (let ((line  (split-string (buffer-substring-no-properties
                                       (line-beginning-position) (line-end-position)) ","))
@@ -739,8 +739,13 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (make-directory directory t)
       (goto-char (point-max))
-      (let (( afiles (if (file-exists-p directory)
-                         (directory-files directory  nil ) nil)))
+      (let* (( afiles (if (file-exists-p directory)
+                         (directory-files directory  nil ) nil))
+            (json-array-type 'list)
+            (json-object-type 'plist)
+            (json-key-type 'keyword)
+            (json-false nil)
+            (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
         (mapcar (lambda (stu)
                   ;;(message "%s" stu)
                   (let* ((fname (plist-get stu :firstname))
@@ -795,29 +800,41 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                      ((equal assignment-type "github")
                       (org-set-property "LOCAL_REPO"
                                         (expand-file-name
-                                         (concat repo-basename "-" github) directory))
+                                         github
+                                         ;; old way
+                                         ;; (concat repo-basename "-" github)
+                                         directory))
                       ;; this is some weird shit I used to do.  Time to fix it maybe.
                       ;; instead use a control vocabulary to find appropriate branches
-                      (if prs
-                          (mapcar (lambda (url)
-                                    ;; (message "inside lambda")
-                                    (if (string-match github url)
+
+                      ;; hard-coded!!!! 
+                      (let* ((json-array-type 'list)
+                             (json-object-type 'plist)
+                             (json-key-type 'keyword)
+                             (json-false nil)
+                             (prs if (string= assignment-type "github"(json-read-file "./00-profile-pr.json"))))
+                        ;; (message "MADE IT INTO LOOP for student with ID %s" github)
+                        (if prs
+                            ;; (message "%s" prs)
+                            (dolist (pull prs)
+                              ;; (message "%s: %s"github  pull)
+                              
+                                    (if (string= (plist-get pull :githubid) github)
                                         (progn
-                                          (message "string matched")
-                                          ;; one thought would be to add all comments PR's to this
-                                          ;; but that would ocmplicate the logic for opening the PR URL
-                                          ;; automatically
-                                          ;; (org-set-property "COMMENTS_PR"
-                                          ;;                   (concat (org-get-entry (point) "COMMENTS_PR") " " url))
-                                          (org-set-property "COMMENTS_PR" url)
-                                          (insert (concat "\nPlease see detailed comments in your github repo: " url))
-                                          )))
-                                  prs)
-                        )
-                      )
-                     ;; ((equal assignment-type "file")
-                     ;;  ;; directory stuff
-                     ;;  )
+                                          (org-set-property "COMMENTS_PR" (plist-get pull :url))
+                                          (let ((s (or (plist-get pull :status) "")))
+                                            (org-set-property "TEST_STATUS" s)
+                                            (cond
+                                             ((string= "fail" s)
+                                              (insert "\nYour repository did not pass all required tests."))
+                                             ((string= "pass" s)
+                                              (insert "\nYour repository passed all required tests for the basic asisgnment!"))
+                                             ((string= "reflection" s)
+                                              (insert "\nYour repository passed all tests, including the reflection checks!")))
+                                            (insert (concat "\nThere may be further comments in your github repo: " (plist-get pull :url) )))
+                                            ))
+                                      ))
+                          ))
 
                      ((equal assignment-type "canvas")
                       ;; (message "SUBTYPE IS CANVAS")
@@ -838,8 +855,6 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                  (concat (file-name-directory (buffer-file-name))
                                          directory "/" thisfile) )
                                 (message "Attached perfect match for %s %s" fname lname)))
-
-
                              (nicknamefiles
                               (dolist (thisfile nicknamefiles)
                                 ;; (if t)
@@ -994,7 +1009,7 @@ the structure of the the alist, and the means of attachment
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "- *Grade* :: \\(.+\\)" nil t )
+    (while (re-search-forward "- Grade :: \\(.+\\)" nil t )
       (org-set-property "GRADE" (match-string 1))
       ;; (save-excursion
       ;;   (org-back-to-heading)
@@ -1352,15 +1367,12 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
   ;;(message "%s" local)
  (if local 
   (loop for c in-ref canvas
-        do
-        ;; (message "CANVAS IS: %s" c)
-        (let* ((defn c)
+        do (let* ((defn c)
                   (email (plist-get defn :email)))
              (dolist (l  local)
                (if (equal
                     email  (plist-get l :email))
-                   (progn
-                     (message "LOCAL: %s" l)
+                   (progn 
                      (plist-put defn :github (plist-get l 'github))
                      (if (plist-get l :nickname)
                          (progn
@@ -1696,8 +1708,10 @@ working on this."
                      (format
                       "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
                       courseid assignmentid studentid))
-      (org-entry-put nil "OL_COMMENT_ID" (format "%s" (plist-get  (car (plist-get comment-response
-                                                                                  :submission_comments)) :id))  )
+      (org-entry-put nil "OL_COMMENT_ID"
+                     (format "%s"
+                             (plist-get  (car (plist-get comment-response
+                                                         :submission_comments)) :id))  )
       (message "%s" (plist-get  (car (plist-get comment-response
                                                 :submission_comments)) :id))
       (message "NO PROBLEMS HERE")
@@ -1905,11 +1919,27 @@ variables must be set or errors will result."
   (setq org-lms-merged-assignments assignments)
   (org-lms-assignments-table assignments)
   )
-(defun org-lms-get-local-students (&optional csv)
+(defun org-lms-get-local-csv-students (&optional csv)
   (unless csv
     (setq csv "./students.csv"))
   (org-lms~parse-plist-symbol-csv-file csv)
   )
+
+(defun org-lms-get-local-json-students (&optional jfile)
+  (unless jfile
+    (setq jfile "./students-merged.json"))
+  (ol-jsonwrapper json-read-file jfile))
+
+
+
+(defcustom org-lms-get-student-function 'org-lms-get-local-json-students
+  "function to use to get students"
+  :type 'function)
+
+(defun org-lms-get-local-students (&optional file)
+  ;; (unless file
+  ;;   (setq file "./students.json"))
+  (apply org-lms-get-student-function (list file)))
 
 ;; Minor mode definition. I'm not really using it right now, but it
 ;; might be a worthwhile improvement. 
