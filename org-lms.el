@@ -23,54 +23,57 @@
     'org-lms-mail-all)
 
 ;; variables
-;; most of these are used for canvas interactions...
+  ;; most of these are used for canvas interactions...
 
-(defvar org-lms-courses nil
-  "Alist in which each car is a symbol, and each cdr is a plist.
+  (defvar org-lms-courses nil
+    "Alist in which each car is a symbol, and each cdr is a plist.
 
-Value of this variable must be set beforeusing the library. The
-plist should include at least the following attributes in order
-to match the local definition with the courses on canvas:
+  Value of this variable must be set beforeusing the library. The
+  plist should include at least the following attributes in order
+  to match the local definition with the courses on canvas:
 
-- `:coursnum' 
-- `:name'
-- `:semester'
-")
+  - `:coursnum' 
+  - `:name'
+  - `:semester'
+  ")
 
-(defcustom org-lms-baseurl nil
-  "Baseurl for canvas API queries. 
-  Should have the form \"https://canvas.instance.at.school/api/v1/\"."
-  :type '(string)
-  )
+  (defcustom org-lms-baseurl nil
+    "Baseurl for canvas API queries. 
+    Should have the form \"https://canvas.instance.at.school/api/v1/\"."
+    :type '(string)
+    )
 
-(defcustom org-lms-token nil
-  "Secret oauth token for Canvas. DO NOT SHARE THIS INFO.
-  Probably customize is a rotten place to put this!"
-  :type '(string))
+  (defcustom org-lms-token nil
+    "Secret oauth token for Canvas. DO NOT SHARE THIS INFO.
+    Probably customize is a rotten place to put this!"
+    :type '(string))
 
-(defvar-local org-lms-course nil
-  "Locally-set variable representing the local course.")
+  (defvar-local org-lms-course nil
+    "Locally-set variable representing the local course.")
 
-(defvar-local org-lms-local-assignments nil
-  "List of assignments for the current course. 
+  (defvar-local org-lms-local-assignments nil
+    "List of assignments for the current course. 
 
-  Intended to be updated automatically somehow, but for now just
-  being set in grading page")
+    Intended to be updated automatically somehow, but for now just
+    being set in grading page")
 
-(defvar-local org-lms-merged-assignments nil
-  "Buffer-local plist of students in this course, merging cnavas and local info. 
+  (defvar-local org-lms-merged-assignments nil
+    "Buffer-local plist of students in this course, merging cnavas and local info. 
 
-  Intended to be set automatically. Should always be buffer-local")
+    Intended to be set automatically. Should always be buffer-local")
 
-(defvar-local org-lms-local-students nil
-  "Buffer-local plist of students in this course, using local csv file. 
+  (defvar-local org-lms-local-students nil
+    "Buffer-local plist of students in this course, using local csv file. 
 
-  Intended to be set automatically. Should always be buffer-local")
+    Intended to be set automatically. Should always be buffer-local")
 
-(defvar-local org-lms-merged-students nil
-  "Buffer-local plist of students in this course, merging cnavas and local info. 
+  (defvar-local org-lms-merged-students nil
+    "Buffer-local plist of students in this course, merging cnavas and local info. 
 
-  Intended to be set automatically. Should always be buffer-local")
+    Intended to be set automatically. Should always be buffer-local")
+(defcustom ol-make-headings-final-hook nil
+  "list of functions to run just after a heading has been created"
+  :safe t)
 
 (defun org-lms-global-props (&optional property buffer)
   "Get the plists of global org properties of current buffer."
@@ -718,6 +721,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
            (assignment-type (plist-get body :assignment-type))
+           (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
            (courseid (or (plist-get body :courseid) (org-lms-get-keyword "ORG_LMS_COURSEID")) 
                      ;; (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
@@ -737,6 +741,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
+      (org-set-property "BASECOMMIT" basecommit)
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
@@ -761,7 +766,6 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                          (id (or (number-to-string (plist-get stu :id)) ""))
                          (props 
                           `(("GRADE" . "0")
-                            ("GRADE" . "0")
                             ("CHITS" . "0")
                             ("NICKNAME" . ,nname)
                             ("FIRSTNAME" . ,fname)
@@ -771,6 +775,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                             ("ORG_LMS_REPO_BASENAME" . ,repo-basename)
                             ("STUDENTID" . ,id)
                             ("COURSEID" . ,courseid)
+                            ("BASECOMMIT" . ,basecommit) ;; it would be better to keep this in the parent
                             ("ORG_LMS_ASSIGNMENT_DIRECTORY" . ,directory)
                             ;; ("MAIL_CC" . "matt.price@utoronto.ca")
                             ("MAIL_REPLY" . "matt.price@utoronto.ca")
@@ -812,11 +817,12 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                              (json-object-type 'plist)
                              (json-key-type 'keyword)
                              (json-false nil)
-                             (prs if (string= assignment-type "github"(json-read-file "./00-profile-pr.json"))))
+                             (prs  '() ;; (json-read-file "./01-profile-pr.json")
+                                  ))
                         ;; (message "MADE IT INTO LOOP for student with ID %s" github)
                         (if prs
                             ;; (message "%s" prs)
-                            (dolist (pull prs)
+                            (dolist (pull prs) ;; need to update this I guless
                               ;; (message "%s: %s"github  pull)
                               
                                     (if (string= (plist-get pull :githubid) github)
@@ -878,7 +884,9 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
 
                       (org-cycle nil))
                     ))
-                students)) ) 
+                students)
+        (run-hooks 'ol-make-headings-final-hook)
+        )) 
     )
   (org-cycle-hide-drawers 'all))
 
@@ -1029,7 +1037,7 @@ the structure of the the alist, and the means of attachment
     (goto-char (point-min))
     (while (re-search-forward "- \\(.*\\)Grade\\(.*\\) :: \\(.+\\)" nil t )
       (let ((grade (match-string 3)))
-        (if (string-match "pass" grade)
+        (if (or (string-match "pass" grade) (string-match "0" grade ))
             (progn (message grade)
                    (org-set-property "GRADE" "1"))
           )) 
@@ -1369,11 +1377,11 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
   (loop for c in-ref canvas
         do (let* ((defn c)
                   (email (plist-get defn :email)))
-             (dolist (l  local)
-               (if (equal
-                    email  (plist-get l :email))
+             (loop for l in-ref local
+                   if (string=  email  (plist-get l :email))
+                   do
                    (progn 
-                     (plist-put defn :github (plist-get l 'github))
+                     (plist-put defn :github (plist-get l :github))
                      (if (plist-get l :nickname)
                          (progn
                            (plist-put defn :nickname (plist-get l :nickname))
@@ -1382,7 +1390,8 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
                        (plist-put defn :firstname (plist-get l :firstname)))
                      (unless (plist-get c :lastname)
                        (plist-put defn :lastname (plist-get l :lastname)))
-                     ))))))
+                     
+                 )))))
   (with-temp-file "students-merged.json" (insert  (ol-write-json-plists canvas)))
   canvas)
 
@@ -1461,7 +1470,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (submission (org-lms-get-single-submission studentid assid))
          (student (org-lms-find-local-user studentid))
          )
-    ;;(message "%s" submission)
+    (message "Sumission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
              (let* ((downloadurl (plist-get attachment :url))
@@ -1478,7 +1487,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                          downloadurl
                          :sync t
                          :parser 'buffer-string ))))
-               ;; (message "FFFFFFF")
+               (message "attachment exists")
                ;;(prin1 f)
                ;;(message "STUDENT %s" (or (plist-get attachment :late) "NOPE"))
                (let ((coding-system-for-write 'binary))
@@ -1540,7 +1549,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                                :submission_type ,(or (org-entry-get nil "SUBMISSION_TYPE") "online_upload") 
                                                :published ,(org-entry-get nil "OL_PUBLISH")
                                                :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
-                                               :grade_type "letter_grade"
+                                               :basecommit ,(org-entry-get nil "BASECOMMIT")
+                                               :grade_type "letter_grade" ;; oops fix this!
                                                :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
                                                :directory ,(or (org-entry-get nil "OL_DIRECTORY")
                                                                (downcase
@@ -1567,6 +1577,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (cl-assert (eq (point) (point-min)))
   (read (current-buffer)))
 )
+
+org-lms-read-assignment-map
 
 ;; assignments
 
@@ -1927,7 +1939,7 @@ variables must be set or errors will result."
 
 (defun org-lms-get-local-json-students (&optional jfile)
   (unless jfile
-    (setq jfile "./students-merged.json"))
+    (setq jfile "./students-local.json"))
   (ol-jsonwrapper json-read-file jfile))
 
 
