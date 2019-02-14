@@ -1017,7 +1017,7 @@ the structure of the the alist, and the means of attachment
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "- Grade :: \\(.+\\)" nil t )
+    (while (re-search-forward "- \\*?Grade\\*? :: \\(.+\\)" nil t )
       (org-set-property "GRADE" (match-string 1))
       ;; (save-excursion
       ;;   (org-back-to-heading)
@@ -1035,9 +1035,9 @@ the structure of the the alist, and the means of attachment
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "- \\(.*\\)Grade\\(.*\\) :: \\(.+\\)" nil t )
-      (let ((grade (match-string 3)))
-        (if (or (string-match "pass" grade) (string-match "0" grade ))
+    (while (re-search-forward "- \\*?Grade\\* :: \\(.+\\)" nil t )
+      (let ((grade (match-string 1)))
+        (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
             (progn (message grade)
                    (org-set-property "GRADE" "1"))
           )) 
