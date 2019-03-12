@@ -1990,6 +1990,7 @@ Functions to create announcements and assignments. Actually the crucial assignme
 
   (let* ((canvasid (org-entry-get nil "CANVASID"))
          (duedate (org-entry-get nil "DUE_AT"))
+         (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
          (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
          (gradingtype (or  (org-entry-get nil "GRADING_TYPE") "letter_grade"))
          (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE") "canvas") "online_upload" "none"))
