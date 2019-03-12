@@ -458,7 +458,7 @@ In that case, send all marked 'READY' or 'TODO'."
   (org-cycle-hide-drawers 'all))
 
 
-(cl-defun ol-send-just-one (&optional (also-mail t) (post-to-lms nil))
+(cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
   (when (string= (nth 2 (org-heading-components) ) "READY")
@@ -1595,6 +1595,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
 
   (let* ((canvasid (org-entry-get nil "CANVASID"))
          (duedate (org-entry-get nil "DUE_AT"))
+         (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
          (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
          (gradingtype (or  (org-entry-get nil "GRADING_TYPE") "letter_grade"))
          (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE") "canvas") "online_upload" "none"))
