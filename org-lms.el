@@ -1578,8 +1578,6 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (read (current-buffer)))
 )
 
-org-lms-read-assignment-map
-
 ;; assignments
 
 (defun org-lms-create-assignment (assignment-data &optional courseid)

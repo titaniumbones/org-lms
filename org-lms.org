@@ -119,7 +119,6 @@ Unit tests wil lbe defined throughout and just tangled to a different place! Fir
         default-students (org-lms-merge-student-lists))
 #+end_src
 
-
 * Helper functions
 These functions do things like parse csv files, set up json properly, etc.  
 ** Debug Messages
@@ -607,7 +606,7 @@ In that case, send all marked 'READY' or 'TODO'."
   (org-cycle-hide-drawers 'all))
 
 
-(cl-defun ol-send-just-one (&optional (also-mail t) (post-to-lms nil))
+(cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
   (when (string= (nth 2 (org-heading-components) ) "READY")
@@ -1956,11 +1955,6 @@ Storing assignments as an intermediate lisp object allows me to avoid parsing an
   (read (current-buffer)))
 )
 
-#+end_src
-
-#+RESULTS:
-#+begin_src emacs-lisp
-org-lms-read-assignment-map
 #+end_src
 
 
