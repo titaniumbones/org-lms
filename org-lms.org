@@ -1917,7 +1917,7 @@ Storing assignments as an intermediate lisp object allows me to avoid parsing an
                                              ;; (org-element-at-point)
                                              (buffer-substring-no-properties
                                               (org-element-property :contents-begin e)
-                                              (org-element-property :contents-end e))
+                                              (-  (org-element-property :contents-end e) 1))
                                              )) "rubric" 'tree))  )
                      ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
                      `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
