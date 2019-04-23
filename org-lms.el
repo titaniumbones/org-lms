@@ -1636,6 +1636,47 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
           ;;(message "RESULT IS: %s" results)
           results))) )
 
+
+(defun ol-assignment-map-internal ()
+    (interactive)
+  (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
+         (results '())
+         (org-use-tag-inheritance nil)
+         )
+    ;; (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
+    (setq results 
+          (org-map-entries
+           (lambda ()
+             (let* ((rubric )
+                    (name (nth 4 (org-heading-components)))
+                    (a-symbol (intern (or (org-entry-get nil  "ORG_LMS_ANAME") 
+                                          (replace-regexp-in-string "[ \n\t]" "" name)))))
+               (setq rubric  (car (org-map-entries
+                                   (lambda ()
+                                     (let ((e (org-element-at-point )))
+                                       ;; in case at some point we would rather have thewhole element (scary)
+                                       ;; (org-element-at-point)
+                                       (buffer-substring-no-properties
+                                        (org-element-property :contents-begin e)
+                                        (-  (org-element-property :contents-end e) 1))
+                                       )) "rubric" 'tree))  )
+               ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
+               `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
+                                         :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
+                                         :name ,(nth 4 (org-heading-components)  ) 
+                                         :submission_type ,(or (org-entry-get nil "SUBMISSION_TYPE") "online_upload") 
+                                         :published ,(org-entry-get nil "OL_PUBLISH")
+                                         :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
+                                         :basecommit ,(org-entry-get nil "BASECOMMIT")
+                                         :grade_type "letter_grade" ;; oops fix this!
+                                         :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
+                                         :directory ,(or (org-entry-get nil "OL_DIRECTORY")
+                                                         (downcase
+                                                          (replace-regexp-in-string "[\s]" "-" name )))
+                                         :rubric ,rubric)))
+             ) "assignment"))
+    ;;(message "RESULT IS: %s" results)
+    results))
   (defun org-lms-save-assignment-map (&optional file)
     "Map assignments and save el object to FILE, \"assignments.el\" by default."
     (interactive)
