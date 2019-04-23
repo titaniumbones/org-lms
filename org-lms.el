@@ -1076,59 +1076,135 @@ the structure of the the alist, and the means of attachment
   "Generate a *grade report* buffer with a summary of the graded assignments
 Simultaneously write results to results.csv in current directory."
   (interactive)
-  (setq assignments '())
-  (setq students '())
 
-  ;;get assignments
-  (let ((org-use-tag-inheritance nil))
-    (org-map-entries
-     (lambda ()
-       (add-to-list 'assignments (nth 4 (org-heading-components)) t))
-     "ASSIGNMENT"))
+  (let ((students (org-lms-get-students))
+        (assignments '()))
 
-  ;; get student names as list of cons cells
-  (let ((org-use-property-inheritance nil))
-    (org-map-entries
-     (lambda ()
-       (add-to-list 'students (cons (nth 4 (org-heading-components)) '()) t))
-     "MAIL_TO={utoronto.ca}"))
-  ;;loop over entries
-  ;; this should be improved, returning a plist to be looped over
-  (dolist (assignment assignments)
-    (save-excursion
-      ;; jump to assignment
-      (org-open-link-from-string (format "[[%s]]" assignment))
-      ;; map over entries
+    ;; hack! having trouble with this
+    (cl-loop for s in-ref students
+             do (plist-put s :grades '()))
+    ;;get assignments
+    (let ((org-use-tag-inheritance nil))
       (org-map-entries
        (lambda ()
-         (let* ((student (car (assoc (nth 4 (org-heading-components)) students))))
-           (when student
-             (setf (cdr (assoc student students))
-                   (append (cdr (assoc student students))
-                           (list (org-entry-get (point) "GRADE")))))))
-       nil 'tree)))
-
-  (setq gradebook
-        (append (list  (append '("Student") assignments)
-                       'hline)
-                students))
-
-  (write-region (orgtbl-to-csv gradebook nil) nil "results3.csv")
-
-   
-  ;; I would like to put the gradebook IN the buffer but I can't figure out
-  ;; a wayt odo it without killing 
-  ;; (org-open-ling-from-string "[[#gradebook]]")
-  ;;(let ((first-child (car (org-element-contents (org-element-at-point)))))  (when (eq )))
-  (let ((this-buffer-name  (buffer-name)))
-    (switch-to-buffer-other-window "*grade report*")
-    (erase-buffer)
-    (org-mode)
+         (add-to-list 'assignments (nth 4 (org-heading-components)) t))
+       "ASSIGNMENT"))
     
-    (insert (orgtbl-to-orgtbl gradebook nil))
-    (pop-to-buffer this-buffer-name))
+    ;;loop over entries
+    ;; this should be improved, returning a plist to be looped over
+    (dolist (assignment assignments)
+      (save-excursion
+        (org-open-link-from-string (format "[[%s]]" assignment)) ;; jump to assignment
+        (org-map-entries        ;; map over entries
+         (lambda ()
+           (let* ((heading (nth 4 (org-heading-components)))
+                  (email (org-entry-get (1+ (point)) "MAIL_TO" )))
+             ;; loop over students, find the right one
+             (cl-loop for s in-ref students
+                      if (string= (plist-get s :email) email)
+                      do
+                      (let* ((grades (plist-get s :grades))
+                             (g (org-entry-get (point) "GRADE")))
+                        (cond
+                         ((string= g "1") (setq g "Pass"))
+                         ((string= g "0") (setq g "Fail")))
+                        (add-to-list 'grades `(,assignment . ,g))
+                        (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS")))
+                        (plist-put s :grades grades)))))
+         nil 'tree)))
+    ;; there's gotta be a bette way!
+    (cl-loop for s in-ref students
+             do (let ((grades (plist-get s :grades)))
+               (plist-put s :grades (reverse grades))))
+    (message "Students = %s" students)
+    
+    (let* ((columns (cl-loop for a in assignments
+                                         collect a
+                                         collect (concat a " Chits")))
+           (tableheader (append '("Students") columns))
+           (rows (cl-loop for s in students
+                     collect
+                     ;; (message "%s" s)
+                     (let* ((grades (plist-get s :grades))
+                            (row (append `(,(plist-get s :name))
+                                         (cl-loop for c in columns
+                                                  collect (cdr (assoc c grades))))))
+                       (message "%s" row)
+                       row)
+                     )))
+      (message "%s %s" (length rows) (length students)) (message "%s" tableheader)
+      (cl-loop for h in-ref tableheader
+               do
+               (if (string-match "chits" (downcase h) )
+                   (setq h "Chits")))
+      
+      (setq gradebook
+            (append (list  tableheader
+                           'hline)
+                    rows))
+
+      (write-region (orgtbl-to-csv gradebook nil) nil "results3.csv"))
+
+    
+    
+    ;; I would like to put the gradebook IN the buffer but I can't figure out
+    ;; a wayt odo it without killing 
+    ;; (org-open-ling-from-string "[[#gradebook]]")
+    ;;(let ((first-child (car (org-element-contents (org-element-at-point)))))  (when (eq )))
+    (let ((this-buffer-name  (buffer-name)))
+      (switch-to-buffer-other-window "*grade report*")
+      (erase-buffer)
+      (org-mode)
+      
+      (insert (orgtbl-to-orgtbl gradebook nil))
+      (insert "\n\n* Grade reports\n")
+
+      (cl-loop for s in students
+               do
+               (message "%s" s)
+               (let* ((grades (plist-get s :grades))
+                      (fname (plist-get s :firstname))
+                      (lname (plist-get s :lastname))
+                      (nname (or  (unless (equal  (plist-get s :nickname) nil)
+                                    (plist-get s :nickname)) fname))
+                      (email (plist-get s :email))
+                      (coursenum (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
+                                     (plist-get org-lms-course :coursenum)
+                                   ""))
+                      (github (or  (plist-get s :github) ""))
+                      ;; (id (or (number-to-string (plist-get s :id)) ""))
+                      (props 
+                       `(("NICKNAME" . ,nname)
+                         ("FIRSTNAME" . ,fname)
+                         ("LASTNAME" . ,lname)
+                         ("MAIL_TO" . ,email)
+                         ("GITHUB" . ,github)
+                         ;; ("STUDENTID" . ,id)
+                         ("MAIL_REPLY" . "matt.price@utoronto.ca")
+                         ("MAIL_SUBJECT" .
+                          ,(format "%s Grades Summary"
+                                   (if coursenum
+                                       (format "[%s] " coursenum)
+                                     ""))))))
+                 ;; (message "COURSENUM: %s" coursenum)
+                 (insert (format "** TODO %s %s" nname lname))
+                 ;; (org-todo 'todo)
+                 (cl-loop for g in grades
+                          do
+                          (insert (concat "\n" "- " (car g) " :: " (cdr g) "\n"))
+                          (dolist (p props)
+                            (org-set-property (car p ) (cdr p))))
+                 (save-excursion
+                   (org-back-to-heading)
+                   (org-cycle nil))
+                 )
+               )
+      
+      (pop-to-buffer this-buffer-name)))
   ;;(pop-to-buffer nil)
   )
+
+;; try writing reports for each students
 
 ;; helper functions for github repos
 (defun org-lms~open-student-repo ()
