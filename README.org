@@ -174,10 +174,26 @@ Running ~(org-lms-make-headings assignment-name)~ will generate org heading tree
   - etc
 Each headline will have a number of properties set to make marking easier. Existing student papers will be attached to the grading subtree and can be quickly opened with ~C-c C-a o~. I find the workflow very quick and easy.  I have libreoffice configured with a few shortcuts for commonly used editing markup (checkmarks, smileyfaces, paragraph marks, and expansion shortcuts for "wrong word" and "awkward"). PDFs are much slower for me to mark, as neither pdf-view nor evince has really excellent text annotation UI. TThis may be a limitation of the PDF annotation standards. For github repos, the PR interface is quite rich for code; for text work it's a little bit clumsier, but I don't have a solution for that yet.  
 
+*** Using Agenda to rapidly filter grading trees
+The org agenda is a powerful tool for sorting and filtering headlines. Since each student assignment is a headline, we can mis-use the agenda to rapidly navigate to specific places in a comments file.  So, for instance, to find all trees with a grade of "0" enter the following:
+
+~C-c a < m GRADE="0"~
+
+This will open the agenda, searching only the current buffer for matches, matching the property "GRADE" with value "0"
+
+It should be possible to add this to ~org-agenda-custom-commands~, but I'm having trouble with this right now.
+
+Also having trouble matching with "|" ("or").
+
+Once created, the agenda can be [[https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html][filtered]], e.g., search for a partiular student using ~=~ and then entering a substring of the student's name
+
+Unfortunately I'm not very adept right now with the agenda but maybe this wil lget easier!!
+
 *** Returning student work
 Right now I run ~org-lms-mail-all~ to mail out all subtrees marked with a ~READY~ org-todo state. This is generally *fairly* reliable, though sometimes there are issues with the message queue.  
 
 *NEW*: I have written ~org-lms-put-single-submission-from-headline~ which half-works and is ready for testing. 
+
 * Known issues
 ** HTML Entities
 The canvas API does not accept all HTML5 semantically-named entities.
