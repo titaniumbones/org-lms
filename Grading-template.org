@@ -1,28 +1,89 @@
 #+TODO: TODO(t) | READY(r)  SENT (s)
-#+COURSE "RLG231"
 #+PROPERTY: GRADE 0 
-# #+PROPERTY: COURSE (:name "hello" :id 2456)
-#+ORG_LMS_COURSEID: 64706
-#+ORG_LMS_ASSIGNMENTS: ~/Wildwater/Assignments-ww1.org
+#+ORG_LMS_COURSEID: 35724
+#+ORG_LMS_ASSIGNMENTS: ~/src/org-grading/Assignments.org
 
-* Setup with new auto-generated assignments. :assignments:
-:PROPERTIES:
-:ID:       36b5a890-a3f3-426b-bf4e-5ea0ebd7b010
-:END:
+This file is currently very messy. When it'sset up properly, it should explain how to use these functions. 
 
+*  Setup with new auto-generated assignments.                   :assignments:
 Grab assignments info from the pre-generated ~assignments.el~ file. 
-
 
 #+begin_src emacs-lisp
 (org-lms-setup-grading)
+
 #+end_src
 
-#+RESULTS:
-| Name (upload here) | Download URL | Inspect               | Make Headers   |
-|--------------------+--------------+-----------------------+----------------|
-| Response Paper 2   |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93074")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'ResponsePaper2 org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
-| Tests only         |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93072342")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'Testsonly org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+| Name (upload here)         | Download URL | Inspect               | Make Headers   |
+|----------------------------+--------------+-----------------------+----------------|
+| [[https://q.utoronto.ca/courses/64706/assignments/93915][Encountering the Madawaska]] |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93915")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'EncounteringtheMadawaska org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+| [[https://q.utoronto.ca/courses/64706/assignments/93074][Response Paper 2]]           |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93074")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'ResponsePaper2 org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
+| [[https://q.utoronto.ca/courses/64706/assignments/97790][Exam]]                       |              | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/97790")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'Exam org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
 
+**  for when ~setup-grading~ isn't working!
+
+#+begin_src emacs-lisp
+  (setq org-lms-merged-students (org-lms-merge-student-lists))
+(setq org-lms-merged-assignments (org-lms-read-assignment-map "~/Wildwater/assignments.el"))
+(org-lms-assignments-table)
+org-lms-merged-students
+(org-lms-merge-student-lists "students.csv")
+(org-lms-get-local-students)
+(org-lms-get-students)
+#+end_src
+
+#+begin_src emacs-lisp
+(org-lms-get-students)
+#+end_src
+
+Doingsome quick filtering on results
+#+begin_src emacs-lisp :results code
+;;(org-lms-get-gb-column-data "721")
+;;(org-lms-canvas-request "courses/64706/custom_gradebook_columns"            "GET" )
+;;(org-lms-post-gb-column "nickname")
+;;(org-lms-map-)
+
+org-lms-merged-assignments
+(org-lms-read-assignment-map "~/Wildwater/assignments.el")
+(alist-get 'Exam org-lms-merged-assignments)
+
+(org-)
+#+end_src
+
+
+#+begin_src emacs-lisp
+
+
+#+begin_src emacs-lisp :tangle no
+  (let* ((students org-lms-merged-students)
+  (ghid 721)
+  (nnid 723)
+  (data 
+   (cl-loop for s in students
+            collect `(("column_id" . ,ghid) ("user_id" . ,(plist-get s :id)) ("content" . ,(plist-get s :github)))
+            collect `(("column_id" . ,nnid) ("user_id" . ,(plist-get s :id)) ("content" . ,(plist-get s :nickname)))
+            )))
+            ;;(setq data `((("column_id" . "721") ("user_id" . "100120") ("content" . nill)))) 
+    (org-lms-post-gb-column-data `(("column_data" . ,data)))
+    ;;(write-region (json-encode data) nil "/home/matt/example.json")
+    )
+#+end_src
+
+** Mapping assignments -- data structure
+
+#+begin_src emacs-lisp :results code
+(org-lms-map-assignments (org-lms-get-keyword "ORG_LMS_ASSIGNMENTS") )
+#+end_src
+
+#+begin_src emacs-lisp
+((EncounteringtheMadawaska :courseid "64706" :canvasid "93915" :due-at "2018-10-23" :html_url "https://q.utoronto.ca/courses/64706/assignments/93915" :name "Encountering the Madawaska" :submission_type "online_upload" :published nil :submission_url "https://q.utoronto.ca/courses/64706/assignments/93915/submissions?zip=1" :grade_type "letter_grade" :assignment-type "canvas" :directory "encountering-the-madawaska" :rubric nil)
+ (ResponsePaper2 :courseid "64706" :canvasid "93074" :due-at "2018-11-23" :html_url "https://q.utoronto.ca/courses/64706/assignments/93074" :name "Response Paper 2" :submission_type "online_upload" :published "t" :submission_url "https://q.utoronto.ca/courses/64706/assignments/93074/submissions?zip=1" :grade_type "letter_grade" :assignment-type "canvas" :directory "response-paper-2" :rubric "- *Organization* :: \n- *Clarity of Argument* :: \n- *Grammar and Spelling* :: \n- *Grade* :: \n- *See Attached Paper for further Comments* :: \n")
+ (Exam :courseid "64706" :canvasid "97790" :due-at "2018-12-07" :html_url "https://q.utoronto.ca/courses/64706/assignments/97790" :name "Exam" :submission_type "online_upload" :published "t" :submission_url "https://q.utoronto.ca/courses/64706/assignments/97790/submissions?zip=1" :grade_type "letter_grade" :assignment-type nil :directory "exam" :rubric "*** Part 1 \n- Organization :: \n- Clarity of Argument :: \n- Grammar and Spelling :: \n- Grade for this part :: \n- See Attached Paper for further Comments :: \n*** Part 2\n- Organization :: \n- Clarity of Argument :: \n- Grammar and Spelling :: \n- Grade for this part :: \n- See Attached Paper for further Comments ::\n*** Overall\n- Grade ::\n- Final Comments :: \n"))
+#+end_src
+
+
+* COMMENT Set Up Course Properties                                            
+
+*this stuff is DEPRECATED!*
 
 To begin with, we have to tell ~org-lms~ a few things about the course and its assignments. This will allows us to talk to the Canvas instance via its API and associate the local info with the hidden keys that the API uses to ingerpret requests.
 
@@ -35,58 +96,20 @@ The following code does a few things:
 - retrieves the student list from Canvas, and checks for a locally stored student list that may contain extra information (e.g., github logins and nicknames,, often important for Asian students especially)
 - generates a table with a number of org-mode links that allow you to interact with the API and also to generate grading subtrees for each assignment
 #+begin_src emacs-lisp
-  (make-local-variable 'org-use-property-inheritance)
-  (setq 'org-use-property-inheritance t)
-  (setq org-lms-baseurl "https://q.utoronto.ca/api/v1/")
-  (setq org-lms-token (password-store-get "q.utoronto.ca"))
+    (make-local-variable 'org-use-property-inheritance)
+    (setq org-use-property-inheritance t)
+    (setq org-lms-baseurl "https://q.utoronto.ca/api/v1/")
+    (setq org-lms-token (password-store-get "q.utoronto.ca"))
 
-  (setq org-lms-courses
-        '(
-          (wildwater .
-                     (:shortname "Wild Waters"
-                                 :coursenum "NEW271"
-                                 :semester "20189"
-                                 ))))
-  (setq org-lms-course (org-lms-get-courseid (alist-get 'wildwater  org-lms-courses)))
-  (setq org-lms-local-assignments
-        '(
-          (darwin .
-                  (:name "Response Paper 1"
-                         :directory "response-paper-1"
-                         :weight 0.10
-                         :grade-type "letter"
-                         :submisison-type "email"
-                         :rubric-list ("Organization" "Clarity of Argument"
-                                       "Grammar and Spelling" "Grade"
-                                       "See Attached Paper for further Comments")
-                         ))
-          (test .
-                (:name "Test Assignment"
-                       :directory "response-paper-1"
-                       :weight 0.10
-                       :grade-type "letter"
-                       :submisison-type "canvas"
-                       :rubric-list ("Organization" "Clarity of Argument"
-                                     "Grammar and Spelling" "Grade"
-                                     "See Attached Paper for further Comments")
-                       ))))
-  (org-lms-setup)
-  ;;(org-lms-merge-assignment-values)
-  ;; (org-lms-merge-student-lists)
-  ;;(org-lms-get-students)
-        ;;; (org-lms-get-courseid org-lms-course)
-  ;; (org-lms-merge-student-lists)
-  ;; (org-lms-get-students)
-  ;;(setq org-lms-merged-students (org-lms-merge-student-lists))
-  ;;(setq org-lms-merged-assignments (org-lms-merge-assignment-values))
-  ;; (org-lms-assignments-table org-lms-merged-assignments org-lms-merged-students)
 #+end_src
 
-#+RESULTS:
 | Name (upload here) | Download URL         | Inspect               | Make Headers   |
 |--------------------+----------------------+-----------------------+----------------|
+| [[https://q.utoronto.ca/courses/64706/assignments/93074][Response Paper 2]]   | [[https://q.utoronto.ca/courses/64706/assignments/93074/submissions?zip=1][Download Submissions]] | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/93074")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'response2 org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
 | [[https://q.utoronto.ca/courses/64706/assignments/88373][Test Assignment]]    | [[https://q.utoronto.ca/courses/64706/assignments/88373/submissions?zip=1][Download Submissions]] | [[elisp:(org-lms-canvas-inspect "courses/64706/assignments/88373")][Inspect Original JSON]] | [[elisp:(org-lms-make-headings (alist-get 'test org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
-| Response Paper 1   |                      |                       | [[elisp:(org-lms-make-headings (alist-get 'darwin org-lms-merged-assignments) org-lms-merged-students)][Make Headlines]] |
 
 
+#+begin_src emacs-lisp :results code
 
+(org-lms-get-courses  "courses.json")
+#+end_src
