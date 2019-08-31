@@ -1245,6 +1245,8 @@ Simultaneously write results to results.csv in current directory."
         (canvas-status nil)
         (json-params (json-encode request-params))
         (target (concat org-lms-baseurl query))
+        ;; (request-coding-system 'no-conversion)
+        ;; (request-conding-system 'no-conversion)
         )
     (message (concat target "   " request-type))
     ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
