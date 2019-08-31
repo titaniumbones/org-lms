@@ -1868,12 +1868,15 @@ working on this."
                ("message" . ,atext)
                ("is_published" . t)
                ("is_announcement" . t)))))
+    (cl-loop for (k v) on response
+             do
+             (message "%s %S" k v))
     (org-entry-put (point) "ORG_LMS_ANNOUNCEMENT_ID" (format "%s" (plist-get response :id)))
     (org-entry-put (point) "ORG_LMS_ANNOUNCEMENT_URL" (format "%s" (plist-get response :url)))
     (org-entry-put (point) "ORG_LMS_POSTED_AT" (format "%s" (plist-get response :posted_at)))
 
-
-    (browse-url (plist-get response :url))
+    (if (plist-get response :url) 
+        (browse-url (plist-get response :url)))
     response))
 
 (defun org-lms-get-grading-standards (&optional courseid)
