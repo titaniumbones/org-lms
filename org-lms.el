@@ -1260,6 +1260,7 @@ Simultaneously write results to results.csv in current directory."
                                  )
                       :sync t
                       :data   (if  json-params json-params  nil) ;; (or data nil)
+                      :encoding 'no-conversion
                       :parser (lambda ()
                                 (if (and (boundp 'file) file) (write-region (buffer-string) nil file))
                                 (ol-jsonwrapper json-read))
