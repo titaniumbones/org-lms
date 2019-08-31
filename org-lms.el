@@ -1121,12 +1121,18 @@ Simultaneously write results to results.csv in current directory."
     (let* ((columns (cl-loop for a in assignments
                                          collect a
                                          collect (concat a " Chits")))
-           (tableheader (append '("Students") columns))
+           (tableheader (append '("Student" "First" "Nick" "Last" "Student #" "email") columns))
            (rows (cl-loop for s in students
                      collect
                      ;; (message "%s" s)
                      (let* ((grades (plist-get s :grades))
-                            (row (append `(,(plist-get s :name))
+                            (row (append `(,(plist-get s :name)
+                                           ,(plist-get s :firstname)
+                                           ,(plist-get s :nickname)
+                                           ,(plist-get s :lastname)
+                                           ,(plist-get s :sis_user_id) ;; check to be sure this is right
+                                           ,(plist-get s :email)
+                                           )
                                          (cl-loop for c in columns
                                                   collect (cdr (assoc c grades))))))
                        (message "%s" row)
