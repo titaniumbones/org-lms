@@ -868,12 +868,32 @@ The cursor is left in the TO field."
 Assumes that the parent headline is the name of a subdirectory,
 and that the current headline is the name of a student. Speeds up file choice."
   (interactive)
-  (if (file-exists-p org-lms~get-parent-headline )
-      (org-attach-attach (read-file-name
-                          (concat  "File for student " (nth 4 (org-heading-components)) ":")
-                          (org-lms~get-parent-headline) ))
-    (message "Warning: no such directory %s; not attaching file" org-lms~get-parent-headline)))
+  (let ((lms-att-dir
+         (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY" t)
+         
+         ;; (save-excursion
+         ;;   (org-up-heading-safe)
+         ;;   ())
+         ))
+    (message lms-att-dir)
+    ;; (read-file-name
+    ;;  (concat  "File for student " (nth 4 (org-heading-components)) ":")
+    ;;  (expand-file-name lms-att-dir))
+    (if lms-att-dir
+        (org-attach-attach (read-file-name
+                            (concat  "File for student " (nth 4 (org-heading-components)) ":")
+                            (concat  (expand-file-name lms-att-dir) "/")))
+      (message "Warning: no such directory %s; not attaching file" lms-att-dir))
+    )
+  ;; (if (save-excursion
+  ;;       )
+  ;;     (org-attach-attach (read-file-name
+  ;;                         (concat  "File for student " (nth 4 (org-heading-components)) ":")
+  ;;                         (org-lms~get-parent-headline) ))
+  ;;   (message "Warning: no such directory %s; not attaching file" (org-lms~get-parent-headline)))
+  )
 
+(define-key org-attach-map (kbd "s p") #'projectile-pt)
 
 (defun org-lms-make-headings (a students)
   "Create a set of headlines for grading.
