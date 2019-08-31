@@ -426,7 +426,7 @@ you have not received a grade for work that you have handed in,
     ))
 
 ;;; NOTE I may have broken this via SEND-ALL condition !!! 2018-11-08
-(cl-defun org-lms-return-all-assignments (&optional (send-all nil) (also-mail nil) (post-to-lms t) )
+(cl-defun org-lms-return-all-assignments (&optional (send-all nil) (also-mail t) (post-to-lms nil) )
   "By default mail all subtrees 'READY' to student recipients, unless SEND-ALL is non-nil.
 In that case, send all marked 'READY' or 'TODO'."
   (interactive)
@@ -458,7 +458,7 @@ In that case, send all marked 'READY' or 'TODO'."
   (org-cycle-hide-drawers 'all))
 
 
-(cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
+(cl-defun ol-send-just-one (&optional (also-mail t) (post-to-lms nil))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
   (when (string= (nth 2 (org-heading-components) ) "READY")
