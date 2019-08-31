@@ -1470,6 +1470,8 @@ These are basically wrappers around ~request.el~ that allow some of the requests
         (canvas-status nil)
         (json-params (json-encode request-params))
         (target (concat org-lms-baseurl query))
+        ;; (request-coding-system 'no-conversion)
+        ;; (request-conding-system 'no-conversion)
         )
     (message (concat target "   " request-type))
     ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
@@ -1485,12 +1487,13 @@ These are basically wrappers around ~request.el~ that allow some of the requests
                                  )
                       :sync t
                       :data   (if  json-params json-params  nil) ;; (or data nil)
+                      :encoding 'no-conversion
                       :parser (lambda ()
                                 (if (and (boundp 'file) file) (write-region (buffer-string) nil file))
                                 (ol-jsonwrapper json-read))
                       :success (cl-function
                                 (lambda (&key data &allow-other-keys)
-                                  ;;(message "SUCCESS: %s" data)
+                                  ;;(message "SUCCESS: %S" data)
                                   (message "SUCCESS!!")
                                   (setq canvas-payload data)
                                   canvas-payload
