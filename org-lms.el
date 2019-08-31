@@ -1265,7 +1265,7 @@ Simultaneously write results to results.csv in current directory."
                                 (ol-jsonwrapper json-read))
                       :success (cl-function
                                 (lambda (&key data &allow-other-keys)
-                                  ;;(message "SUCCESS: %s" data)
+                                  ;;(message "SUCCESS: %S" data)
                                   (message "SUCCESS!!")
                                   (setq canvas-payload data)
                                   canvas-payload
