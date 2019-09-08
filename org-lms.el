@@ -303,33 +303,63 @@ default values are:
     (split-string (buffer-string) "\n" t)))
 
 ;; john kitchin's version
-(defun org-lms-get-keyword (key)
-  (org-element-map (org-element-parse-buffer) 'keyword
-    (lambda (k)
-      (when (string= key (org-element-property :key k))
-        (org-element-property :value k))) 
-    nil t))
+;; (defun org-lms-get-keyword (key &optional buffer)
+
+;;   (org-element-map (org-element-parse-buffer) 'keyword
+;;     (lambda (k)
+;;       (when (string= key (org-element-property :key k))
+;;         (org-element-property :value k))) 
+;;     nil t))
+
+
+(defun org-lms-get-keyword (key &optional file)
+  (save-excursion
+    (let ((result nil)
+          (buf (current-buffer))
+          )
+      
+      (if file 
+          (setq buf (find-file-noselect file)))
+      (with-current-buffer buf
+        (let ((setup (org-element-map
+                         (org-element-parse-buffer)
+                         'keyword
+                         (lambda (k)
+                           (when (string= "SETUPFILE" (org-element-property :key k))
+                             (org-element-property :value k)))
+                         nil t)))
+          (setq result
+                (or
+                 (org-element-map (org-element-parse-buffer) 'keyword
+                   (lambda (k)
+                     (when (string= key (org-element-property :key k))
+                       (setq result  (org-element-property :value k)))
+                     result) 
+                   nil t)
+                 (and setup
+                      (org-lms-get-keyword key setup ))
+                 )))))))
 
 ;; nicolas g's version
-(defun org-lms-get-keyword (key)
-  "Get value of keyword, whether or not it's been defined by org. 
+;; (defun org-lms-get-keyword (key)
+;;   "Get value of keyword, whether or not it's been defined by org. 
 
-Look for a keyword statement of the form 
-#+KEYWORD: 
+;; Look for a keyword statement of the form 
+;; #+KEYWORD: 
 
-and return either the last-declared value of the keyword, or the
-value of the current headline's property of the same name."
+;; and return either the last-declared value of the keyword, or the
+;; value of the current headline's property of the same name."
 
-  (let ((case-fold-search t)
-        (regexp (format "^[ \t]*#\\+%s:" key))
-        (result nil))
-    (org-with-point-at 1
-      (while (re-search-forward regexp nil t)
-        (let ((element (org-element-at-point)))
-          (when (eq 'keyword (org-element-type element))
-            (push (org-element-property :value element) result)))))
-    (or (org-entry-get nil key) (car result)))
-  )
+;;   (let ((case-fold-search t)
+;;         (regexp (format "^[ \t]*#\\+%s:" key))
+;;         (result nil))
+;;     (org-with-point-at 1
+;;       (while (re-search-forward regexp nil t)
+;;         (let ((element (org-element-at-point)))
+;;           (when (eq 'keyword (org-element-type element))
+;;             (push (org-element-property :value element) result)))))
+;;     (or (org-entry-get nil key) (car result)))
+;;   )
 
 
 
