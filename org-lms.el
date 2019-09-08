@@ -845,7 +845,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                      ((equal assignment-type "canvas")
                       ;; (message "SUBTYPE IS CANVAS")
                       (org-lms-get-canvas-attachments))
-                     (t
+                      (t
                       (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
                              (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
                         ;;(message "fullnamefiles is: %s" fullnamefiles)
