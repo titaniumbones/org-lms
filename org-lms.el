@@ -1480,6 +1480,67 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
   (with-temp-file "students-merged.json" (insert  (ol-write-json-plists canvas)))
   canvas)
 
+(defun org-lms-post-page ()
+  "Extract page data from HEADLINE.
+  HEADLINE is an org-element object."
+  (interactive)
+
+  (let* ((canvasid (org-entry-get nil "CANVASID"))
+         (canvas-page-url (org-entry-get nil "CANVAS_PAGE_URL"))
+         ;; (duedate (org-entry-get nil "DUE_AT"))
+         (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
+         ;; (pointspossible (if (org-entry-get nil "PAGE_WEIGHT") (* 100 (string-to-number (org-entry-get nil "PAGE_WEIGHT")))))
+         (editing-roles  (or  (org-entry-get nil "CANVAS_EDITING_ROLES") "teachers"))
+         (subtype (if (equal (org-entry-get nil "PAGE_TYPE") "canvas") "online_upload" "none"))
+         ;;( (org-entry-get nil "DUE_AT"))
+         (publish (org-entry-get nil "OL_PUBLISH")))
+    ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
+    ;;(prin1 canvasid)
+    (let* ((org-export-with-tags nil)
+           (page-params `(("wiki_page" .
+                                 (("title" .  ,(nth 4 (org-heading-components)) )
+                                  ("body" . ,(org-export-as 'html t nil t))
+                                  ;; ("submission_types" . ,subtype)
+                                  ;; ("grading_type" . ,gradingtype)
+                                  ;; ("grading_standard_idcomment" . 458)
+                                  ("editing_roles" . ,editing-roles)
+                                  ;; ("points_possible" . ,(or pointspossible 10))
+                                  ("published" . ,(if publish t nil) )))))
+
+           (response
+            (org-lms-canvas-request (format "courses/%s/pages%s"
+                                            (org-lms-get-keyword "ORG_LMS_COURSEID");; (plist-get org-lms-course :id)
+                                            (if canvas-page-url
+                                                (format  "/%s" canvas-page-url) "")
+                                            )
+                                    (if canvas-page-url "PUT" "POST")
+                                    page-params
+                                    ))
+           (response-data (or response nil))
+           )
+      ;; (message "HERE COMES THE PARAMS %s" (request-response-data response) )
+      ;; (prin1 (assq-delete-all "page[description]" page-params))
+      (if (plist-get response-data :url)
+          (progn
+            (message "received response-data")
+            (org-set-property "CANVASID" (format "%s"(plist-get response-data :page_id)))
+            (org-set-property "CANVAS_PAGE_URL" (format "%s"(plist-get response-data :url)))
+            (org-set-property "PUBLISH" (format "%s"(plist-get response-data :published)))
+            (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
+            (org-set-property "CANVAS_EDITING_ROLES" (format "%s" (plist-get response-data :editing_roles)))
+            ;; (org-set-property "SUBMISSIONS_DOWNLOAD_URL" (format "%s"(plist-get response-data :submissions_download_url)))
+            ;; (org-set-property "GRADING_STANDARD_ID" (format "%s"(plist-get response-data :grading_standard_id)))
+            ;; (org-set-property "CANVAS_SUBMISSION_TYPES" (format "%s"(plist-get response-data :submission_types)))
+            ;; (org-set-property "GRADING_TYPE" (format "%s"(plist-get response-data :grading_type)))
+            ;; (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
+
+            ) )
+      ;; (message "PAGE_TYPE is canvas %s" (equal "canvas" (org-entry-get nil "PAGE_TYPE")))
+      ;; (message "RESPONSE IS %s" response)
+      (if (plist-get response-data :html_url)
+          (browse-url (plist-get response-data :html_url)))
+      response)))
+
 (defun org-lms-get-assignments (&optional courseid)
   (unless courseid
     (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
