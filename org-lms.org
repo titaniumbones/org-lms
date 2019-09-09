@@ -923,7 +923,11 @@ and that the current headline is the name of a student. Speeds up file choice."
   ;;   (message "Warning: no such directory %s; not attaching file" (org-lms~get-parent-headline)))
   )
 
-(define-key org-attach-map (kbd "s p") #'projectile-pt)
+;; This doesn't work because org-attach doesn't have a map per se
+;; instead this would need to modify `org-attach-commands`
+;; also, you'd only want to do that if org-grading were active I guess
+;; this feels a bit fragile
+;;(define-key 'org-attach-map (kbd "s p") #'projectile-pt)
 
 (defun org-lms-make-headings (a students)
   "Create a set of headlines for grading.
