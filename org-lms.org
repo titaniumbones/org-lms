@@ -479,29 +479,19 @@ From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre 
 ;;   )
 
 
+** Deal with timestamps
+#+begin_src emacs-lisp
+(require 'ts)
+(defun o-l-date-to-timestamp (date)
+  "use ts.el date parse functions return an ISO-compatible
+timestamp for transmission to Canvas via API. DATE is a string,
+usually of the form `2019-09-26`, but optionally including a full time."
 
-(defun org-lms-set-keyword (tag value)
-  "Set filetag TAG to VALUE.
-        If VALUE is nil, remove the filetag."
-  (save-excursion
-    (goto-char (point-min))
-    (if (re-search-forward (format "#\\+%s:" tag) (point-max) 'end)
-        ;; replace existing filetag
-        (progn
-          (beginning-of-line)
-          (kill-line)
-          (when value
-            (insert (format "#+%s: %s" tag value))))
-      ;; add new filetag
-      (if (looking-at "^$") 		;empty line
-          ;; at beginning of line
-          (when value
-            (insert (format "#+%s: %s" tag value)))
-        ;; at end of some line, so add a new line
-        (when value
-          (insert (format "\n#+%s: %s" tag value)))))))
+  (ts-format "%Y-%m-%dT%H:%M:%S%:z" (ts-parse-fill 'end date )))
 #+end_src
 
+#+RESULTS:
+: o-l-date-to-timestamp
 * Integration with Mail systems
 I like to mail my marks back to my students.  These are the functions that manage that.  
 
@@ -2208,7 +2198,9 @@ Functions to create announcements and assignments. Actually the crucial assignme
                                  (("name" .  ,(nth 4 (org-heading-components)) )
                                   ("description" . ,(org-export-as 'html t nil t))
                                   ,(if duedate
-                                       `("due_at"   . ,(concat duedate  "T23:59:59-05:00")))
+                                       ;;`("due_at"   . ,(concat duedate  "T23:59:59-04:00"))
+                                       `("due_at"   . ,(o-l-date-to-timestamp duedate))
+                                     )
                                   ("submission_types" . ,subtype)
                                   ("grading_type" . ,gradingtype)
                                   ("grading_standard_idcomment" . 458)
