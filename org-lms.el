@@ -302,87 +302,19 @@ default values are:
     (insert-file-contents filePath)
     (split-string (buffer-string) "\n" t)))
 
-;; john kitchin's version
-;; (defun org-lms-get-keyword (key &optional buffer)
+(defun org-lms-process-props () 
+"retrieve all properties in a headline, then downcase and standardize the key names so that they are convenient to use with `let-alist`"
+(cl-loop for (key . value) in (org-entry-properties)
+         collect
+         (cons (intern
+                (replace-regexp-in-string
+                 "^org_lms_" "ol_"
+                 (downcase key))) value )))
 
-;;   (org-element-map (org-element-parse-buffer) 'keyword
-;;     (lambda (k)
-;;       (when (string= key (org-element-property :key k))
-;;         (org-element-property :value k))) 
-;;     nil t))
-
-
-(defun org-lms-get-keyword (key &optional file)
-  (save-excursion
-    (let ((result nil)
-          (buf (current-buffer))
-          )
-      
-      (if file 
-          (setq buf (find-file-noselect file)))
-      (with-current-buffer buf
-        (let ((setup (org-element-map
-                         (org-element-parse-buffer)
-                         'keyword
-                         (lambda (k)
-                           (when (string= "SETUPFILE" (org-element-property :key k))
-                             (org-element-property :value k)))
-                         nil t)))
-          (setq result
-                (or
-                 (org-element-map (org-element-parse-buffer) 'keyword
-                   (lambda (k)
-                     (when (string= key (org-element-property :key k))
-                       (setq result  (org-element-property :value k)))
-                     result) 
-                   nil t)
-                 (and setup
-                      (org-lms-get-keyword key setup ))
-                 )))))))
-
-;; nicolas g's version
-;; (defun org-lms-get-keyword (key)
-;;   "Get value of keyword, whether or not it's been defined by org. 
-
-;; Look for a keyword statement of the form 
-;; #+KEYWORD: 
-
-;; and return either the last-declared value of the keyword, or the
-;; value of the current headline's property of the same name."
-
-;;   (let ((case-fold-search t)
-;;         (regexp (format "^[ \t]*#\\+%s:" key))
-;;         (result nil))
-;;     (org-with-point-at 1
-;;       (while (re-search-forward regexp nil t)
-;;         (let ((element (org-element-at-point)))
-;;           (when (eq 'keyword (org-element-type element))
-;;             (push (org-element-property :value element) result)))))
-;;     (or (org-entry-get nil key) (car result)))
-;;   )
-
-
-
-(defun org-lms-set-keyword (tag value)
-  "Set filetag TAG to VALUE.
-        If VALUE is nil, remove the filetag."
-  (save-excursion
-    (goto-char (point-min))
-    (if (re-search-forward (format "#\\+%s:" tag) (point-max) 'end)
-        ;; replace existing filetag
-        (progn
-          (beginning-of-line)
-          (kill-line)
-          (when value
-            (insert (format "#+%s: %s" tag value))))
-      ;; add new filetag
-      (if (looking-at "^$") 		;empty line
-          ;; at beginning of line
-          (when value
-            (insert (format "#+%s: %s" tag value)))
-        ;; at end of some line, so add a new line
-        (when value
-          (insert (format "\n#+%s: %s" tag value)))))))
+(defun org-lms-set-prop (munged-var)
+   "write a variable value to a headline property. MUNGED-VAR is a dot-variable set by `let-alist`, 
+which see for more details"
+   )
 
 ;; stolen from gnorb, but renamed to avoid conflicts
 (defun org-lms~attachment-list (&optional id)
@@ -468,38 +400,25 @@ In that case, send all marked 'READY' or 'TODO'."
            `(string= (org-element-property :todo-keyword item) "READY")
            )))
     (org-map-entries 
-     #'ol-send-just-one
-      )
-    
-    ;; (org-element-map (org-element-parse-buffer) 'headline
-;;       (lambda (item)
-;;         ;; (print (nth 0 (org-element-property :todo-keyword item)))
-;;         (when (string= (org-element-property :todo-keyword item) "READY") ;;  send-condition ;;
-;;           (save-excursion
-;;             (goto-char (1+ (org-element-property :contents-begin item)))
-;;             (when also-mail  (save-excursion
-;;                                ;;(org-lms-mime-org-subtree-htmlize )
-;;                              (org-lms~send-subtree-with-attachments)
-;;                              ;; (message-send-and-exit)
-;; ))
-;;             (when post-to-lms (org-lms-put-single-submission-from-headline))
-;;             (org-todo "SENT")))))
-    )
+     #'ol-send-just-one))
   (org-cycle-hide-drawers 'all))
 
 
 (cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
-  (when (string= (nth 2 (org-heading-components) ) "READY")
-  (when also-mail  (save-excursion
-                     ;;(org-lms-mime-org-subtree-htmlize )
-                     (org-lms~send-subtree-with-attachments)
-                     (sleep-for 2)
-                     ;; (message-send-and-exit)
-                     ))
-  (when post-to-lms (org-lms-put-single-submission-from-headline))
-  (org-todo "SENT")))
+  (let ((also-mail (org-entry-get nil "ORG_LMS_EMAIL_COMMENTS"))
+        (post-to-lms (org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")))
+    
+    (when (string= (nth 2 (org-heading-components) ) "READY")
+      (when post-to-lms (org-lms-put-single-submission-from-headline))
+      (when also-mail  (save-excursion
+                         ;;(org-lms-mime-org-subtree-htmlize )
+                         (org-lms~send-subtree-with-attachments)
+                         (sleep-for 1)
+                         ;; (message-send-and-exit)
+                         ))
+      (org-todo "SENT"))))
 ;; should get rid of this & just add a flag to ~org-lms-mail-all~
 (defun org-lms-mail-all-undone ()
   (interactive)
