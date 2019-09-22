@@ -134,7 +134,7 @@ I need to figure out a setter -- these are just getters.  Something like :
 
 ~(insert (concat "#+" (upcase property )))~
 
- But first find the right place i n the buffer (??)
+*EDIT <2019-09-19 Thu>:* Actually I have my keyword getter  from John Kitchin somewhere; that does a better job. In either case I should make sure that the buffer gets widened inside the function so that everything can be set properly.  
 #+begin_src emacs-lisp
   (defun org-lms-global-props (&optional property buffer)
     "Get the plists of global org properties of current buffer."
@@ -538,6 +538,7 @@ usually of the form `2019-09-26`, but optionally including a full time."
 
 #+RESULTS:
 : o-l-date-to-timestamp
+
 * Integration with Mail systems
 I like to mail my marks back to my students.  These are the functions that manage that.  
 
@@ -730,7 +731,6 @@ you have not received a grade for work that you have handed in,
 
 #+RESULTS:
 : org-lms-send-missing-subtree
-
 
 
 ** Even more Mail -- org-mime rewrite functions. 
@@ -1993,9 +1993,6 @@ Function to create and update pages, which might start to reduce reliance on ext
 
 The UI for this is likely to be a bit finicky so maybe don't make a lot of decisions right now.  
 
-** ACTION Calendar Events
-Right now I have no way to generate calendar events & therefore put stuff into the "upcoming events' stream in Canvas.  [[https://canvas.instructure.com/doc/api/calendar_events.html][The API for Calendar Events is described here]]. It won't be easy for me to accommodate this mode of organization, unfortunately.  Probably won't happen for a while.   
-
 ** Assignments, Submissions, and Attachments
 Assignments first.  
 - org-lms-get-assignments :: getter for all assignments in a course
@@ -2132,6 +2129,9 @@ Attachments. These functions are a little complicated because attachments are st
 
 #+RESULTS:
 : org-lms-get-canvas-attachments
+
+** ACTION Calendar Events
+Right now I have no way to generate calendar events & therefore put stuff into the "upcoming events' stream in Canvas.  [[https://canvas.instructure.com/doc/api/calendar_events.html][The API for Calendar Events is described here]]. It won't be easy for me to accommodate this mode of organization, unfortunately.  Probably won't happen for a while.   
 
 ** Reading and Writing Assignment Variables from files
 Storing assignments as an intermediate lisp object allows me to avoid parsing an org buffer or making a json call before doing things like making headlines.
