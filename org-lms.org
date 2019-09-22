@@ -152,6 +152,103 @@ I need to figure out a setter -- these are just getters.  Something like :
 
 *TODO* no tests yet!!
 
+** ACTION Reading keywords in org files
+:PROPERTIES:
+:ORG_LMS_COURSE: calmwater
+:END:
+
+From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre "define" a new keyword without the elabotrate  apparatus of an org exporter. 
+
+*TODO:* don't forget to actually start using this
+
+- GETTER :: 
+
+#+begin_src emacs-lisp :results code
+
+
+;; john kitchin's version
+;; (defun org-lms-get-keyword (key &optional buffer)
+
+;;   (org-element-map (org-element-parse-buffer) 'keyword
+;;     (lambda (k)
+;;       (when (string= key (org-element-property :key k))
+;;         (org-element-property :value k))) 
+;;     nil t))
+
+
+(defun org-lms-get-keyword (key &optional file)
+  (save-excursion
+    (let ((result nil)
+          (buf (current-buffer))
+          )
+      
+      (if file 
+          (setq buf (find-file-noselect file)))
+      (with-current-buffer buf
+        (let ((setup (org-element-map
+                         (org-element-parse-buffer)
+                         'keyword
+                         (lambda (k)
+                           (when (string= "SETUPFILE" (org-element-property :key k))
+                             (org-element-property :value k)))
+                         nil t)))
+          (setq result
+                (or
+                 (org-element-map (org-element-parse-buffer) 'keyword
+                   (lambda (k)
+                     (when (string= key (org-element-property :key k))
+                       (setq result  (org-element-property :value k)))
+                     result) 
+                   nil t)
+                 (and setup
+                      (org-lms-get-keyword key setup ))
+                 )))))))
+
+;; nicolas g's version
+;; (defun org-lms-get-keyword (key)
+;;   "Get value of keyword, whether or not it's been defined by org. 
+
+;; Look for a keyword statement of the form 
+;; #+KEYWORD: 
+
+;; and return either the last-declared value of the keyword, or the
+;; value of the current headline's property of the same name."
+
+;;   (let ((case-fold-search t)
+;;         (regexp (format "^[ \t]*#\\+%s:" key))
+;;         (result nil))
+;;     (org-with-point-at 1
+;;       (while (re-search-forward regexp nil t)
+;;         (let ((element (org-element-at-point)))
+;;           (when (eq 'keyword (org-element-type element))
+;;             (push (org-element-property :value element) result)))))
+;;     (or (org-entry-get nil key) (car result)))
+;;   )
+
+
+
+(defun org-lms-set-keyword (tag value)
+  "Set filetag TAG to VALUE.
+        If VALUE is nil, remove the filetag."
+  (save-excursion
+    (goto-char (point-min))
+    (if (re-search-forward (format "#\\+%s:" tag) (point-max) 'end)
+        ;; replace existing filetag
+        (progn
+          (beginning-of-line)
+          (kill-line)
+          (when value
+            (insert (format "#+%s: %s" tag value))))
+      ;; add new filetag
+      (if (looking-at "^$") 		;empty line
+          ;; at beginning of line
+          (when value
+            (insert (format "#+%s: %s" tag value)))
+        ;; at end of some line, so add a new line
+        (when value
+          (insert (format "\n#+%s: %s" tag value)))))))
+#+end_src
+
 ** ACTION CSV Parsers
 There are several of these here. The code is largely redundant and should be combined into one or two
 #+begin_src emacs-lisp
@@ -405,79 +502,28 @@ default values are:
 
 #+end_src
 
-** ACTION Reading keywords in org files
-:PROPERTIES:
-:ORG_LMS_COURSE: calmwater
-:END:
+** Parse and set properties
+Much of the code in this library reads and sets properties at the headline level.  This code should increase readability and maintainability by farming those functions out to reusable helpers; these values can then be extracted with `let-alist`. 
 
-From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre "define" a new keyword without the elabotrate  apparatus of an org exporter. 
+#+NAME:lms-process
+#+begin_src emacs-lisp
+(defun org-lms-process-props () 
+"retrieve all properties in a headline, then downcase and standardize the key names so that they are convenient to use with `let-alist`"
+(cl-loop for (key . value) in (org-entry-properties)
+         collect
+         (cons (intern
+                (replace-regexp-in-string
+                 "^org_lms_" "ol_"
+                 (downcase key))) value )))
 
-*TODO:* don't forget to actually start using this
+(defun org-lms-set-prop (munged-var)
+   "write a variable value to a headline property. MUNGED-VAR is a dot-variable set by `let-alist`, 
+which see for more details"
+   ) 
+#+end_src
 
-- GETTER :: 
-
-#+begin_src emacs-lisp :results code
-
-
-;; john kitchin's version
-;; (defun org-lms-get-keyword (key &optional buffer)
-
-;;   (org-element-map (org-element-parse-buffer) 'keyword
-;;     (lambda (k)
-;;       (when (string= key (org-element-property :key k))
-;;         (org-element-property :value k))) 
-;;     nil t))
-
-
-(defun org-lms-get-keyword (key &optional file)
-  (save-excursion
-    (let ((result nil)
-          (buf (current-buffer))
-          )
-      
-      (if file 
-          (setq buf (find-file-noselect file)))
-      (with-current-buffer buf
-        (let ((setup (org-element-map
-                         (org-element-parse-buffer)
-                         'keyword
-                         (lambda (k)
-                           (when (string= "SETUPFILE" (org-element-property :key k))
-                             (org-element-property :value k)))
-                         nil t)))
-          (setq result
-                (or
-                 (org-element-map (org-element-parse-buffer) 'keyword
-                   (lambda (k)
-                     (when (string= key (org-element-property :key k))
-                       (setq result  (org-element-property :value k)))
-                     result) 
-                   nil t)
-                 (and setup
-                      (org-lms-get-keyword key setup ))
-                 )))))))
-
-;; nicolas g's version
-;; (defun org-lms-get-keyword (key)
-;;   "Get value of keyword, whether or not it's been defined by org. 
-
-;; Look for a keyword statement of the form 
-;; #+KEYWORD: 
-
-;; and return either the last-declared value of the keyword, or the
-;; value of the current headline's property of the same name."
-
-;;   (let ((case-fold-search t)
-;;         (regexp (format "^[ \t]*#\\+%s:" key))
-;;         (result nil))
-;;     (org-with-point-at 1
-;;       (while (re-search-forward regexp nil t)
-;;         (let ((element (org-element-at-point)))
-;;           (when (eq 'keyword (org-element-type element))
-;;             (push (org-element-property :value element) result)))))
-;;     (or (org-entry-get nil key) (car result)))
-;;   )
-
+#+RESULTS:
+: org-lms-set-prop
 
 ** Deal with timestamps
 #+begin_src emacs-lisp
@@ -2129,6 +2175,9 @@ Storing assignments as an intermediate lisp object allows me to avoid parsing an
                                                :published ,(org-entry-get nil "OL_PUBLISH")
                                                :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
                                                :basecommit ,(org-entry-get nil "BASECOMMIT")
+                                               :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
+                                               :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
+
                                                :grade_type "letter_grade" ;; oops fix this!
                                                :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
                                                :directory ,(or (org-entry-get nil "OL_DIRECTORY")
