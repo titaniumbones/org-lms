@@ -10,7 +10,7 @@ Also, this package is fairly unstable due to the low quality of the code :-/. Ex
 
 This package  is developed with emacs 27.0.50 and org-mode from git; there's no guarantee it will work with other versions, sorry :-(. 
 
-It also depends on [[https://github.com/tkf/emacs-request][request.el]] and [[https://github.com/org-mime/org-mime][org-mime]], both of which can be downloaded from MELPA. 
+It also depends on [[https://github.com/tkf/emacs-request][request.el]] and [[https://github.com/org-mime/org-mime][org-mime]], both of which can be downloaded from MELPA. ~Request.el~ in particular has changed a lot in the last little while (mid-2019) so the MELPA version is required. 
 
 then simply  
 
@@ -59,8 +59,18 @@ Write your announcements and assignments as org-mode subtrees, and then post the
 
 See [[./Grading-template.org]] for some examples.
 
+** Posting the Syllabus
+
+Follow the instructions above, navigate to your syllabus document, and simply ~M-x org-lms-post-syllabus~. If everything's working properly, the syllabus should appear on the front page of your Canvas site.
+
+This function assumes he syllabus lives in its own file. 
+  
 ** Posting Announcements
 I've added a method to export subtrees as HTML announcements.  This saves me having to compose in the web interface (finally!).  Just call ~org-lms-headline-to-announcement~ from the right subtree (sorry, it won't traverse up the tree like ~ox-hugo's~ "dwim" scope -- haven't programmed that yet!). A successful post will set the ~ORG_LMS_ANNOUNCEMENT_ID~ property, and the next time you call from this subtree, the existing announcement will be updated (that is, no new announcement will be posted). Also, the ~ORLG_LMS_ANNOUNCEMENT_URL~ property will be set, and a new browser tab will open up with the announcement page. 
+
+** Creating and Updating Pages
+
+*Pages* are pretty easy to create from subtrees; just execute ~org-lms-post-page~ from a subtree and its content will be uploaded as HTML to your Canvas site. 
 
 ** STARTED Assignments and Marking
 Marking is the bulk of the work associated with an LMS and the most complex part of the workflow this package is designed for.  These instructions may not be up to date and may also be somewhat idiosyncratic.  
@@ -109,18 +119,6 @@ I generally use a file called =Comments.org= and keep it in a directory =Grading
 - the variable =org-lms-merged-students= should also be set.  This is a little baroque and should be streamlined; the name derives from my perhaps idiosyncratic practice of maintaining a student list that includes both /nicknames/ and /github ids/ for students. Right now, the easiest way to generate this list involves creating a file =students.csv= and running =(org-lms-merge-student-lists)= to sync the existing csv and the current list of students (which will change every time someone adds or drops the class).  
 
 - run ~org-lms-setup-grading~ to generate a table of assignments. You can then manually click the "create headlines" field
-
-*** Old Notes
-There's an awful lot of churn here, as I try to adjust my old, creaky workflow into something with less friction. There are at least three different definitions of "assignment" here: 
-- A local org-mode source file or subtree containing the text of the assignment and media accompaniments of one kind or another (images, code blocks, etc.)
-- A lisp alist object with a mnemonic symbol as ~car~ and a ~cdr~ in plist form. This object is used for generating marking schemes, which I describe more below. 
-- A Canvas object which contains the same text as the local source file, and is identified by a unique ID as well as several URL's and a substantial number of properties, most of which any given user will be unconcerned with.
-
-Ideally, all three of these entities would be co-ordinated in an entirely automated and error-free way. However, right now the connections between them are somewhat tenuous. Here's what I can do:
-- *post* a local assignment to Canvas, and record the Canvas ID and other data as properties of the subtreee that was just posted
-- *get* a list of Canvas assignments and *extract* an assignment ID from a matching assignment.
-- *write* and *read* an elisp object to a file e.g. ~assignments.el~ and use that to gneerate headings.
-
 
 *** Ideal Workflow
 - [X] Write assignment(s) in ~Assignments.org~ (see template)
