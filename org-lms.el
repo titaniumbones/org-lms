@@ -398,6 +398,14 @@ default values are:
 which see for more details"
    )
 
+(require 'ts)
+(defun o-l-date-to-timestamp (date)
+  "use ts.el date parse functions return an ISO-compatible
+timestamp for transmission to Canvas via API. DATE is a string,
+usually of the form `2019-09-26`, but optionally including a full time."
+
+  (ts-format "%Y-%m-%dT%H:%M:%S%:z" (ts-parse-fill 'end date )))
+
 ;; stolen from gnorb, but renamed to avoid conflicts
 (defun org-lms~attachment-list (&optional id)
   "Get a list of files (absolute filenames) attached to the
@@ -722,12 +730,36 @@ The cursor is left in the TO field."
 Assumes that the parent headline is the name of a subdirectory,
 and that the current headline is the name of a student. Speeds up file choice."
   (interactive)
-  (if (file-exists-p org-lms~get-parent-headline )
-      (org-attach-attach (read-file-name
-                          (concat  "File for student " (nth 4 (org-heading-components)) ":")
-                          (org-lms~get-parent-headline) ))
-    (message "Warning: no such directory %s; not attaching file" org-lms~get-parent-headline)))
+  (let ((lms-att-dir
+         (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY" t)
+         
+         ;; (save-excursion
+         ;;   (org-up-heading-safe)
+         ;;   ())
+         ))
+    (message lms-att-dir)
+    ;; (read-file-name
+    ;;  (concat  "File for student " (nth 4 (org-heading-components)) ":")
+    ;;  (expand-file-name lms-att-dir))
+    (if lms-att-dir
+        (org-attach-attach (read-file-name
+                            (concat  "File for student " (nth 4 (org-heading-components)) ":")
+                            (concat  (expand-file-name lms-att-dir) "/")))
+      (message "Warning: no such directory %s; not attaching file" lms-att-dir))
+    )
+  ;; (if (save-excursion
+  ;;       )
+  ;;     (org-attach-attach (read-file-name
+  ;;                         (concat  "File for student " (nth 4 (org-heading-components)) ":")
+  ;;                         (org-lms~get-parent-headline) ))
+  ;;   (message "Warning: no such directory %s; not attaching file" (org-lms~get-parent-headline)))
+  )
 
+;; This doesn't work because org-attach doesn't have a map per se
+;; instead this would need to modify `org-attach-commands`
+;; also, you'd only want to do that if org-grading were active I guess
+;; this feels a bit fragile
+;;(define-key 'org-attach-map (kbd "s p") #'projectile-pt)
 
 (defun org-lms-make-headings (a students)
   "Create a set of headlines for grading.
@@ -752,6 +784,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
            (assignment-type (plist-get body :assignment-type))
+           ;; (email-response (plist-get body :email-response))
            (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
            (courseid (or (plist-get body :courseid) (org-lms-get-keyword "ORG_LMS_COURSEID")) 
@@ -1070,7 +1103,7 @@ the structure of the the alist, and the means of attachment
       (let ((grade (match-string 1)))
         (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
             (progn (message grade)
-                   (org-set-property "GRADE" "1"))
+                   (org-set-property "GRADE" "pass"))
           )) 
       
       ;;(org-set-property "GRADE" (match-string 1))
@@ -1727,6 +1760,9 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                                :published ,(org-entry-get nil "OL_PUBLISH")
                                                :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
                                                :basecommit ,(org-entry-get nil "BASECOMMIT")
+                                               :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
+                                               :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
+
                                                :grade_type "letter_grade" ;; oops fix this!
                                                :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
                                                :directory ,(or (org-entry-get nil "OL_DIRECTORY")
@@ -1785,7 +1821,9 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                  (("name" .  ,(nth 4 (org-heading-components)) )
                                   ("description" . ,(org-export-as 'html t nil t))
                                   ,(if duedate
-                                       `("due_at"   . ,(concat duedate  "T23:59:59-05:00")))
+                                       ;;`("due_at"   . ,(concat duedate  "T23:59:59-04:00"))
+                                       `("due_at"   . ,(o-l-date-to-timestamp duedate))
+                                     )
                                   ("submission_types" . ,subtype)
                                   ("grading_type" . ,gradingtype)
                                   ("grading_standard_idcomment" . 458)
