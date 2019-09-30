@@ -2239,7 +2239,9 @@ Functions to create announcements and assignments. Actually the crucial assignme
          (gradingtype (or  (org-entry-get nil "GRADING_TYPE") "letter_grade"))
          (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE") "canvas") "online_upload" "none"))
          ;;( (org-entry-get nil "DUE_AT"))
-         (publish (org-entry-get nil "OL_PUBLISH")))
+         (publish (org-entry-get nil "OL_PUBLISH"))
+         (reflection (org-entry-get nil "OL_HAS_REFLECTION"))
+         (reflection-id (org-entry-get nil "OL_REFLECTION_ID")))
     ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
     ;;(prin1 canvasid)
     (let* ((org-export-with-tags nil)
@@ -2281,8 +2283,37 @@ Functions to create announcements and assignments. Actually the crucial assignme
             (org-set-property "CANVAS_SUBMISSION_TYPES" (format "%s"(plist-get response-data :submission_types)))
             (org-set-property "GRADING_TYPE" (format "%s"(plist-get response-data :grading_type)))
             (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
+            (if reflection 
+                (let* ((reflection-params `(("assignment" .
+                                             (("name" .  ,(concat  (nth 4 (org-heading-components)) " Reflection Questions") )
+                                              ("description" . ,(org-export-as 'html t nil t))
+                                              ,(if duedate
+                                                   ;;`("due_at"   . ,(concat duedate  "T23:59:59-04:00"))
+                                                   `("due_at"   . ,(o-l-date-to-timestamp duedate))
+                                                 )
+                                              ("submission_types" . "none")
+                                              ("grading_type" . ,gradingtype)
+                                              ("grading_standard_idcomment" . 458)
+                                              ("points_possible" . 1)
+                                              ("published" . ,(if publish t nil) )))))
+                       (reflection-response
+                        (org-lms-canvas-request (format "courses/%s/assignments%s"
+                                                        (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                                        (if reflection-id
+                                                            (format  "/%s" reflection-id) "")
+                                                        )
+                                                (if reflection-id "PUT" "POST")
+                                                assignment-params
+                                                )))
+                  (if (and reflection-response (plist-get reflection-response :id))
+                      (progn
+                        (message "received reflection response-data")
+                        (org-set-property "OL_REFLECTION_ID" (format "%s" (plist-get response-data :id)))))))
+            
+            
+            ))
 
-            ) )
+      
       ;; (message "ASSIGNMENT_TYPE is canvas %s" (equal "canvas" (org-entry-get nil "ASSIGNMENT_TYPE")))
       ;; (message "RESPONSE IS %s" response)
       response)))
