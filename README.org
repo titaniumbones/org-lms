@@ -12,7 +12,11 @@ This package  is developed with emacs 27.0.50 and org-mode from git; there's no 
 
 It also depends on [[https://github.com/tkf/emacs-request][request.el]] and [[https://github.com/org-mime/org-mime][org-mime]], both of which can be downloaded from MELPA. ~Request.el~ in particular has changed a lot in the last little while (mid-2019) so the MELPA version is required. 
 
-then simply  
+As of <2019-09-30 Mon> dash, ts, and let-alist are also all dependencies. 
+
+I personally use ~password-store~ to manage my oauth token and userid, and I recommend that method for others as well. 
+
+Once you have the dependencies, then simply  
 
 - clone this repository
 - add the directory to your load-path
@@ -24,7 +28,7 @@ This is my use-package declaration; you'll have to adjust the path of course:
 (use-package org-lms
 :load-path "/home/matt/src/org-grading"
 :pin manual
-:after (org)
+:after (org password-store ts dash let-alist)
 :commands (org-lms-setup org-lms-get-courseid)
 :config 
 ;; nothing yet
@@ -50,7 +54,8 @@ In order to use them, you'll first need to set the following variables:
 - ~org-lms-token~, your [[https://community.canvaslms.com/docs/DOC-10806-4214724194][secret API token]], which you can acces svia the Canvas web interface (follow the link for details)
 - ~ORG_LMS_COURSEID~, set either as a file-wide keyword or a headline-level org property. You can use ~org-lms-get-courses~ to retrieve all the course objects and their ~:id~ properties.
 - other ID's for individual students, assignments, submissions, announcements, etc; the higher-level functions here will retrieve those values and store them in headline-level properties.  
-
+*** Note on GraphQL API <2019-09-30 Mon>
+Canvas also has a GraphQL API which is dramatically more efficient than the RESTful API. I would like to ocnvert som portions of this oce to use that API, but that will take a while.  See [[https://github.com/titaniumbones/Org-Marking-Mode/issues/27][the Github Issue in this repo]] for more details.  
 ** Initial Setup 
 
 Create a course-specific directory containing your org-mode source files.  In each file, add the ~#+ORG_LMS_COURSEID:~ value specific to your course. This will have to be set each year, since the course ids will change.
