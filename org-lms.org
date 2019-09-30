@@ -975,6 +975,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
            (assignment-type (plist-get body :assignment-type))
+           ;; (email-response (plist-get body :email-response))
            (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
            (courseid (or (plist-get body :courseid) (org-lms-get-keyword "ORG_LMS_COURSEID")) 
@@ -1308,7 +1309,7 @@ These are for showing grades in the org buffer
       (let ((grade (match-string 1)))
         (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
             (progn (message grade)
-                   (org-set-property "GRADE" "1"))
+                   (org-set-property "GRADE" "pass"))
           )) 
       
       ;;(org-set-property "GRADE" (match-string 1))
