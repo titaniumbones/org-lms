@@ -2273,7 +2273,7 @@ Functions to create announcements and assignments. Actually the crucial assignme
       ;; (prin1 (assq-delete-all "assignment[description]" assignment-params))
       (if (plist-get response-data :id)
           (progn
-            (message "received response-data")
+            (message "received assignment response-data")
             (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
             (org-set-property "PUBLISH" (format "%s"(plist-get response-data :published)))
             (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
