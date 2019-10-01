@@ -577,25 +577,35 @@ I like to mail my marks back to my students.  These are the functions that manag
 ** Attachments 
 
 Make sure to get all the attachments.  I think that org-mime now takes care of this so it might be a good idea to refactor.  
+** ACTION Generic get-valid-subtree function.
 
+This function, which is [[https://github.com/kaushalmodi/ox-hugo/blob/b5672ea8925eaff93c4e17982b35acec302ba5e7/ox-hugo.el#L3617][taken directly from ox-hugo]] and is effectively (c) Kaushal Modi under GPL-3.0, *moves point* to the parent subtree and should always be wrapped in a save-excursion.  Most of the export functions above should also now get wrapper functions for wim-scope, and end users could be expected to mostly use those (rather than the existing functions). 
 
+Needs to be documented in README
 #+begin_src emacs-lisp
-
-;; stolen from gnorb, but renamed to avoid conflicts
-(defun org-lms~attachment-list (&optional id)
-  "Get a list of files (absolute filenames) attached to the
-  current heading, or the heading indicated by optional argument ID."
-  (when (featurep 'org-attach)
-    (let* ((attach-dir (save-excursion
-                         (when id
-                (org-id-goto id))
-                         (org-attach-dir t)))
-           (files
-            (mapcar
-             (lambda (f)
-               (expand-file-name f attach-dir))
-             (org-attach-file-list attach-dir))))
-      files)))
+(defun org-lms--get-valid-subtree ()
+  "Return the Org element for a valid Hugo post subtree.
+The condition to check validity is that the EXPORT_FILE_NAME
+property is defined for the subtree element.
+As this function is intended to be called inside a valid Hugo
+post subtree, doing so also moves the point to the beginning of
+the heading of that subtree.
+Return nil if a valid Hugo post subtree is not found.  The point
+will be moved in this case too."
+  (catch 'break
+    (while :infinite
+      (let* ((entry (org-element-at-point))
+             (fname (org-string-nw-p (org-element-property :EXPORT_FILE_NAME entry)))
+             level)
+        (when fname
+          (throw 'break entry))
+        ;; Keep on jumping to the parent heading if the current
+        ;; entry does not have an EXPORT_FILE_NAME property.
+        (setq level (org-up-heading-safe))
+        ;; If no more parent heading exists, break out of the loop
+        ;; and return nil
+        (unless level
+          (throw 'break nil))))))
 
 #+end_src
 
@@ -2037,6 +2047,21 @@ Assignments first.
       (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
 
     (org-lms-canvas-request (format "courses/%s/assignments" courseid) "GET"))
+;; stolen from gnorb, but renamed to avoid conflicts
+(defun org-lms~attachment-list (&optional id)
+  "Get a list of files (absolute filenames) attached to the
+  current heading, or the heading indicated by optional argument ID."
+  (when (featurep 'org-attach)
+    (let* ((attach-dir (save-excursion
+                         (when id
+                (org-id-goto id))
+                         (org-attach-dir t)))
+           (files
+            (mapcar
+             (lambda (f)
+               (expand-file-name f attach-dir))
+             (org-attach-file-list attach-dir))))
+      files)))
 
   (defun org-lms-get-single-assignment (assignmentid &optional courseid)
     (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
