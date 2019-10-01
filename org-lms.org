@@ -503,7 +503,7 @@ default values are:
 #+end_src
 
 ** Parse and set properties
-Much of the code in this library reads and sets properties at the headline level.  This code should increase readability and maintainability by farming those functions out to reusable helpers; these values can then be extracted with `let-alist`. 
+Much of the code in this library reads and sets properties at the headline level.  These helpers should increase readability and maintainability. We use ~let-alist~ to set headline-level variables accessed with ~org-lms-process-props~, and set those properties using a dictionary-like map of Canvas API response property names to org-lms headline properties.  
 
 #+NAME:lms-process
 #+begin_src emacs-lisp
@@ -514,13 +514,39 @@ Much of the code in this library reads and sets properties at the headline level
          (cons (intern
                 (replace-regexp-in-string
                  "^org_lms_" "ol_"
-                 (downcase key))) value )))
+                 (downcase key)))
+               (if (string= "nil" value)
+                   nil
+                 value ))))
 
-(defun org-lms-set-prop (munged-var)
+(defun org-lms-propertize-response-data (response-data)
    "write a variable value to a headline property. MUNGED-VAR is a dot-variable set by `let-alist`, 
 which see for more details"
-   ) 
+   (let ((propDictionary
+          '((:id .  "CANVASID")
+            (:published . "OL_PUBLISH")
+            (:html_url . "CANVAS_HTML_URL")
+            (:submission_url . "CANVAS_SUBMISSION_URL")
+            (:submissions_download_url . "SUBMISSIONS_DOWNLOAD_URL:")
+            (:grading_standard_id . "GRADING_STANDARD_ID")
+            (:submission_types . "CANVAS_SUBMISSION_TYPES")
+            (:grading_type . "GRADING_TYPE"))))
+     (cl-loop for (k . v) in propDictionary
+              do
+              (if (plist-get response-data k)
+                  (progn
+                    (message "yup, got prop %s" k)
+                    (org-set-property v (format "%s" (plist-get response-data k))))
+                (message "nope, no prop %s" k))
+              ;; collect
+              ;; `(,k . ,(plist-get response-data k))
+              )
+            
+   ))
 #+end_src
+
+#+RESULTS: lms-process
+: org-lms-propertize-response-data
 
 #+RESULTS:
 : org-lms-set-prop
