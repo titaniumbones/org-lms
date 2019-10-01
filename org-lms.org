@@ -109,7 +109,9 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   :safe t)
 #+end_src
 
-* Set up Testing
+* ACTION Set up Testing
+Thisi s a complete joke; needs to be entirely rethought. 
+
 Unit tests wil lbe defined throughout and just tangled to a different place! First we have to set up the environment. You'll need to set some of these values up yourself!
 
 #+begin_src emacs-lisp :tangle org-lms-tests.el
@@ -2564,7 +2566,9 @@ Unfortunately, at Canadian schools we need to set the grading standard for every
 
 #+end_src
 
-** Canvas-inspect
+** MAYBE Canvas-inspect
+
+Maybe deprecate/eliminate this? 
 
 I don't use this but the idea is that I'm supposed to be able to lok at the output of a request in a file. 
 
