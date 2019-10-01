@@ -35,7 +35,11 @@ Source blocks are tangled using org-babel.
 (require 'org) ;; the source of all good!
 (require 'org-attach) ;; for attaching files to emails
 (require 'cl) ;; may not be necessary anymore in newer Emacsen
-(require 'org-mime) 
+(require 'org-mime) ;; Unfortunately I require this somewhat outdated library for mailing
+(require 'dash) ;; modern syntax
+(require 'ts) ;; easy time manipulation
+;; (require 's) ;; modern strings
+;; (require 'org-ql) ;; faster, easier query syntax
 ;;(require 'ov) ;; for grade overlays
 
 #+end_src
