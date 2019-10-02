@@ -1,8 +1,15 @@
+#+TODO: ACTION(a) STARTED(s) WAITING(w) NEEDSHELP(n) MISSING(m) | DONE(d) WONTDO(o)
 #+PROPERTY: header-args    :tangle org-lms.el
 #+ORG_LMS_COURSE: wildwater
 I'm moving this package to a literate programming format to make it easier to maintain.
 
-Source blocks are tangled using org-babel.  
+Source blocks are tangled using org-babel.
+
+* STARTED Canvas API Docs & docs for some of the packages used.   
+- The very extensive Canvas REST API is [[https://canvas.instructure.com/doc/api/][documented in full here]].
+- Most institutions also provide a [[[ df [[ [[https://community.canvaslms.com/docs/DOC-14390-canvas-apis-getting-started-the-practical-ins-and-outs-gotchas-tips-and-tricks  [[https://canvas.instructure.com/doc/api/live][live API]], as [[https://community.canvaslms.com/docs/DOC-14390-canvas-apis-getting-started-the-practical-ins-and-outs-gotchas-tips-and-tricks][discussed in this excellent and somewhat hidden document]]. You'll need to use your own institution's instance since you need an auth token; I use [[https://q.utoronto.ca/doc/api/live#!/][the one that University of Toronto provides]]
+- The [[https://canvas.instructure.com/doc/api/file.graphql.html][GraphQL API]] is much less well-documented, though it also comes with a live interaction tool; at U of T it's [[https://q.utoronto.ca/graphiql][at this URL]]. 
+- Add some docs about request, and maybe dash? 
 * Package intro
 
 #+begin_src emacs-lisp
@@ -21,7 +28,7 @@ Source blocks are tangled using org-babel.
 
 #+end_src
 
-* What does this package contain? 
+* COMMENT What does this package contain? 
 
 #+begin_src emacs-lisp :results list :tangle no
 (matches-in-buffer "(\\\(defun .*\\\)")
@@ -53,7 +60,7 @@ THere's some stuff I should get rid of. Trying to track it down.
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
     'org-lms-mail-all)
 #+end_src
-* ACTION Variable definitions
+* STARTED Variable definitions
 The underlying data structure has changed a bit :-) as I start to understand what information needs to be stored in non-textual data structures and what doesn't. A lot of this has not been documented yet!
   
 - need to give a better default value to org-lms-courses
@@ -113,7 +120,7 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   :safe t)
 #+end_src
 
-* ACTION Set up Testing
+* NEEDSHELP Set up Testing
 Thisi s a complete joke; needs to be entirely rethought. 
 
 Unit tests wil lbe defined throughout and just tangled to a different place! First we have to set up the environment. You'll need to set some of these values up yourself!
@@ -572,7 +579,6 @@ usually of the form `2019-09-26`, but optionally including a full time."
 #+RESULTS:
 : o-l-date-to-timestamp
 
-
 ** ACTION Generic get-valid-subtree function.
 
 This function, which is [[https://github.com/kaushalmodi/ox-hugo/blob/b5672ea8925eaff93c4e17982b35acec302ba5e7/ox-hugo.el#L3617][taken directly from ox-hugo]] and is effectively (c) Kaushal Modi under GPL-3.0, *moves point* to the parent subtree and should always be wrapped in a save-excursion.  Most of the export functions above should also now get wrapper functions for wim-scope, and end users could be expected to mostly use those (rather than the existing functions). 
@@ -609,7 +615,43 @@ will be moved in this case too."
 : org-lms--get-valid-subtree
 
 * Talking to Canvas - Fundamentals
-Everything in here should be generically useful, and segregated from my unique workflow.
+Everything in here should be generically useful, and segregated from my unique workflow. That means, among other things, that there should be a specific relationship to an API endpoint. 
+** Doc: Functions to interact with specific parts of the Canvas API
+This is a lot of the bulk of the library; these convenience functions make it easier to ask Canvas for specific, requently-requested kinds of information.
+
+Organization:
+- GETTERS :: for each supported endpoint, write a simple convenience function using ~org-lms-canvas-request~ to GET json data from endpoint
+- SETTERS :: for each supported endpoint, write a simple convenience function using ~org=lms-canvas-request~ to POST or PUT json data to endpoint
+- TRANSFORMERS :: where appropriate, write additional functions to translate canvas data into a form compatible with local data  
+
+ Supported Endpoints
+
+| Name              | Getter              | Setter | Transformer | API Reference |
+|-------------------+---------------------+--------+-------------+---------------|
+| courses           | org-lms-get-courses | --     | --          |               |
+| assignments       |                     |        |             |               |
+| submissions       |                     |        |             |               |
+| announcements     |                     |        |             |               |
+| grading standards |                     |        |             |               |
+| syllabus          |                     |        |             |               |
+| users/students |                     |        |             |               |
+| pages             |                     |        |             |               |
+
+Planned Endpoints
+
+| Name                     | Getter | Setter | Transformer | API Reference |
+|--------------------------+--------+--------+-------------+---------------|
+| course modules           |        |        |             |               |
+| discussions              |        |        |             |               |
+| conversations            |        |        |             |               |
+| custom gradebook columns |        |        |             |               |
+| calendar events          |        |        |             |               |
+|                          |        |        |             |               |
+
+
+No Plans Yet
+
+- Everything else!
 ** Basic "request" function
 :PROPERTIES:
 :GRADE:    1
@@ -675,22 +717,8 @@ These are basically wrappers around ~request.el~ that allow some of the requests
 
 #+RESULTS:
 : org-lms-canvas-request
-
-** Doc: Functions to interact with specific parts of the Canvas API
-This is a lot of the bulk of the library; these convenience functions make it easier to ask Canvas for specific, requently-requested kinds of information.
-
-Organization:
-- GETTERS :: for each supported endpoint, write a simple convenience function using ~org-lms-canvas-request~ to GET json data from endpoint
-- SETTERS :: for each supported endpoint, write a simple convenience function using ~org=lms-canvas-request~ to POST or PUT json data to endpoint
-- TRANSFORMERS :: where appropriate, write additional functions to translate canvas data into a form compatible with local data  
-
- Supported Endpoints
-
-| Name    | Getter              | Setter | Transformer | API Reference |
-|---------+---------------------+--------+-------------+---------------|
-| courses | org-lms-get-courses | --     | --          |               |
-|         |                     |        |             |               |
-
+** WAITING Add GraphQL request function
+In order to rewrite the basic requests from REST to GraphQL, we'll need a basic graphql function.
 ** STARTED Courses
 *** Getters
 - org-lms-get-courses :: getter for all courses
@@ -923,7 +951,9 @@ Exploring this as a way to store nicknames and github IDs.  Doesn't seem any eas
 - org-lms-get-students :: get students in a course
 - org-lms-get-all-users :: also get the non-student users in a course
 - org-lms-get-single-user :: get just one user (usally as student with id)
-- org-lms-merge-student-lists :: merge local and LMS student definitions 
+- org-lms-merge-student-lists :: merge local and LMS student definitions
+
+No Setters here! We don't add or remove students from the class via the API.  
 *** Getters
 #+begin_src emacs-lisp
 
@@ -1153,7 +1183,7 @@ Rewritten <2019-10-01 Tue> to use let-alist.  Function to create and update page
 
 #+RESULTS:
 
-** ACTION Modules
+** MISSING Modules
 
 [[https://community.canvaslms.com/docs/DOC-10735][modules]] are collections of content intended to structure a course into sections ([[https://canvas.instructure.com/doc/api/modules.html][see api docs]]).  They don't map all that well onto my course docs organization, and they're likely to be difficult to maintain.  It wil ltake a lot of work to do this properly, but probably want to start with 
 - [ ] an *accessor* that downloads module(s) using the [[https://canvas.instructure.com/doc/api/modules.html#method.context_modules_api.index][list modules]] function, and iterate through the results to create a tree with module item attributes stored in subtree properties.
@@ -1418,8 +1448,11 @@ Right now I have no way to generate calendar events & therefore put stuff into t
 ** ACTION Announcements
 *** ACTION Setters -- headline to announcement
 todo: docstrings!!; also, need to switch to CANVASID from ORG_LMS_ANNOUNCEMENT_ID for consistency, in order to use ~org-lms-propertize-thingie~. 
+
+Also, looks like it isn't reading heading properties before posting!! Needs to be rewritten on model of other setters.
 #+begin_src emacs-lisp
-  ;; huh is this deprecated? 
+  ;; huh is this deprecated?
+  ;; doesn't seem to be used at all 
 (defun org-lms-post-announcement (payload &optional courseid)
   "Create new announcement using PAYLOAD a data in course COURSEID."
     (setq courseid (or courseid
@@ -1527,6 +1560,8 @@ Unfortunately, at Canadian schools we need to set the grading standard for every
 
 #+RESULTS:
 : org-lms-get-grading-standards
+** MISSING Forum Posts
+[[https://canvas.instructure.com/doc/api/discussion_topics.html][API docs are here]]. U of Toronto [[https://q.utoronto.ca/doc/api/live#!/][live API is here]]. 
 * MWP-specific workflow
 Needs to be segregated and maybe re-namespaced, and potentially made more generally useful. 
 ** Reading and Writing Assignment Variables from files
@@ -1691,7 +1726,6 @@ working on this."
 #+RESULTS:
 : org-lms-put-single-submission-from-headline
 
-
 ** ACTION Set up local environment
 Need to assess usefulness of all this. 
 
@@ -1749,7 +1783,6 @@ variables must be set or errors will result."
 : org-lms-get-local-students
 
 ** Assignments Table
-
 This function prints out a helpful table with links to various locations (e.g., LMS URLs for assignments & submissions) and elisp functions (e.g., grading headline generation).
 #+begin_src emacs-lisp
   (defun org-lms-assignments-table (&optional assignments students)
