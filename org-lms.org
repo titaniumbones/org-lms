@@ -1864,6 +1864,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
     ;; (message "students=%s" students)
     ;; (mapcar (lambda (x)))
     (let* ((body a)
+           ;; rewrite this part wit horg-process-props? 
+           ;; nmaybe not possible as written. 
            (atitle (plist-get body :name ))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
@@ -1879,14 +1881,6 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                      ;;   nil)
                      )
            (template (plist-get body :rubric))
-           ;; (template (let ((output ""))
-           ;;             (dolist (item  (plist-get body :rubric-list) output)
-           ;;               (setq output (concat output
-           ;;                                    (format "- *%s* :: \n" item))))))
-           ;; (template (plist-get 'rubric-list body))
-           )
-      ;; (message "BODY:\n%s\n%s\n%s\n%s/BODY" body atitle directory weight)
-      ;; (message "DANVASID %s" assignmentid)
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
@@ -1900,6 +1894,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
             (json-object-type 'plist)
             (json-key-type 'keyword)
             (json-false nil)
+            ;; this crufty garbage needs to be fixed. 
             (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
         (mapcar (lambda (stu)
                   ;;(message "%s" stu)
@@ -2167,7 +2162,7 @@ Make sure to get all the attachments.  I think that org-mime now takes care of t
 *** ACTION Sending Subtrees
 Huh, interesting. I have two versions of this code and no idea which of them is actually used where!! +In fact, it kind of looks like neither is being used.  Source of much confusion!!+
 
-*UPDATE <2018-11-08 Thu>:* ~org-mime-lms-send-subtree-with-attachments~ is an obsolete function which has been replaced by ~org-lms-mime-org-subtree-htmlize~.  I'm too hcicken to delete it right now but should do so soon.  
+*UPDATE <2018-11-08 Thu>:* ~org-mime-lms-send-subtree-with-attachments~ is an obsolete function which has been replaced by ~org-lms-mime-org-subtree-htmlize~.  I'm too chicken to delete it right now but should do so soon.
 
 *UPDATE <2019-10-01 Tue>:* need to remove calls to ~mwp-org-get-parent-headline~, and also figure out if these are still used at all.  
 
