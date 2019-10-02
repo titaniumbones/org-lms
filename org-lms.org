@@ -127,8 +127,9 @@ Unit tests wil lbe defined throughout and just tangled to a different place! Fir
 
 * Helper functions
 These functions do things like parse csv files, set up json properly, etc.  
-** Debug Messages
-I am unfortunately no past the stage of using debug messages :-/ 
+** ACTION Debug Messages
+I am unfortunately no past the stage of using debug messages :-/
+sooo.. write this fing function?  
 #+begin_src emacs-lisp :tangle no
 (debug-message (message )
 (if plaplapla))
@@ -1299,7 +1300,8 @@ Attachments. These functions are a little complicated because attachments are st
 #+RESULTS:
 : org-lms-get-canvas-attachments
 
-*** Setters -- Creating Assignments
+*** ACTION Setters -- Creating Assignments
+*rename -parse-assignment to -post-assignment*
 
 Functions to create announcements and assignments. Actually the crucial assignment code is still languishing in ~grading-template.org~. That's one of the reasons I made this org file - -to try to avoid that kind of junk!
 
