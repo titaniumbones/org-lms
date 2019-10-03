@@ -1493,7 +1493,6 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
          ;;(courseid (plist-get course :id))
-         (atitle (nth 4 (org-heading-components)))
          (atext (org-export-as 'html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
@@ -1842,7 +1841,6 @@ This function prints out a helpful table with links to various locations (e.g., 
       ))
 
 #+end_src
-
 #+RESULTS:
 : org-lms-assignments-table
 
