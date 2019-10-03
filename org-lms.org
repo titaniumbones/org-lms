@@ -1284,7 +1284,7 @@ Attachments. These functions are a little complicated because attachments are st
          (submission (org-lms-get-single-submission studentid assid))
          (student (org-lms-find-local-user studentid))
          )
-    (message "Sumission: %s" submission)
+    (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
              (let* ((downloadurl (plist-get attachment :url))
@@ -1296,19 +1296,29 @@ Attachments. These functions are a little complicated because attachments are st
                                  "late_" "")
                              studentid   (org-lms-safe-pget attachment :studentid)
                              (plist-get attachment :display_name)))
-                    (f (request-response-data
-                        (request
-                         downloadurl
-                         :sync t
-                         :parser 'buffer-string ))))
-               (message "attachment exists")
+                    (r (request downloadurl
+                                :sync t
+                                :encoding 'no-conversion
+                                :parser 'buffer-string
+                                :success (cl-function
+                                          (lambda (&key data &allow-othr-keys)
+                                            (message "success!")
+                                            data))
+                                :error (cl-function (lambda ( &key error-thrown data status &allow-other-keys )
+                                                      (setq canvas-err error-thrown)
+                                                      (message "ERROR: %s" error-thrown)))))
+                    (f (request-response-data r))
+                    (e (request-response-error-thrown r))
+                    (filename (expand-file-name filename (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY")))
+                    (message "attachment exists"))
+               (message "FILENAME: %s" filename)
                ;;(prin1 f)
                ;;(message "STUDENT %s" (or (plist-get attachment :late) "NOPE"))
                (let ((coding-system-for-write 'binary))
                  (with-temp-file (expand-file-name
                                   filename
                                   (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))
-                   (set-buffer-multibyte nil)
+                   ;;(set-buffer-multibyte nil)
                    (insert (string-as-multibyte f))
                    ;; (encode-coding-string contents 'utf-8 nil (current-buffer))
                    ))
