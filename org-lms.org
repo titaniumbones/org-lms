@@ -1987,9 +1987,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                                (* 100   (if (numberp weight) weight (string-to-number weight))))))
 
 
-                    ;; TODO: this should be converted to a (cond...) that works differnetly
-                    ;; with different assignment types
-                    ;; try to attach files, if possible
+                    ;; Gather student assignments, if possible
+                    ;; method depends on assignment type
                     ;; (message "SUBMISSIONTYPE %s" assignment-type)
                     (cond
                      ((equal assignment-type "github")
@@ -1999,10 +1998,14 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                          ;; old way
                                          ;; (concat repo-basename "-" github)
                                          directory))
+
                       ;; this is some weird shit I used to do.  Time to fix it maybe.
                       ;; instead use a control vocabulary to find appropriate branches
 
-                      ;; hard-coded!!!! 
+                      ;; anyway as of 2019, not currently in use.
+
+                      ;; hard-coded!!!!
+                      ;; shouldn't this use ol-json-wrapper?
                       (let* ((json-array-type 'list)
                              (json-object-type 'plist)
                              (json-key-type 'keyword)
@@ -2031,10 +2034,12 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                             ))
                                       ))
                           ))
-
+                     ;; if assignment is handed in on canvas, getstudent work as attachments     
                      ((equal assignment-type "canvas")
                       ;; (message "SUBTYPE IS CANVAS")
                       (org-lms-get-canvas-attachments))
+                      
+                      ;; otherwise, look for existing files with approximately matching names in the appropriate directory.  
                       (t
                       (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
                              (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
