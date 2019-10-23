@@ -2703,7 +2703,9 @@ Simultaneously write results to results.csv in current directory."
                              (g (org-entry-get (point) "GRADE")))
                         (cond
                          ((string= g "1") (setq g "Pass"))
-                         ((string= g "0") (setq g "Fail")))
+                         ;; this needs to be figured out. I want this in p/f booleans but not for 0 grades in non-booleans
+                         ;;((string= g "0") (setq g "Fail"))
+                         )
                         (add-to-list 'grades `(,assignment . ,g))
                         (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS")))
                         (plist-put s :grades grades)))))
