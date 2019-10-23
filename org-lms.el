@@ -2017,10 +2017,9 @@ The cursor is left in the TO field."
   )
 
 (defun org-lms-clear-overlays ()
-    "if the overlays become annoying at any point"
-    (ov-clear)
-    
-    )
+  "if the overlays become annoying at any point"
+  (interactive)
+  (ov-clear))
 
 (defun org-lms-set-grade (grade)
   "set grade property at point and regenerate overlays"
