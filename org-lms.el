@@ -915,7 +915,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (submission (org-lms-get-single-submission studentid assid))
          (student (org-lms-find-local-user studentid))
          )
-    (message "Submission: %s" submission)
+         (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
              (let* ((downloadurl (plist-get attachment :url))
@@ -1772,8 +1772,8 @@ In that case, send all marked 'READY' or 'TODO'."
 (cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
-  (let ((also-mail (org-entry-get nil "ORG_LMS_EMAIL_COMMENTS"))
-        (post-to-lms (org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")))
+  (let ((also-mail (org-entry-get nil "ORG_LMS_EMAIL_COMMENTS" t))
+        (post-to-lms (org-entry-get nil "ORG_LMS_CANVAS_COMMENTS" t)))
     
     (when (string= (nth 2 (org-heading-components) ) "READY")
       (when post-to-lms (org-lms-put-single-submission-from-headline))
@@ -1997,7 +1997,7 @@ The cursor is left in the TO field."
 
 ;; still imperfect, but good enough for me.  
 (defun org-lms-overlay-headings ()
-  "Show grades at end of headlines that have a 'GRADE' property."
+  "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
   (interactive)
   (require 'ov)
 
@@ -2142,7 +2142,9 @@ Simultaneously write results to results.csv in current directory."
                              (g (org-entry-get (point) "GRADE")))
                         (cond
                          ((string= g "1") (setq g "Pass"))
-                         ((string= g "0") (setq g "Fail")))
+                         ;; this needs to be figured out. I want this in p/f booleans but not for 0 grades in non-booleans
+                         ;;((string= g "0") (setq g "Fail"))
+                         )
                         (add-to-list 'grades `(,assignment . ,g))
                         (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS")))
                         (plist-put s :grades grades)))))
