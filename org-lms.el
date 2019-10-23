@@ -929,10 +929,13 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                         (request
                          downloadurl
                          :sync t
-                         :parser 'buffer-string ))))
+                         :parser 'buffer-string )))
+                    (fullpath (expand-file-name filename (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))))
                (message "attachment exists")
                ;;(prin1 f)
                ;;(message "STUDENT %s" (or (plist-get attachment :late) "NOPE"))
+               (if (file-exists-p fullpath )
+                   (message "file %s already exists, not downloading" filename)
                (let ((coding-system-for-write 'binary))
                  (with-temp-file (expand-file-name
                                   filename
@@ -940,7 +943,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                    (set-buffer-multibyte nil)
                    (insert (string-as-multibyte f))
                    ;; (encode-coding-string contents 'utf-8 nil (current-buffer))
-                   ))
+                     )))
                ;; (with-temp-file (expand-file-name
                ;;                  filename
                ;;                  (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))
