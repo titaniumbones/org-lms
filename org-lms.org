@@ -199,6 +199,8 @@ From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre 
       (if file 
           (setq buf (find-file-noselect file)))
       (with-current-buffer buf
+        (save-restriction
+          (widen)
         (let ((setup (org-element-map
                          (org-element-parse-buffer)
                          'keyword
@@ -216,7 +218,7 @@ From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre 
                    nil t)
                  (and setup
                       (org-lms-get-keyword key setup ))
-                 )))))))
+                   ))))))))
 
 ;; nicolas g's version
 ;; (defun org-lms-get-keyword (key)
