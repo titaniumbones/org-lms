@@ -2292,8 +2292,8 @@ In that case, send all marked 'READY' or 'TODO'."
 (cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
-  (let ((also-mail (org-entry-get nil "ORG_LMS_EMAIL_COMMENTS"))
-        (post-to-lms (org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")))
+  (let ((also-mail (org-entry-get nil "ORG_LMS_EMAIL_COMMENTS" t))
+        (post-to-lms (org-entry-get nil "ORG_LMS_CANVAS_COMMENTS" t)))
     
     (when (string= (nth 2 (org-heading-components) ) "READY")
       (when post-to-lms (org-lms-put-single-submission-from-headline))
