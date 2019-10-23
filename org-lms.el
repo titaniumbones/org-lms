@@ -2007,6 +2007,7 @@ The cursor is left in the TO field."
   (interactive)
   (require 'ov)
 
+  (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
   (org-map-entries
    (lambda ()
      (when (org-entry-get (point) "GRADE")
@@ -2017,9 +2018,10 @@ The cursor is left in the TO field."
        (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
        (overlay-put
         ov 'display
-        (format  "%s  GRADE: %s CHITS: %s" character (org-entry-get (point) "GRADE") (org-entry-get (point) "CHITS")))
+          (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
+                   (if chits (org-entry-get (point) "CHITS") "")))
        (overlay-put ov 'name "grading")
-       (message "%s" (overlay-get ov "name")))))
+         (message "%s" (overlay-get ov "name"))))))
   )
 
 (defun org-lms-clear-overlays ()
