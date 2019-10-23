@@ -1662,7 +1662,7 @@ working on this."
                                        (org-entry-get (point) "ASSIGNMENTID"))))
   (unless studentid (setq studentid (org-entry-get (point)  "STUDENTID")))
   ;; main loop
-  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
          (grade (org-entry-get (point) "GRADE"))
          (comments (let*((org-export-with-toc nil)
                          ;;(atext (org-export-as 'html t))
