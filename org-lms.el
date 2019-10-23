@@ -1086,7 +1086,6 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
          ;;(courseid (plist-get course :id))
-         (atitle (nth 4 (org-heading-components)))
          (atext (org-export-as 'html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
