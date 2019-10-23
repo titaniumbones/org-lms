@@ -108,6 +108,8 @@
       (if file 
           (setq buf (find-file-noselect file)))
       (with-current-buffer buf
+        (save-restriction
+          (widen)
         (let ((setup (org-element-map
                          (org-element-parse-buffer)
                          'keyword
@@ -125,7 +127,7 @@
                    nil t)
                  (and setup
                       (org-lms-get-keyword key setup ))
-                 )))))))
+                   ))))))))
 
 ;; nicolas g's version
 ;; (defun org-lms-get-keyword (key)
