@@ -915,7 +915,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (submission (org-lms-get-single-submission studentid assid))
          (student (org-lms-find-local-user studentid))
          )
-    (message "Sumission: %s" submission)
+    (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
              (let* ((downloadurl (plist-get attachment :url))
@@ -938,18 +938,12 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                ;;(message "STUDENT %s" (or (plist-get attachment :late) "NOPE"))
                (if (file-exists-p fullpath )
                    (message "file %s already exists, not downloading" filename)
-               (let ((coding-system-for-write 'binary))
-                 (with-temp-file (expand-file-name
-                                  filename
-                                  (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))
-                   (set-buffer-multibyte nil)
+               (let ((coding-system-for-write 'no-conversion))
+                   (with-temp-file fullpath
+                   ;; (set-buffer-multibyte nil)
                    (insert (string-as-multibyte f))
                    ;; (encode-coding-string contents 'utf-8 nil (current-buffer))
                      )))
-               ;; (with-temp-file (expand-file-name
-               ;;                  filename
-               ;;                  (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))
-               ;;   (insert (string-as-multibyte f) ))
                (unwind-protect
                    (condition-case err
                        (org-attach-attach (expand-file-name
