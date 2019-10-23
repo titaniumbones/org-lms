@@ -1420,6 +1420,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
     ;; (message "students=%s" students)
     ;; (mapcar (lambda (x)))
     (let* ((body a)
+           ;; rewrite this part wit horg-process-props? 
+           ;; nmaybe not possible as written. 
            (atitle (plist-get body :name ))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
@@ -1434,15 +1436,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                      ;;     (number-to-string (plist-get org-lms-course :id))
                      ;;   nil)
                      )
-           (template (plist-get body :rubric))
-           ;; (template (let ((output ""))
-           ;;             (dolist (item  (plist-get body :rubric-list) output)
-           ;;               (setq output (concat output
-           ;;                                    (format "- *%s* :: \n" item))))))
-           ;; (template (plist-get 'rubric-list body))
-           )
-      ;; (message "BODY:\n%s\n%s\n%s\n%s/BODY" body atitle directory weight)
-      ;; (message "DANVASID %s" assignmentid)
+           (template (plist-get body :rubric))))
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
@@ -1456,6 +1450,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
             (json-object-type 'plist)
             (json-key-type 'keyword)
             (json-false nil)
+            ;; this crufty garbage needs to be fixed. 
             (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
         (mapcar (lambda (stu)
                   ;;(message "%s" stu)
@@ -1503,9 +1498,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                                (* 100   (if (numberp weight) weight (string-to-number weight))))))
 
 
-                    ;; TODO: this should be converted to a (cond...) that works differnetly
-                    ;; with different assignment types
-                    ;; try to attach files, if possible
+                    ;; Gather student assignments, if possible
+                    ;; method depends on assignment type
                     ;; (message "SUBMISSIONTYPE %s" assignment-type)
                     (cond
                      ((equal assignment-type "github")
@@ -1547,10 +1541,12 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                             ))
                                       ))
                           ))
-
+                     ;; if assignment is handed in on canvas, getstudent work as attachments     
                      ((equal assignment-type "canvas")
                       ;; (message "SUBTYPE IS CANVAS")
                       (org-lms-get-canvas-attachments))
+                      
+                      ;; otherwise, look for existing files with approximately matching names in the appropriate directory.  
                       (t
                       (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
                              (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))

@@ -1913,7 +1913,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                      ;;     (number-to-string (plist-get org-lms-course :id))
                      ;;   nil)
                      )
-           (template (plist-get body :rubric))
+           (template (plist-get body :rubric))))
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
@@ -2544,10 +2544,11 @@ These are for showing grades in the org buffer
 #+begin_src emacs-lisp
 ;; still imperfect, but good enough for me.  
 (defun org-lms-overlay-headings ()
-  "Show grades at end of headlines that have a 'GRADE' property."
+  "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
   (interactive)
   (require 'ov)
 
+  (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
   (org-map-entries
    (lambda ()
      (when (org-entry-get (point) "GRADE")
@@ -2558,9 +2559,10 @@ These are for showing grades in the org buffer
        (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
        (overlay-put
         ov 'display
-        (format  "%s  GRADE: %s CHITS: %s" character (org-entry-get (point) "GRADE") (org-entry-get (point) "CHITS")))
+          (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
+                   (if chits (org-entry-get (point) "CHITS") "")))
        (overlay-put ov 'name "grading")
-       (message "%s" (overlay-get ov "name")))))
+         (message "%s" (overlay-get ov "name"))))))
   )
 
 (defun org-lms-clear-overlays ()
