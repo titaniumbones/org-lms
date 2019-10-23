@@ -1320,8 +1320,7 @@ variables must be set or errors will result."
   "Return a 2-dimensional list suitable whose contents are org-mode table cells.
 
 Intnded to be used in a simpe src block with :results header `value raw table'. 
-Resultant links allow quick access to the canvas web interface as well as the make-headings
-commangs."
+Resultant links allow quick access to the canvas web interface as well as the make-headings commands."
   (unless assignments
     (setq assignments org-lms-merged-assignments))
   (unless students
@@ -1593,7 +1592,6 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                 students)
         (run-hooks 'ol-make-headings-final-hook)
         )) 
-      )
   (org-cycle-hide-drawers 'all))
 
 ;; org make headings, but for github assignments
