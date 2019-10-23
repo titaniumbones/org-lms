@@ -201,23 +201,23 @@ From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre 
       (with-current-buffer buf
         (save-restriction
           (widen)
-        (let ((setup (org-element-map
-                         (org-element-parse-buffer)
-                         'keyword
+          (let ((setup (org-element-map
+                           (org-element-parse-buffer)
+                           'keyword
                          (lambda (k)
                            (when (string= "SETUPFILE" (org-element-property :key k))
                              (org-element-property :value k)))
                          nil t)))
-          (setq result
-                (or
-                 (org-element-map (org-element-parse-buffer) 'keyword
-                   (lambda (k)
-                     (when (string= key (org-element-property :key k))
-                       (setq result  (org-element-property :value k)))
-                     result) 
-                   nil t)
-                 (and setup
-                      (org-lms-get-keyword key setup ))
+            (setq result
+                  (or
+                   (org-element-map (org-element-parse-buffer) 'keyword
+                     (lambda (k)
+                       (when (string= key (org-element-property :key k))
+                         (setq result  (org-element-property :value k)))
+                       result) 
+                     nil t)
+                   (and setup
+                        (org-lms-get-keyword key setup ))
                    ))))))))
 
 ;; nicolas g's version
@@ -636,7 +636,7 @@ Organization:
 | announcements     |                     |        |             |               |
 | grading standards |                     |        |             |               |
 | syllabus          |                     |        |             |               |
-| users/students |                     |        |             |               |
+| users/students    |                     |        |             |               |
 | pages             |                     |        |             |               |
 
 Planned Endpoints
@@ -2070,7 +2070,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                 students)
         (run-hooks 'ol-make-headings-final-hook)
         )) 
-    )
+      )
   (org-cycle-hide-drawers 'all))
 
 
@@ -2549,19 +2549,19 @@ These are for showing grades in the org buffer
   (require 'ov)
 
   (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
-  (org-map-entries
-   (lambda ()
-     (when (org-entry-get (point) "GRADE")
-       (ov-clear (- (line-end-position) 1)
-                 (+ 0 (line-end-position)))
-       (setq ov (make-overlay (- (line-end-position) 1)
-                              (+ 0 (line-end-position))))
-       (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
-       (overlay-put
-        ov 'display
+    (org-map-entries
+     (lambda ()
+       (when (org-entry-get (point) "GRADE")
+         (ov-clear (- (line-end-position) 1)
+                   (+ 0 (line-end-position)))
+         (setq ov (make-overlay (- (line-end-position) 1)
+                                (+ 0 (line-end-position))))
+         (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
+         (overlay-put
+          ov 'display
           (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
                    (if chits (org-entry-get (point) "CHITS") "")))
-       (overlay-put ov 'name "grading")
+         (overlay-put ov 'name "grading")
          (message "%s" (overlay-get ov "name"))))))
   )
 

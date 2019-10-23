@@ -110,23 +110,23 @@
       (with-current-buffer buf
         (save-restriction
           (widen)
-        (let ((setup (org-element-map
-                         (org-element-parse-buffer)
-                         'keyword
+          (let ((setup (org-element-map
+                           (org-element-parse-buffer)
+                           'keyword
                          (lambda (k)
                            (when (string= "SETUPFILE" (org-element-property :key k))
                              (org-element-property :value k)))
                          nil t)))
-          (setq result
-                (or
-                 (org-element-map (org-element-parse-buffer) 'keyword
-                   (lambda (k)
-                     (when (string= key (org-element-property :key k))
-                       (setq result  (org-element-property :value k)))
-                     result) 
-                   nil t)
-                 (and setup
-                      (org-lms-get-keyword key setup ))
+            (setq result
+                  (or
+                   (org-element-map (org-element-parse-buffer) 'keyword
+                     (lambda (k)
+                       (when (string= key (org-element-property :key k))
+                         (setq result  (org-element-property :value k)))
+                       result) 
+                     nil t)
+                   (and setup
+                        (org-lms-get-keyword key setup ))
                    ))))))))
 
 ;; nicolas g's version
@@ -930,19 +930,19 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                     (f (request-response-data
                         (request
                          downloadurl
-                         :sync t
+                                :sync t
                          :parser 'buffer-string )))
                     (fullpath (expand-file-name filename (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))))
                (message "attachment exists")
                ;;(prin1 f)
                ;;(message "STUDENT %s" (or (plist-get attachment :late) "NOPE"))
-               (if (file-exists-p fullpath )
+               (if (file-exists-p fullpath)
                    (message "file %s already exists, not downloading" filename)
                (let ((coding-system-for-write 'no-conversion))
                    (with-temp-file fullpath
                    ;; (set-buffer-multibyte nil)
-                   (insert (string-as-multibyte f))
-                   ;; (encode-coding-string contents 'utf-8 nil (current-buffer))
+                     (insert (string-as-multibyte f))
+                     ;; (encode-coding-string contents 'utf-8 nil (current-buffer))
                      )))
                (unwind-protect
                    (condition-case err
@@ -1054,7 +1054,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (org-lms-parse-assignment)
   (org-lms-save-assignment-map file))
 
-;; huh is this deprecated? 
+;; huh is this deprecated?
+  ;; doesn't seem to be used at all 
 (defun org-lms-post-announcement (payload &optional courseid)
   "Create new announcement using PAYLOAD a data in course COURSEID."
     (setq courseid (or courseid
@@ -1509,10 +1510,14 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                          ;; old way
                                          ;; (concat repo-basename "-" github)
                                          directory))
+
                       ;; this is some weird shit I used to do.  Time to fix it maybe.
                       ;; instead use a control vocabulary to find appropriate branches
 
-                      ;; hard-coded!!!! 
+                      ;; anyway as of 2019, not currently in use.
+
+                      ;; hard-coded!!!!
+                      ;; shouldn't this use ol-json-wrapper?
                       (let* ((json-array-type 'list)
                              (json-object-type 'plist)
                              (json-key-type 'keyword)
@@ -1589,7 +1594,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                 students)
         (run-hooks 'ol-make-headings-final-hook)
         )) 
-    )
+      )
   (org-cycle-hide-drawers 'all))
 
 ;; org make headings, but for github assignments
@@ -1998,19 +2003,19 @@ The cursor is left in the TO field."
   (require 'ov)
 
   (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
-  (org-map-entries
-   (lambda ()
-     (when (org-entry-get (point) "GRADE")
-       (ov-clear (- (line-end-position) 1)
-                 (+ 0 (line-end-position)))
-       (setq ov (make-overlay (- (line-end-position) 1)
-                              (+ 0 (line-end-position))))
-       (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
-       (overlay-put
-        ov 'display
+    (org-map-entries
+     (lambda ()
+       (when (org-entry-get (point) "GRADE")
+         (ov-clear (- (line-end-position) 1)
+                   (+ 0 (line-end-position)))
+         (setq ov (make-overlay (- (line-end-position) 1)
+                                (+ 0 (line-end-position))))
+         (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
+         (overlay-put
+          ov 'display
           (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
                    (if chits (org-entry-get (point) "CHITS") "")))
-       (overlay-put ov 'name "grading")
+         (overlay-put ov 'name "grading")
          (message "%s" (overlay-get ov "name"))))))
   )
 
