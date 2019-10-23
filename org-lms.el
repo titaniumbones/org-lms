@@ -2027,6 +2027,19 @@ The cursor is left in the TO field."
   (org-lms-clear-overlays)
   (org-lms-overlay-headings) )
 
+(defun org-lms-set-grade ()
+  "set grade property for all headings on basis of \"- Grade :: \" line.
+
+  Use with caution."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading)
+    (while (re-search-forward "- \\*?Grade\\*? :: \\(.+\\)" nil t )
+      (org-set-property "GRADE" (match-string 1))
+      ))
+  (org-lms-overlay-headings) 
+
+  )
 
 (defun org-lms-set-all-grades ()
   "set grade property for all headings on basis of \"- Grade :: \" line.
