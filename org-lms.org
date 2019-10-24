@@ -1912,7 +1912,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                      ;;     (number-to-string (plist-get org-lms-course :id))
                      ;;   nil)
                      )
-           (template (plist-get body :rubric))))
+           (template (plist-get body :rubric)))
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
@@ -1921,13 +1921,13 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
-                         (directory-files directory  nil ) nil))
-            (json-array-type 'list)
-            (json-object-type 'plist)
-            (json-key-type 'keyword)
-            (json-false nil)
-            ;; this crufty garbage needs to be fixed. 
-            (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
+                          (directory-files directory  nil ) nil))
+             (json-array-type 'list)
+             (json-object-type 'plist)
+             (json-key-type 'keyword)
+             (json-false nil)
+             ;; this crufty garbage needs to be fixed. 
+             (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
         (mapcar (lambda (stu)
                   ;;(message "%s" stu)
                   (let* ((fname (plist-get stu :firstname))
@@ -1998,36 +1998,36 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                              (json-key-type 'keyword)
                              (json-false nil)
                              (prs  '() ;; (json-read-file "./01-profile-pr.json")
-                                  ))
+                                   ))
                         ;; (message "MADE IT INTO LOOP for student with ID %s" github)
                         (if prs
                             ;; (message "%s" prs)
                             (dolist (pull prs) ;; need to update this I guless
                               ;; (message "%s: %s"github  pull)
                               
-                                    (if (string= (plist-get pull :githubid) github)
-                                        (progn
-                                          (org-set-property "COMMENTS_PR" (plist-get pull :url))
-                                          (let ((s (or (plist-get pull :status) "")))
-                                            (org-set-property "TEST_STATUS" s)
-                                            (cond
-                                             ((string= "fail" s)
-                                              (insert "\nYour repository did not pass all required tests."))
-                                             ((string= "pass" s)
-                                              (insert "\nYour repository passed all required tests for the basic asisgnment!"))
-                                             ((string= "reflection" s)
-                                              (insert "\nYour repository passed all tests, including the reflection checks!")))
-                                            (insert (concat "\nThere may be further comments in your github repo: " (plist-get pull :url) )))
-                                            ))
-                                      ))
-                          ))
+                              (if (string= (plist-get pull :githubid) github)
+                                  (progn
+                                    (org-set-property "COMMENTS_PR" (plist-get pull :url))
+                                    (let ((s (or (plist-get pull :status) "")))
+                                      (org-set-property "TEST_STATUS" s)
+                                      (cond
+                                       ((string= "fail" s)
+                                        (insert "\nYour repository did not pass all required tests."))
+                                       ((string= "pass" s)
+                                        (insert "\nYour repository passed all required tests for the basic asisgnment!"))
+                                       ((string= "reflection" s)
+                                        (insert "\nYour repository passed all tests, including the reflection checks!")))
+                                      (insert (concat "\nThere may be further comments in your github repo: " (plist-get pull :url) )))
+                                    ))
+                              ))
+                        ))
                      ;; if assignment is handed in on canvas, getstudent work as attachments     
                      ((equal assignment-type "canvas")
                       ;; (message "SUBTYPE IS CANVAS")
                       (org-lms-get-canvas-attachments))
-                      
-                      ;; otherwise, look for existing files with approximately matching names in the appropriate directory.  
-                      (t
+                     
+                     ;; otherwise, look for existing files with approximately matching names in the appropriate directory.  
+                     (t
                       (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
                              (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
                         ;;(message "fullnamefiles is: %s" fullnamefiles)
@@ -2069,7 +2069,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                 students)
         (run-hooks 'ol-make-headings-final-hook)
         )) 
-  (org-cycle-hide-drawers 'all))
+    (org-cycle-hide-drawers 'all)))
 
 
 #+end_src
