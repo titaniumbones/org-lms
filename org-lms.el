@@ -472,6 +472,7 @@ will be moved in this case too."
     `json-key-type' 'symbol
     maybe key-type needs to be keyword though! Still a work in progress.
     "
+  (declare (indent defun))
   (unless request-type (setq request-type "GET"))
   (let ((canvas-payload nil)
         (canvas-err nil)
