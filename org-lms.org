@@ -1611,7 +1611,7 @@ Needs to be ocnverted to org-ql! <2019-10-01 Tue>
                                                :basecommit ,(org-entry-get nil "BASECOMMIT")
                                                :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
                                                :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
-
+                                               :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
                                                :grade_type "letter_grade" ;; oops fix this!
                                                :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
                                                :directory ,(or (org-entry-get nil "OL_DIRECTORY")
