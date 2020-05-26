@@ -1203,49 +1203,49 @@ Assignments first.
 **** Assignments 
 #+begin_src emacs-lisp
 (defun org-lms-get-assignments (&optional courseid)
-    (unless courseid
-      (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
 
-    (org-lms-canvas-request (format "courses/%s/assignments" courseid) "GET"))
+  (org-lms-canvas-request (format "courses/%s/assignments" courseid) "GET"))
 
 (defun org-lms-get-single-assignment (assignmentid &optional courseid)
-    (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
-    (org-lms-canvas-request (format "courses/%s/assignments/%s" courseid assignmentid) "GET"))
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
+  (org-lms-canvas-request (format "courses/%s/assignments/%s" courseid assignmentid) "GET"))
 
 
 
 (defun org-lms-merge-assignment-values (&optional local canvas)
-    (unless local
-      (setq local org-lms-local-assignments ))
-    (unless canvas
-      (setq canvas (org-lms-get-assignments)))
-    (message "LOCALLLLL")
-    ;; (prin1 local)
-    ;; (prin1 canvas)
-    (let ((result '()))
-      (loop for l in-ref local
-            do (let* ((defn (cdr l))
-                      (name (plist-get defn :name)))
-                 (message "LLLLLLLLL")
-                 ;; (prin1 l)
-                 ;; (prin1 (plist-get (cdr l) :name))
-                 ;; (prin1 name)
-                 (dolist (c canvas)
-                   (message "CCCCCCCC")
-                   ;;(message "Printing canvas defn of %s" (plist-get c :name))
-                   ;;(prin1 c)
-                   (if (equal
-                        name  (plist-get c :name))
-                       (progn
-                         (message "MADE ITI N")
-                         (plist-put defn :canvasid (plist-get c :id))
-                         (plist-put defn :html_url (plist-get c :html_url))
-                         (plist-put defn :submissions_download_url (plist-get c :submissions_download_url))
-                         (message "DEFN")
-                         (prin1 defn)
+  (unless local
+    (setq local org-lms-local-assignments ))
+  (unless canvas
+    (setq canvas (org-lms-get-assignments)))
+  (message "LOCALLLLL")
+  ;; (prin1 local)
+  ;; (prin1 canvas)
+  (let ((result '()))
+    (loop for l in-ref local
+          do (let* ((defn (cdr l))
+                    (name (plist-get defn :name)))
+               (message "LLLLLLLLL")
+               ;; (prin1 l)
+               ;; (prin1 (plist-get (cdr l) :name))
+               ;; (prin1 name)
+               (dolist (c canvas)
+                 (message "CCCCCCCC")
+                 ;;(message "Printing canvas defn of %s" (plist-get c :name))
+                 ;;(prin1 c)
+                 (if (equal
+                      name  (plist-get c :name))
+                     (progn
+                       (message "MADE ITI N")
+                       (plist-put defn :canvasid (plist-get c :id))
+                       (plist-put defn :html_url (plist-get c :html_url))
+                       (plist-put defn :submissions_download_url (plist-get c :submissions_download_url))
+                       (message "DEFN")
+                       (prin1 defn)
 
-                         (add-to-list 'result `(,(car l) .  ,defn)))))))
-      result))
+                       (add-to-list 'result `(,(car l) .  ,defn)))))))
+    result))
 #+end_src
 
 #+RESULTS:
