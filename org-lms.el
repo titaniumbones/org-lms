@@ -1218,7 +1218,8 @@ working on this."
          (comments (let*((org-export-with-toc nil)
                          ;;(atext (org-export-as 'html t))
                          (atitle (nth 4 (org-heading-components)))
-                         (org-ascii-text-width 2305843009213693951))
+;;                          (org-ascii-text-width 2305843009213)
+                         )
                      (org-export-as 'ascii t nil t)))
          (returnval '()))
     ;; loop over attachments
