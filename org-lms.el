@@ -2068,7 +2068,7 @@ The cursor is left in the TO field."
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "- \\*?Grade\\* :: \\(.+\\)" nil t )
+    (while (re-search-forward "- \\*?Grade\\*? :: \\(.+\\)" nil t )
       (let ((grade (match-string 1)))
         (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
             (progn (message grade)
