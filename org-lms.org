@@ -674,6 +674,7 @@ These are basically wrappers around ~request.el~ that allow some of the requests
     `json-key-type' 'symbol
     maybe key-type needs to be keyword though! Still a work in progress.
     "
+  (declare (indent defun))
   (unless request-type (setq request-type "GET"))
   (let ((canvas-payload nil)
         (canvas-err nil)
@@ -1201,19 +1202,19 @@ Assignments first.
 *** Getters
 **** Assignments 
 #+begin_src emacs-lisp
-  (defun org-lms-get-assignments (&optional courseid)
+(defun org-lms-get-assignments (&optional courseid)
     (unless courseid
       (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
 
     (org-lms-canvas-request (format "courses/%s/assignments" courseid) "GET"))
 
-  (defun org-lms-get-single-assignment (assignmentid &optional courseid)
+(defun org-lms-get-single-assignment (assignmentid &optional courseid)
     (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
     (org-lms-canvas-request (format "courses/%s/assignments/%s" courseid assignmentid) "GET"))
 
 
 
-  (defun org-lms-merge-assignment-values (&optional local canvas)
+(defun org-lms-merge-assignment-values (&optional local canvas)
     (unless local
       (setq local org-lms-local-assignments ))
     (unless canvas
