@@ -1962,6 +1962,150 @@ The cursor is left in the TO field."
 
 
 
+;; still imperfect, but good enough for me.  
+(defun org-lms-overlay-headings ()
+  "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
+  (interactive)
+  (require 'ov)
+
+  (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
+    (org-map-entries
+     (lambda ()
+       (when (org-entry-get (point) "GRADE")
+         (ov-clear (- (line-end-position) 1)
+                   (+ 0 (line-end-position)))
+         (setq ov (make-overlay (- (line-end-position) 1)
+                                (+ 0 (line-end-position))))
+         (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
+         (overlay-put
+          ov 'display
+          (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
+                   (if chits (org-entry-get (point) "CHITS") "")))
+         (overlay-put ov 'name "grading")
+         (message "%s" (overlay-get ov "name"))))))
+  )
+
+(defun org-lms-overlay-current-heading ()
+  "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
+  (interactive)
+  (require 'ov)
+
+  (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
+    (save-excursion
+      (org-back-to-heading)
+      
+      (when (org-entry-get (point) "GRADE")
+        (ov-clear (- (line-end-position) 1)
+                  (+ 0 (line-end-position)))
+        (setq ov (make-overlay (- (line-end-position) 1)
+                               (+ 0 (line-end-position))))
+        (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
+        (overlay-put
+         ov 'display
+         (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
+                  (if chits (org-entry-get (point) "CHITS") "")))
+        (overlay-put ov 'name "grading")
+        (message "%s" (overlay-get ov "name")))))
+  )
+
+(defun org-lms-clear-overlays ()
+  "if the overlays become annoying at any point"
+  (interactive)
+  (ov-clear))
+
+;; (defun org-lms-set-grade (grade)
+;;   "set grade property at point and regenerate overlays"
+;;   (interactive "sGrade:")
+;;   (org-set-property "GRADE" grade)
+;;   (org-lms-clear-overlays)
+;;   (org-lms-overlay-headings) )
+
+(defvar ol-grade-regex  "- \\*?Grade:?\\*?\\( ::\\)? ?\\(.+\\)"
+  "regular expression matching grade lines." )
+
+(defun org-lms-set-grade ()
+  "set grade property for all headings on basis of \"- Grade :: \" line.
+
+  Use with caution."
+  (interactive)
+  (save-restriction 
+    (org-narrow-to-subtree)
+  (save-excursion
+    (org-back-to-heading)
+    (while (re-search-forward ol-grade-regex nil t )
+      (let ((mark (or (match-string 2) 0)))
+
+        (if (string= mark "Pass")
+            (setq mark "pass"))
+        (org-set-property "GRADE" mark)
+        (org-todo "READY"))
+      )))
+  (org-lms-overlay-headings) 
+
+  )
+
+(defun org-lms-set-all-grades ()
+  "set grade property for all headings on basis of \"- Grade :: \" line.
+
+  Use with caution."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward ol-grade-regex nil t )
+      (org-set-property "GRADE" (or (match-string 2) 0))
+      ;; (save-excursion
+      ;;   (org-back-to-heading)
+      ;;   (org-set-property)
+      ;;   (org-element-at-point))
+      ))
+  (org-lms-overlay-headings) 
+
+  )
+
+(defun org-lms-set-all-grades-boolean ()
+  "set grade property for all headings on basis of \"- Grade :: \" line.
+
+  Use with caution."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward ol-grade-regex nil t )
+      (let ((grade (match-string 1)))
+        (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
+            (progn (message grade)
+                   (org-set-property "GRADE" "pass"))
+          )) 
+      
+      ;;(org-set-property "GRADE" (match-string 1))
+      ;; (save-excursion
+      ;;   (org-back-to-heading)
+      ;;   (org-set-property)
+      ;;   (org-element-at-point))
+      ))
+  (org-lms-overlay-headings) 
+  ;;(org-lms-overlay-headings) 
+
+  )
+
+;; helper function to set grades easily. Unfinished.
+(defun org-lms-pass ()
+  "set the current tree to pass"
+  
+  (interactive)
+  (org-set-property "GRADE" "1")
+  ;;(ov-clear)
+  (org-lms-overlay-headings)
+  )
+
+(defun org-lms-chit ()
+  "set the current tree to one chit"
+  
+  (interactive)
+  (org-set-property "CHITS" "1")
+  (ov-clear)
+  (org-lms-overlay-headings)
+  )
+
 (defun org-lms-generate-tables ()
   "Generate a *grade report* buffer with a summary of the graded assignments
 Simultaneously write results to results.csv in current directory."

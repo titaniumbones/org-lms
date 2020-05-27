@@ -2547,7 +2547,7 @@ The cursor is left in the TO field."
 
 #+end_src 
 
-** COMMENT Set Grades and Overlays
+** Set Grades and Overlays
 These are for showing grades in the org buffer
 
 #+begin_src emacs-lisp
