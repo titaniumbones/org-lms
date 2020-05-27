@@ -496,7 +496,7 @@ will be moved in this case too."
                                  )
                       :sync t
                       :data   (if  json-params json-params  nil) ;; (or data nil)
-                      :encoding 'no-conversion
+                      ;;:encoding 'no-conversion
                       :parser (lambda ()
                                 (if (and (boundp 'file) file) (write-region (buffer-string) nil file))
                                 (ol-jsonwrapper json-read))
