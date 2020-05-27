@@ -1900,6 +1900,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            ;; rewrite this part wit horg-process-props? 
            ;; nmaybe not possible as written. 
            (atitle (plist-get body :name ))
+           (number (plist-get body :assignment_number))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
            (weight (plist-get body :assignment-weight ))
@@ -1908,6 +1909,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            ;; (email-response (plist-get body :email-response))
            (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
+           (grading-type (or (plist-get body :grading-type) "letter_grade"))
            (courseid (or (plist-get body :courseid) (org-lms-get-keyword "ORG_LMS_COURSEID")) 
                      ;; (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
                      ;;     (number-to-string (plist-get org-lms-course :id))
@@ -1919,6 +1921,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "ASSIGNMENTID" assignmentid)
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (org-set-property "BASECOMMIT" basecommit)
+      (org-set-property "GRADING_TYPE" grading-type)
+      (org-set-property "NUMBER" number)
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
