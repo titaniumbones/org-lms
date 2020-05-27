@@ -919,6 +919,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
+             (message "%s%s"(downcase (plist-get student :lastname))
+                      (downcase (plist-get student :firstname)) )
              (let* ((downloadurl (plist-get attachment :url))
                     (filename
                      (format "%s%s_%s%s_%s_%s"
@@ -1170,7 +1172,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                                :basecommit ,(org-entry-get nil "BASECOMMIT")
                                                :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
                                                :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
-
+                                               :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
                                                :grade_type "letter_grade" ;; oops fix this!
                                                :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
                                                :directory ,(or (org-entry-get nil "OL_DIRECTORY")
@@ -1219,8 +1221,7 @@ working on this."
          (comments (let*((org-export-with-toc nil)
                          ;;(atext (org-export-as 'html t))
                          (atitle (nth 4 (org-heading-components)))
-;;                          (org-ascii-text-width 2305843009213)
-                         )
+                         (org-ascii-text-width 23058430000))
                      (org-export-as 'ascii t nil t)))
          (returnval '()))
     ;; loop over attachments
@@ -1273,50 +1274,6 @@ working on this."
       (message "NO PROBLEMS HERE")
       ;; (message "Response: %s" comment-response )
       comment-response)))
-
-;;deprectaed!!!!!!
-(defun org-lms-setup ()
-  "Merge  defs and students lists, and create table for later use.
-
-`org-lms-course', `org-lms-local-assignments' and other org-lms
-variables must be set or errors wil lresult."
-  (setq org-lms-merged-students (org-lms-merge-student-lists))
-  (setq org-lms-merged-assignments (org-lms-merge-assignment-values))
-  (org-lms-assignments-table org-lms-merged-assignments)
-  )
-
-(defun org-lms-setup-grading (&optional courseid assignmentsfile)
-  "Parse assignments buffer and students lists, and create table for later use.
-
-`org-lms-course', `org-lms-local-assignments' and other org-lms
-variables must be set or errors will result."
-  (setq org-lms-merged-students (org-lms-merge-student-lists))
-  ;;(setq org-lms-merged-assignments (org-lms-merge-assignment-values))
-  (setq assignments (org-lms-map-assignments (org-lms-get-keyword "ORG_LMS_ASSIGNMENTS")))
-  (setq org-lms-merged-assignments assignments)
-  (org-lms-assignments-table assignments)
-  )
-(defun org-lms-get-local-csv-students (&optional csv)
-  (unless csv
-    (setq csv "./students.csv"))
-  (org-lms~parse-plist-symbol-csv-file csv)
-  )
-
-(defun org-lms-get-local-json-students (&optional jfile)
-  (unless jfile
-    (setq jfile "./students-local.json"))
-  (ol-jsonwrapper json-read-file jfile))
-
-
-
-(defcustom org-lms-get-student-function 'org-lms-get-local-json-students
-  "function to use to get students"
-  :type 'function)
-
-(defun org-lms-get-local-students (&optional file)
-  ;; (unless file
-  ;;   (setq file "./students.json"))
-  (apply org-lms-get-student-function (list file)))
 
 (defun org-lms-assignments-table (&optional assignments students)
   "Return a 2-dimensional list suitable whose contents are org-mode table cells.
@@ -1424,6 +1381,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            ;; rewrite this part wit horg-process-props? 
            ;; nmaybe not possible as written. 
            (atitle (plist-get body :name ))
+           (number (plist-get body :assignment_number))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
            (weight (plist-get body :assignment-weight ))
@@ -1432,6 +1390,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            ;; (email-response (plist-get body :email-response))
            (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
+           (grading-type (or (plist-get body :grading-type) "letter_grade"))
            (courseid (or (plist-get body :courseid) (org-lms-get-keyword "ORG_LMS_COURSEID")) 
                      ;; (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
                      ;;     (number-to-string (plist-get org-lms-course :id))
@@ -1443,6 +1402,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "ASSIGNMENTID" assignmentid)
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (org-set-property "BASECOMMIT" basecommit)
+      (org-set-property "GRADING_TYPE" grading-type)
+      (org-set-property "NUMBER" number)
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
@@ -1758,15 +1719,21 @@ you have not received a grade for work that you have handed in,
 In that case, send all marked 'READY' or 'TODO'."
   (interactive)
   (message "Mailing all READY subtrees to students")
-  (let ((send-condition
+  
+  (let* ((ol-status-org-msg org-msg-mode)
+        
+        (send-condition
          (if send-all
              `(or (string= (org-element-property :todo-keyword item) "READY")
                   (string= (org-element-property :todo-keyword item) "TODO") )
            `(string= (org-element-property :todo-keyword item) "READY")
            )))
+    (if ol-status-org-msg (org-msg-mode))
     (org-map-entries 
-     #'ol-send-just-one))
-  (org-cycle-hide-drawers 'all))
+     #'ol-send-just-one)
+    (if ol-status-org-msg (org-msg-mode)))
+  (org-cycle-hide-drawers 'all)
+  )
 
 
 (cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
@@ -1995,124 +1962,14 @@ The cursor is left in the TO field."
 
 
 
-;; still imperfect, but good enough for me.  
-(defun org-lms-overlay-headings ()
-  "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
-  (interactive)
-  (require 'ov)
-
-  (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
-    (org-map-entries
-     (lambda ()
-       (when (org-entry-get (point) "GRADE")
-         (ov-clear (- (line-end-position) 1)
-                   (+ 0 (line-end-position)))
-         (setq ov (make-overlay (- (line-end-position) 1)
-                                (+ 0 (line-end-position))))
-         (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
-         (overlay-put
-          ov 'display
-          (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
-                   (if chits (org-entry-get (point) "CHITS") "")))
-         (overlay-put ov 'name "grading")
-         (message "%s" (overlay-get ov "name"))))))
-  )
-
-(defun org-lms-clear-overlays ()
-  "if the overlays become annoying at any point"
-  (interactive)
-  (ov-clear))
-
-(defun org-lms-set-grade (grade)
-  "set grade property at point and regenerate overlays"
-  (interactive "sGrade:")
-  (org-set-property "GRADE" grade)
-  (org-lms-clear-overlays)
-  (org-lms-overlay-headings) )
-
-(defun org-lms-set-grade ()
-  "set grade property for all headings on basis of \"- Grade :: \" line.
-
-  Use with caution."
-  (interactive)
-  (save-excursion
-    (org-back-to-heading)
-    (while (re-search-forward "- \\*?Grade\\*? :: \\(.+\\)" nil t )
-      (org-set-property "GRADE" (match-string 1))
-      ))
-  (org-lms-overlay-headings) 
-
-  )
-
-(defun org-lms-set-all-grades ()
-  "set grade property for all headings on basis of \"- Grade :: \" line.
-
-  Use with caution."
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "- \\*?Grade\\*? :: \\(.+\\)" nil t )
-      (org-set-property "GRADE" (match-string 1))
-      ;; (save-excursion
-      ;;   (org-back-to-heading)
-      ;;   (org-set-property)
-      ;;   (org-element-at-point))
-      ))
-  (org-lms-overlay-headings) 
-
-  )
-
-(defun org-lms-set-all-grades-boolean ()
-  "set grade property for all headings on basis of \"- Grade :: \" line.
-
-  Use with caution."
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "- \\*?Grade\\*? :: \\(.+\\)" nil t )
-      (let ((grade (match-string 1)))
-        (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
-            (progn (message grade)
-                   (org-set-property "GRADE" "pass"))
-          )) 
-      
-      ;;(org-set-property "GRADE" (match-string 1))
-      ;; (save-excursion
-      ;;   (org-back-to-heading)
-      ;;   (org-set-property)
-      ;;   (org-element-at-point))
-      ))
-  (org-lms-overlay-headings) 
-  ;;(org-lms-overlay-headings) 
-
-  )
-
-;; helper function to set grades easily. Unfinished.
-(defun org-lms-pass ()
-  "set the current tree to pass"
-  
-  (interactive)
-  (org-set-property "GRADE" "1")
-  ;;(ov-clear)
-  (org-lms-overlay-headings)
-  )
-
-(defun org-lms-chit ()
-  "set the current tree to one chit"
-  
-  (interactive)
-  (org-set-property "CHITS" "1")
-  (ov-clear)
-  (org-lms-overlay-headings)
-  )
-
 (defun org-lms-generate-tables ()
   "Generate a *grade report* buffer with a summary of the graded assignments
 Simultaneously write results to results.csv in current directory."
   (interactive)
 
   (let ((students (org-lms-get-students))
-        (assignments '()))
+        (assignments '())
+        (chits (org-lms-get-keyword "OL_USE_CHITS")))
 
     ;; hack! having trouble with this
     (cl-loop for s in-ref students
@@ -2145,9 +2002,11 @@ Simultaneously write results to results.csv in current directory."
                          ;;((string= g "0") (setq g "Fail"))
                          )
                         (add-to-list 'grades `(,assignment . ,g))
-                        (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS")))
+                        
+                        (if chits
+                            (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS"))))
                         (plist-put s :grades grades)))))
-         nil 'tree)))
+         nil 'file 'comment)))
     ;; there's gotta be a bette way!
     (cl-loop for s in-ref students
              do (let ((grades (plist-get s :grades)))
@@ -2156,6 +2015,7 @@ Simultaneously write results to results.csv in current directory."
     
     (let* ((columns (cl-loop for a in assignments
                                          collect a
+                                         if chits
                                          collect (concat a " Chits")))
            (tableheader (append '("Student" "First" "Nick" "Last" "Student #" "email") columns))
            (rows (cl-loop for s in students
@@ -2328,17 +2188,18 @@ maybe key-type needs to be keyword though! Still a work in progress.
 to keep announcement creation super-lightweight, *always* export that 
 headline."
   (interactive)
-  (save-excursion
-    (let ((subtree (org-lms--get-valid-subtree)))
-      (org-lms-headline-to-announcement)
-      )))
+  (if (string= (org-lms-get-keyword "ORG_LMS_SECTION") "announcement")
+      (save-excursion
+        (let ((subtree (org-lms--get-valid-subtree)))
+          (org-lms-headline-to-announcement)
+          ))))
 
 (defun mwp-subtree-to-slack-wim ()
   "move point to top level subtree, then, since we want 
 to keep announcement creation super-lightweight, *always*  
 copy that subtree as slack text for posting to slack."
   (interactive)
-  (save-excursion
+    (save-excursion
     (let ((subtree (org-lms--get-valid-subtree)))
       (org-mark-subtree)
       (org-slack-export-to-clipboard-as-slack)
@@ -2358,12 +2219,43 @@ copy that subtree as slack text for posting to slack."
           (message "Couldn't find a valid subtree!!! Not posted."))
         ))))
 
+;; TODO: detect if grade should be boolean or normal
+(defun org-lms-grades-wim ()
+  "set grade in current subtree, set state to ready, and advance to next grade"
+  (interactive)
+  (org-lms-set-grade)
+  (org-todo "READY")
+  (org-forward-heading-same-level 1))
+
+(defun org-lms-wim-wim ()
+  "test for org-lms-section, then perform the appropriate wim function"
+  (interactive)
+  (pcase (org-lms-get-keyword "ORG_LMS_SECTION")
+    ("announcement" (org-lms-announcement-wim))
+    ("assignment" (org-lms-assignment-wim))
+    ("slides" (org-lms-slides-wim))
+    ("grades" (org-lms-grades-wim))
+    )
+  )
+
 ;; Minor mode definition. I'm not really using it right now, but it
-;; might be a worthwhile improvement. 
+;; might be a worthwhile improvement.
+(defun o-l-set-grade ()
+(call-interactively (org-set-property "GRADE"))) 
 (define-minor-mode org-lms-mode
-  "a mode to get my grading in order"
-  ;;:keymap (kbd "C-c C-x C-g" . (call-interactively (org-set-property "GRADE")))
+  "a mode to get my grading and other lms interacitons in order"
+  :init-value nil
+  :global nil
+  :keymap  (let ((map (make-sparse-keymap))) 
+             (define-key map (kbd "C-c C-x C-g") 'o-l-set-grade )
+             map )
   :lighter " Mark"
+  (mwp-toggle-macros)
+  (if org-lms-mode
+      (progn
+        (add-hook 'org-ctrl-c-ctrl-c-final-hook 'org-lms-wim-wim))
+
+    (remove-hook 'org-ctrl-c-ctrl-c-hinal-hook 'org-lms-wim-wim))
   )
 
 (provide 'org-lms)
