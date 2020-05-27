@@ -2281,15 +2281,21 @@ Once again, I've written multiple functions to do two very similar tasks. Need t
 In that case, send all marked 'READY' or 'TODO'."
   (interactive)
   (message "Mailing all READY subtrees to students")
-  (let ((send-condition
+  
+  (let* ((ol-status-org-msg org-msg-mode)
+        
+        (send-condition
          (if send-all
              `(or (string= (org-element-property :todo-keyword item) "READY")
                   (string= (org-element-property :todo-keyword item) "TODO") )
            `(string= (org-element-property :todo-keyword item) "READY")
            )))
+    (if ol-status-org-msg (org-msg-mode))
     (org-map-entries 
-     #'ol-send-just-one))
-  (org-cycle-hide-drawers 'all))
+     #'ol-send-just-one)
+    (if ol-status-org-msg (org-msg-mode)))
+  (org-cycle-hide-drawers 'all)
+  )
 
 
 (cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
