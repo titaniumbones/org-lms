@@ -2973,17 +2973,18 @@ Copying the excellent "do what I mean" scope from [[https://github.com/kaushalmo
 to keep announcement creation super-lightweight, *always* export that 
 headline."
   (interactive)
-  (save-excursion
-    (let ((subtree (org-lms--get-valid-subtree)))
-      (org-lms-headline-to-announcement)
-      )))
+  (if (string= (org-lms-get-keyword "ORG_LMS_SECTION") "announcement")
+      (save-excursion
+        (let ((subtree (org-lms--get-valid-subtree)))
+          (org-lms-headline-to-announcement)
+          ))))
 
 (defun mwp-subtree-to-slack-wim ()
   "move point to top level subtree, then, since we want 
 to keep announcement creation super-lightweight, *always*  
 copy that subtree as slack text for posting to slack."
   (interactive)
-  (save-excursion
+    (save-excursion
     (let ((subtree (org-lms--get-valid-subtree)))
       (org-mark-subtree)
       (org-slack-export-to-clipboard-as-slack)
