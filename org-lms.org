@@ -3029,20 +3029,39 @@ copy that subtree as slack text for posting to slack."
 #+end_src
 
 #+RESULTS:
-: org-lms-assignment-wim
+: org-lms-wim-wim
 
-* Moribund minor-mode
-It would be nice to define a minor mode that set the coure up properly, but there's a bit of a ways to go before I do that .
-
+** Preliminary mode defn
+- define a key map prefix (C-c C-x ?)
+- add hook to ctrl-c ctrl-c; if in thism ode, and in announcements, announcement-wim; if in lectures, lslides-wim; if in grades... etc.  
 #+begin_src emacs-lisp
 ;; Minor mode definition. I'm not really using it right now, but it
-;; might be a worthwhile improvement. 
+;; might be a worthwhile improvement.
+(defun o-l-set-grade ()
+(call-interactively (org-set-property "GRADE"))) 
 (define-minor-mode org-lms-mode
-  "a mode to get my grading in order"
-  ;;:keymap (kbd "C-c C-x C-g" . (call-interactively (org-set-property "GRADE")))
+  "a mode to get my grading and other lms interacitons in order"
+  :init-value nil
+  :global nil
+  :keymap  (let ((map (make-sparse-keymap))) 
+             (define-key map (kbd "C-c C-x C-g") 'o-l-set-grade )
+             map )
   :lighter " Mark"
+  (mwp-toggle-macros)
+  (if org-lms-mode
+      (progn
+        (add-hook 'org-ctrl-c-ctrl-c-final-hook 'org-lms-wim-wim))
+
+    (remove-hook 'org-ctrl-c-ctrl-c-hinal-hook 'org-lms-wim-wim))
   )
+
+
+
+
 #+end_src
+
+#+RESULTS:
+| keymap | (3 keymap (24 keymap (7 . o-l-set-grade))) |
 
 * library closing
 
