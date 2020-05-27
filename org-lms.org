@@ -2958,7 +2958,10 @@ maybe key-type needs to be keyword though! Still a work in progress.
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 #+end_src
 
-* ACTION WIM functions
+* Moribund minor-mode
+It would be nice to define a minor mode that set the coure up properly, but there's a bit of a ways to go before I do that .
+
+** ACTION WIM functions
 
 This is now working; place these functions next to their topically-appropriate siblings. 
  
@@ -3004,6 +3007,24 @@ copy that subtree as slack text for posting to slack."
           (message "Couldn't find a valid subtree!!! Not posted."))
         ))))
 
+;; TODO: detect if grade should be boolean or normal
+(defun org-lms-grades-wim ()
+  "set grade in current subtree, set state to ready, and advance to next grade"
+  (interactive)
+  (org-lms-set-grade)
+  (org-todo "READY")
+  (org-forward-heading-same-level 1))
+
+(defun org-lms-wim-wim ()
+  "test for org-lms-section, then perform the appropriate wim function"
+  (interactive)
+  (pcase (org-lms-get-keyword "ORG_LMS_SECTION")
+    ("announcement" (org-lms-announcement-wim))
+    ("assignment" (org-lms-assignment-wim))
+    ("slides" (org-lms-slides-wim))
+    ("grades" (org-lms-grades-wim))
+    )
+  )
 
 #+end_src
 
