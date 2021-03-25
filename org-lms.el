@@ -13,7 +13,7 @@
 ;; require the dependencies
 (require 'org) ;; the source of all good!
 (require 'org-attach) ;; for attaching files to emails
-(require 'cl) ;; may not be necessary anymore in newer Emacsen
+(require 'cl-lib) ;; may not be necessary anymore in newer Emacsen
 (require 'org-mime) ;; Unfortunately I require this somewhat outdated library for mailing
 (require 'dash) ;; modern syntax
 (require 'ts) ;; easy time manipulation
@@ -22,9 +22,9 @@
 ;;(require 'ov) ;; for grade overlays
 
 (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
-    'org-lms~send-subtree-with-attachments)
+    'org-lms~send-subtree-with-attachments "a while ago")
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
-    'org-lms-mail-all)
+    'org-lms-mail-all "a while ago")
 
 ;; variables
   ;; most of these are used for canvas interactions...
@@ -1135,17 +1135,18 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
 (defun org-lms-map-assignments (&optional file )
     "turn a buffer of assignment objects into a plist with relevant info enclosed."
 
-    (let ((old-buffer (current-buffer)))
+    (let ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
+          (old-buffer (current-buffer)))
       (with-temp-buffer 
         (if file (insert-file-contents (expand-file-name file))
           (insert-buffer-substring-no-properties old-buffer))
         ;; (insert-file-contents file)
         (org-mode)
-        (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
+        (let* (
                (results '())
                (org-use-tag-inheritance nil)
                )
-         ;; (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
+         (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
           (setq results 
                 (org-map-entries
                  (lambda ()
@@ -1200,6 +1201,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (cl-assert (eq (point) (point-min)))
   (read (current-buffer)))
 )
+
 
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
@@ -1274,6 +1276,50 @@ working on this."
       (message "NO PROBLEMS HERE")
       ;; (message "Response: %s" comment-response )
       comment-response)))
+
+;;deprectaed!!!!!!
+(defun org-lms-setup ()
+  "Merge  defs and students lists, and create table for later use.
+
+`org-lms-course', `org-lms-local-assignments' and other org-lms
+variables must be set or errors wil lresult."
+  (setq org-lms-merged-students (org-lms-merge-student-lists))
+  (setq org-lms-merged-assignments (org-lms-merge-assignment-values))
+  (org-lms-assignments-table org-lms-merged-assignments)
+  )
+
+(defun org-lms-setup-grading (&optional courseid assignmentsfile)
+  "Parse assignments buffer and students lists, and create table for later use.
+
+`org-lms-course', `org-lms-local-assignments' and other org-lms
+variables must be set or errors will result."
+  (setq org-lms-merged-students (org-lms-merge-student-lists))
+  ;;(setq org-lms-merged-assignments (org-lms-merge-assignment-values))
+  (setq assignments (org-lms-map-assignments (org-lms-get-keyword "ORG_LMS_ASSIGNMENTS")))
+  (setq org-lms-merged-assignments assignments)
+  (org-lms-assignments-table assignments)
+  )
+(defun org-lms-get-local-csv-students (&optional csv)
+  (unless csv
+    (setq csv "./students.csv"))
+  (org-lms~parse-plist-symbol-csv-file csv)
+  )
+
+(defun org-lms-get-local-json-students (&optional jfile)
+  (unless jfile
+    (setq jfile "./students-local.json"))
+  (ol-jsonwrapper json-read-file jfile))
+
+
+
+(defcustom org-lms-get-student-function 'org-lms-get-local-json-students
+  "function to use to get students"
+  :type 'function)
+
+(defun org-lms-get-local-students (&optional file)
+  ;; (unless file
+  ;;   (setq file "./students.json"))
+  (apply org-lms-get-student-function (list file)))
 
 (defun org-lms-assignments-table (&optional assignments students)
   "Return a 2-dimensional list suitable whose contents are org-mode table cells.
