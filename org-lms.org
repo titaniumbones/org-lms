@@ -2873,8 +2873,9 @@ Simultaneously write results to results.csv in current directory."
     
     (let* ((columns (cl-loop for a in assignments
                                          collect a
-                                         if chits
-                                         collect (concat a " Chits")))
+                                         ;; if chits
+                                         ;; collect (concat a " Chits")
+                                         ))
            (tableheader (append '("Student" "First" "Nick" "Last" "Student #" "email") columns))
            (rows (cl-loop for s in students
                      collect
