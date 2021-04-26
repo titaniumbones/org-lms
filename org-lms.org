@@ -2776,7 +2776,7 @@ Simultaneously write results to results.csv in current directory."
                                            ,(plist-get s :firstname)
                                            ,(plist-get s :nickname)
                                            ,(plist-get s :lastname)
-                                           ,(plist-get s :sis_user_id) ;; check to be sure this is right
+                                           ,(plist-get s :integration_id) ;; check to be sure this is right
                                            ,(plist-get s :email)
                                            )
                                          (cl-loop for c in columns
