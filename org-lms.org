@@ -1935,7 +1935,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
              (json-key-type 'keyword)
              (json-false nil)
              ;; this crufty garbage needs to be fixed. 
-             (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
+             ;;(prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json")))
+             )
         (mapcar (lambda (stu)
                   ;;(message "%s" stu)
                   (let* ((fname (plist-get stu :firstname))
