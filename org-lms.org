@@ -659,7 +659,9 @@ No Plans Yet
 :GRADE:    1
 :END:
 These are basically wrappers around ~request.el~ that allow some of the requests to be simplified. I have written 2 functions, one for passing requests via header arguments, and another for passing them via json. THese should be combined & I should use a switch to allow users to use one interface rather than theo ther (though probably we should always go through the JSON interface!
-) 
+)
+
+<2020-05-27 Wed> Continue to have trouble relating to changes in ~request~ that create major difficulties. Trying to rewrite my way around them.  
 #+begin_src emacs-lisp
 ;; talking to canvas via API v1: https://canvas.instructure.com/doc/api/ 
 
