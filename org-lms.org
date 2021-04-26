@@ -2633,7 +2633,7 @@ These are for showing grades in the org buffer
         (org-todo "READY"))
       )))
   (org-lms-overlay-headings) 
-
+  (org-next-visible-heading 1)
   )
 
 (defun org-lms-set-all-grades ()
