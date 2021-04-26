@@ -1135,14 +1135,13 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
 (defun org-lms-map-assignments (&optional file )
     "turn a buffer of assignment objects into a plist with relevant info enclosed."
 
-    (let ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
-          (old-buffer (current-buffer)))
+    (let ((old-buffer (current-buffer)))
       (with-temp-buffer 
         (if file (insert-file-contents (expand-file-name file))
           (insert-buffer-substring-no-properties old-buffer))
         ;; (insert-file-contents file)
         (org-mode)
-        (let* (
+        (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
                (results '())
                (org-use-tag-inheritance nil)
                )
@@ -1162,7 +1161,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                              (buffer-substring-no-properties
                                               (org-element-property :contents-begin e)
                                               (-  (org-element-property :contents-end e) 1))
-                                             )) "rubric" 'tree))  )
+                                             ))
+                                         "rubric" 'tree))  )
                      ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
                      `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
                                                :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
@@ -1180,7 +1180,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                                                (downcase
                                                                 (replace-regexp-in-string "[\s]" "-" name )))
                                                :rubric ,rubric)))
-                                               ) "assignment"))
+                   )
+                 "assignment"))
           ;;(message "RESULT IS: %s" results)
           results))) )
 
@@ -1459,7 +1460,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
              (json-key-type 'keyword)
              (json-false nil)
              ;; this crufty garbage needs to be fixed. 
-             (prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json"))))
+             ;;(prs (if (string= assignment-type "github") (json-read-file "./00-profile-pr.json")))
+             )
         (mapcar (lambda (stu)
                   ;;(message "%s" stu)
                   (let* ((fname (plist-get stu :firstname))
@@ -2087,7 +2089,7 @@ The cursor is left in the TO field."
         (org-todo "READY"))
       )))
   (org-lms-overlay-headings) 
-
+  (org-next-visible-heading 1)
   )
 
 (defun org-lms-set-all-grades ()
@@ -2189,12 +2191,12 @@ Simultaneously write results to results.csv in current directory."
                         (cond
                          ((string= g "1") (setq g "Pass"))
                          ;; this needs to be figured out. I want this in p/f booleans but not for 0 grades in non-booleans
-                         ;;((string= g "0") (setq g "Fail"))
+                         ((string= g "0") (setq g "Fail"))
                          )
                         (add-to-list 'grades `(,assignment . ,g))
                         
-                        (if chits
-                            (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS"))))
+                        ;; (if chits
+                        ;;     (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS"))))
                         (plist-put s :grades grades)))))
          nil 'file 'comment)))
     ;; there's gotta be a bette way!
@@ -2205,8 +2207,9 @@ Simultaneously write results to results.csv in current directory."
     
     (let* ((columns (cl-loop for a in assignments
                                          collect a
-                                         if chits
-                                         collect (concat a " Chits")))
+                                         ;; if chits
+                                         ;; collect (concat a " Chits")
+                                         ))
            (tableheader (append '("Student" "First" "Nick" "Last" "Student #" "email") columns))
            (rows (cl-loop for s in students
                      collect
@@ -2216,7 +2219,7 @@ Simultaneously write results to results.csv in current directory."
                                            ,(plist-get s :firstname)
                                            ,(plist-get s :nickname)
                                            ,(plist-get s :lastname)
-                                           ,(plist-get s :sis_user_id) ;; check to be sure this is right
+                                           ,(plist-get s :integration_id) ;; check to be sure this is right
                                            ,(plist-get s :email)
                                            )
                                          (cl-loop for c in columns
