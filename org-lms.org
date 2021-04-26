@@ -2749,12 +2749,12 @@ Simultaneously write results to results.csv in current directory."
                         (cond
                          ((string= g "1") (setq g "Pass"))
                          ;; this needs to be figured out. I want this in p/f booleans but not for 0 grades in non-booleans
-                         ;;((string= g "0") (setq g "Fail"))
+                         ((string= g "0") (setq g "Fail"))
                          )
                         (add-to-list 'grades `(,assignment . ,g))
                         
-                        (if chits
-                            (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS"))))
+                        ;; (if chits
+                        ;;     (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS"))))
                         (plist-put s :grades grades)))))
          nil 'file 'comment)))
     ;; there's gotta be a bette way!
