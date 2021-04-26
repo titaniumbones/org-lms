@@ -1584,7 +1584,7 @@ Needs to be ocnverted to org-ql! <2019-10-01 Tue>
                (results '())
                (org-use-tag-inheritance nil)
                )
-         ;; (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
+         (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
           (setq results 
                 (org-map-entries
                  (lambda ()
