@@ -1290,6 +1290,8 @@ Attachments. These functions are a little complicated because attachments are st
          (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
+             (message "%s%s"(downcase (plist-get student :lastname))
+                      (downcase (plist-get student :firstname)) )
              (let* ((downloadurl (plist-get attachment :url))
                     (filename
                      (format "%s%s_%s%s_%s_%s"
