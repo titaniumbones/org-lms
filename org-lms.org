@@ -1602,7 +1602,8 @@ Needs to be ocnverted to org-ql! <2019-10-01 Tue>
                                              (buffer-substring-no-properties
                                               (org-element-property :contents-begin e)
                                               (-  (org-element-property :contents-end e) 1))
-                                             )) "rubric" 'tree))  )
+                                             ))
+                                         "rubric" 'tree))  )
                      ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
                      `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
                                                :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
