@@ -41,7 +41,7 @@ Source blocks are tangled using org-babel.
 ;; require the dependencies
 (require 'org) ;; the source of all good!
 (require 'org-attach) ;; for attaching files to emails
-(require 'cl) ;; may not be necessary anymore in newer Emacsen
+(require 'cl-lib) ;; may not be necessary anymore in newer Emacsen
 (require 'org-mime) ;; Unfortunately I require this somewhat outdated library for mailing
 (require 'dash) ;; modern syntax
 (require 'ts) ;; easy time manipulation
