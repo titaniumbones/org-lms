@@ -22,9 +22,9 @@
 ;;(require 'ov) ;; for grade overlays
 
 (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
-    'org-lms~send-subtree-with-attachments "a while ago")
+    'org-lms~send-subtree-with-attachments)
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
-    'org-lms-mail-all "a while ago")
+    'org-lms-mail-all)
 
 ;; variables
   ;; most of these are used for canvas interactions...
@@ -1180,8 +1180,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                                                (downcase
                                                                 (replace-regexp-in-string "[\s]" "-" name )))
                                                :rubric ,rubric)))
-                   )
-                 "assignment"))
+                                               ) "assignment"))
           ;;(message "RESULT IS: %s" results)
           results))) )
 
@@ -1202,7 +1201,6 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (cl-assert (eq (point) (point-min)))
   (read (current-buffer)))
 )
-
 
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
