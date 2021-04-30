@@ -22,9 +22,9 @@
 ;;(require 'ov) ;; for grade overlays
 
 (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
-    'org-lms~send-subtree-with-attachments)
+    'org-lms~send-subtree-with-attachments "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
-    'org-lms-mail-all)
+    'org-lms-mail-all "a pretty long time ago")
 
 ;; variables
   ;; most of these are used for canvas interactions...
@@ -549,7 +549,7 @@ will be moved in this case too."
           (semester (plist-get course :semester))
           (result nil)
           )
-      (loop for can in-ref canvas-courses
+      (cl-loop for can in-ref canvas-courses
             do
             ;;(prin1 can)
             (let ((course-code (plist-get can :sis_course_id)))
@@ -656,7 +656,7 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
                                       ("per_page" . 500 )))))
       ;;(message "RESULTS")
       ;;(with-temp-file "students-canvas.json" (insert result))
-      (loop for student in-ref result
+      (cl-loop for student in-ref result
             do
             (if (string-match "," (plist-get student :sortable_name))
                 (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
@@ -693,10 +693,10 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
 
   ;;(message "%s" local)
  (if local 
-  (loop for c in-ref canvas
+  (cl-loop for c in-ref canvas
         do (let* ((defn c)
                   (email (plist-get defn :email)))
-             (loop for l in-ref local
+             (cl-loop for l in-ref local
                    if (string=  email  (plist-get l :email))
                    do
                    (progn 
@@ -862,7 +862,7 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
   ;; (prin1 local)
   ;; (prin1 canvas)
   (let ((result '()))
-    (loop for l in-ref local
+    (cl-loop for l in-ref local
           do (let* ((defn (cdr l))
                     (name (plist-get defn :name)))
                (message "LLLLLLLLL")
@@ -957,6 +957,17 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                  (message "Cleaning up attach...")))))
   )
 
+(defun org-lms-get-assignment-groups (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/assignment_groups" courseid) "GET"))
+
+(defun org-lms-get-single-assignment-group (groupid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/assignment_groups/%s" courseid groupid) "GET"))
+
 (defun org-lms-parse-assignment ()
   "Extract assignment data from HEADLINE.
   HEADLINE is an org-element object."
@@ -970,6 +981,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE") "canvas") "online_upload" "none"))
          ;;( (org-entry-get nil "DUE_AT"))
          (publish (org-entry-get nil "OL_PUBLISH"))
+         (group (org-entry-get nil "ASSIGNMENT_GROUP"))
          (reflection (org-entry-get nil "OL_HAS_REFLECTION"))
          (reflection-id (org-entry-get nil "OL_REFLECTION_ID")))
     ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
@@ -978,75 +990,79 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
            (assignment-params `(("assignment" .
                                  (("name" .  ,(nth 4 (org-heading-components)) )
                                   ("description" . ,(org-export-as 'html t nil t))
-                                  ,(if duedate
-                                       ;;`("due_at"   . ,(concat duedate  "T23:59:59-04:00"))
-                                       `("due_at"   . ,(o-l-date-to-timestamp duedate))
-                                     )
+                                  ("due_at" . ,(o-l-date-to-timestamp
+                                                (or duedate
+                                                    (format-time-string "%Y-%m-%d"
+                                                                        (time-add (current-time) (* 7 24 3600) )) ) ))
+                                  ;;`("due_at"   . ,(o-l-date-to-timestamp duedate))
+                                     
                                   ("submission_types" . ,subtype)
                                   ("grading_type" . ,gradingtype)
                                   ("grading_standard_idcomment" . 458)
                                   ("points_possible" . ,(or pointspossible 10))
-                                  ("published" . ,(if publish t nil) )))))
-
-           (response
-            (org-lms-canvas-request (format "courses/%s/assignments%s"
-                                            (org-lms-get-keyword "ORG_LMS_COURSEID");; (plist-get org-lms-course :id)
-                                            (if canvasid
-                                                (format  "/%s" canvasid) "")
-                                            )
-                                    (if canvasid "PUT" "POST")
-                                    assignment-params
-                                    ))
-           (response-data (or response nil))
+                                  ("published" . ,(if publish t nil) )
+                                  ("assignment_group_id" . ,(if group (org-lms-map-assignment-group-from-name group) nil))))))
            )
-      ;; (message "HERE COMES THE PARAMS %s" (request-response-data response) )
-      ;; (prin1 (assq-delete-all "assignment[description]" assignment-params))
-      (if (plist-get response-data :id)
-          (progn
-            (message "received assignment response-data")
-            (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
-            (org-set-property "OL_PUBLISH" (format "%s"(plist-get response-data :published)))
-            (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
-            (org-set-property "CANVAS_SUBMISSION_URL" (format "%s" (plist-get response-data :submissions_download_url)))
-            (org-set-property "SUBMISSIONS_DOWNLOAD_URL" (format "%s"(plist-get response-data :submissions_download_url)))
-            (org-set-property "GRADING_STANDARD_ID" (format "%s"(plist-get response-data :grading_standard_id)))
-            (org-set-property "CANVAS_SUBMISSION_TYPES" (format "%s"(plist-get response-data :submission_types)))
-            (org-set-property "GRADING_TYPE" (format "%s"(plist-get response-data :grading_type)))
-            (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
-            (if reflection 
-                (let* ((reflection-params `(("assignment" .
-                                             (("name" .  ,(concat  (nth 4 (org-heading-components)) " Reflection Questions") )
-                                              ("description" . ,(org-export-as 'html t nil t))
-                                              ,(if duedate
-                                                   ;;`("due_at"   . ,(concat duedate  "T23:59:59-04:00"))
-                                                   `("due_at"   . ,(o-l-date-to-timestamp duedate))
-                                                 )
-                                              ("submission_types" . "none")
-                                              ("grading_type" . ,gradingtype)
-                                              ("grading_standard_idcomment" . 458)
-                                              ("points_possible" . 1)
-                                              ("published" . ,(if publish t nil) )))))
-                       (reflection-response
-                        (org-lms-canvas-request (format "courses/%s/assignments%s"
-                                                        (org-lms-get-keyword "ORG_LMS_COURSEID")
-                                                        (if reflection-id
-                                                            (format  "/%s" reflection-id) "")
-                                                        )
-                                                (if reflection-id "PUT" "POST")
-                                                assignment-params
-                                                )))
-                  (if (and reflection-response (plist-get reflection-response :id))
-                      (progn
-                        (message "received reflection response-data")
-                        (org-set-property "OL_REFLECTION_ID" (format "%s" (plist-get response-data :id)))))))
-            
-            
-            ))
+      ;; (when group
+      ;;   (plist-put assignment-params "assignment_group" group))
 
       
-      ;; (message "ASSIGNMENT_TYPE is canvas %s" (equal "canvas" (org-entry-get nil "ASSIGNMENT_TYPE")))
-      ;; (message "RESPONSE IS %s" response)
-      response)))
+
+      (let* ((response
+              (org-lms-canvas-request (format "courses/%s/assignments%s"
+                                              (org-lms-get-keyword "ORG_LMS_COURSEID");; (plist-get org-lms-course :id)
+                                              (if canvasid
+                                                  (format  "/%s" canvasid) "")
+                                              )
+                (if canvasid "PUT" "POST")
+                assignment-params
+                ))
+             (response-data (or response nil)))
+        
+        ;; (message "HERE COMES THE PARAMS %s" (request-response-data response) )
+        ;; (prin1 (assq-delete-all "assignment[description]" assignment-params))
+        (if (plist-get response-data :id)
+            (progn
+              (message "received assignment response-data")
+              (org-set-property "DUE_AT"  (format "%s" (substring
+                                                        (plist-get response-data :due_at)
+                                                        0 10)))
+              (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
+              (org-set-property "OL_PUBLISH" (format "%s"(plist-get response-data :published)))
+              (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
+              (org-set-property "CANVAS_SUBMISSION_URL" (format "%s" (plist-get response-data :submissions_download_url)))
+              (org-set-property "SUBMISSIONS_DOWNLOAD_URL" (format "%s"(plist-get response-data :submissions_download_url)))
+              (org-set-property "GRADING_STANDARD_ID" (format "%s"(plist-get response-data :grading_standard_id)))
+              (org-set-property "CANVAS_SUBMISSION_TYPES" (format "%s"(plist-get response-data :submission_types)))
+              (org-set-property "GRADING_TYPE" (format "%s"(plist-get response-data :grading_type)))
+              (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
+              
+              (if reflection 
+                  (let* ((reflection-params `(("assignment" .
+                                               (("name" .  ,(concat  (nth 4 (org-heading-components)) " Reflection Questions") )
+                                                ("description" . ,(org-export-as 'html t nil t))
+                                                ,(if duedate
+                                                     `("due_at"   . ,(o-l-date-to-timestamp duedate))
+                                                   )
+                                                ("submission_types" . "none")
+                                                ("grading_type" . ,gradingtype)
+                                                ("grading_standard_idcomment" . 458)
+                                                ("points_possible" . 1)
+                                                ("published" . ,(if publish t nil) )))))
+                         (reflection-response
+                          (org-lms-canvas-request (format "courses/%s/assignments%s"
+                                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                                          (if reflection-id
+                                                              (format  "/%s" reflection-id) "")
+                                                          )
+                            (if reflection-id "PUT" "POST")
+                            assignment-params
+                            )))
+                    (if (and reflection-response (plist-get reflection-response :id))
+                        (progn
+                          (message "received reflection response-data")
+                          (org-set-property "OL_REFLECTION_ID" (format "%s" (plist-get response-data :id)))))))))
+        response))))
 
 
 
@@ -1056,6 +1072,72 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (unless file (setq file (expand-file-name "assignments.el")))
   (org-lms-parse-assignment)
   (org-lms-save-assignment-map file))
+
+(defun org-lms-asignment-group-from-headline ()
+  "Extract assignment group data from HEADLINE.
+  HEADLINE is an org-element object."
+  (let* ((canvasid (org-entry-get nil "CANVASID"))
+         (name  (nth 4 (org-heading-components)) )
+         (position (org-etry-get nil "POSITION"))
+         (weight (org-entry-get nil "WEIGHT"))
+         ;; rules...
+         (params `((name . ,name)
+                   (canvasid . ,canvasid)
+                   ))
+         (when position (plist-put params :position position))
+         (when weight (plist-put params :group_weight weight))
+         (let* ((response (org-lms-set-assignment-group params))
+               (response-data (or response nil)))
+           
+           (if (plist-get response-data :id)
+               (progn
+                 (message "received assignment group response-data")
+                 (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
+                 (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+                 (org-set-property "GROUP_WEIGHT" (format "%s"(plist-get response-data :group_weight)))
+                 )
+             (message "did not receine assignment group response-data"))
+           response))))
+
+(defun org-lms-set-assignment-group (params)
+  "Create an asignment group from params"
+  (interactive)
+
+  (let* ((canvasid (plist-get params  "CANVASID"))
+         (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
+         (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
+         )
+    ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
+    ;;(prin1 canvasid)
+    (let* ((org-export-with-tags nil)
+           (assignment-params  params 
+                               )
+           
+
+           (response
+            (org-lms-canvas-request (format "courses/%s/assignment_groups%s"
+                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                            (if canvasid
+                                                (format  "/%s" canvasid) "")
+                                            )
+                                    (if canvasid "PUT" "POST")
+                                    assignment-params
+                                    ))
+           (response-data (or response nil)))
+      response)))
+
+(defun org-lms-map-assignment-group-from-name (name)
+  (interactive)
+  (let* ((groups (org-lms-get-assignment-groups))
+         (match (or (--first (string= (plist-get it :name) name) groups )
+                    (org-lms-set-assignment-group `((name . ,name)))))
+         )
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
+
+
+;;(org-lms-set-assignment-group `((name . "Tests")))
 
 ;; huh is this deprecated?
   ;; doesn't seem to be used at all 
@@ -1131,76 +1213,6 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
            (result
             (org-lms-canvas-request (format "courses/%s/grading_standards" courseid) "GET" )))
       result))
-
-(defun org-lms-map-assignments (&optional file )
-    "turn a buffer of assignment objects into a plist with relevant info enclosed."
-
-    (let ((old-buffer (current-buffer)))
-      (with-temp-buffer 
-        (if file (insert-file-contents (expand-file-name file))
-          (insert-buffer-substring-no-properties old-buffer))
-        ;; (insert-file-contents file)
-        (org-mode)
-        (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
-               (results '())
-               (org-use-tag-inheritance nil)
-               )
-         (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
-          (setq results 
-                (org-map-entries
-                 (lambda ()
-                   (let* ((rubric )
-                          (name (nth 4 (org-heading-components)))
-                          (a-symbol (intern (or (org-entry-get nil  "ORG_LMS_ANAME") 
-                                                (replace-regexp-in-string "[ \n\t]" "" name)))))
-                     (setq rubric  (car (org-map-entries
-                                         (lambda ()
-                                           (let ((e (org-element-at-point )))
-                                             ;; in case at some point we would rather have thewhole element (scary)
-                                             ;; (org-element-at-point)
-                                             (buffer-substring-no-properties
-                                              (org-element-property :contents-begin e)
-                                              (-  (org-element-property :contents-end e) 1))
-                                             ))
-                                         "rubric" 'tree))  )
-                     ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
-                     `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
-                                               :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
-                                               :name ,(nth 4 (org-heading-components)  ) 
-                                               :submission_type ,(or (org-entry-get nil "SUBMISSION_TYPE") "online_upload") 
-                                               :published ,(org-entry-get nil "OL_PUBLISH")
-                                               :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
-                                               :basecommit ,(org-entry-get nil "BASECOMMIT")
-                                               :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
-                                               :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
-                                               :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
-                                               :grade_type "letter_grade" ;; oops fix this!
-                                               :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
-                                               :directory ,(or (org-entry-get nil "OL_DIRECTORY")
-                                                               (downcase
-                                                                (replace-regexp-in-string "[\s]" "-" name )))
-                                               :rubric ,rubric)))
-                                               ) "assignment"))
-          ;;(message "RESULT IS: %s" results)
-          results))) )
-
-  (defun org-lms-save-assignment-map (&optional file)
-    "Map assignments and save el object to FILE, \"assignments.el\" by default."
-    (interactive)
-    (unless file (setq file (expand-file-name "assignments.el")))
-    (let ((output (org-lms-map-assignments)))
-      (with-temp-file (expand-file-name "assignments.el")
-
-        (prin1 output (current-buffer))  )) )
-
-(defun org-lms-read-assignment-map (&optional file)
-  "Read assignments map from optional FILE, `assignments.el' by default."
-  (unless file (setq file (expand-file-name "assignments.el")))
-(with-temp-buffer
-  (insert-file-contents (expand-file-name file))
-  (cl-assert (eq (point) (point-min)))
-  (read (current-buffer)))
-)
 
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
@@ -2312,6 +2324,139 @@ Simultaneously write results to results.csv in current directory."
         (org-attach-open)
       (org-lms~open-student-repo)
       )))
+
+(defun org-lms-map-assignments (&optional file )
+    "turn a buffer of assignment objects into a plist with relevant info enclosed."
+
+    (let ((old-buffer (current-buffer)))
+      (with-temp-buffer 
+        (if file (insert-file-contents (expand-file-name file))
+          (insert-buffer-substring-no-properties old-buffer))
+        ;; (insert-file-contents file)
+        (org-mode)
+        (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
+               (results '())
+               (org-use-tag-inheritance nil)
+               )
+         (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
+          (setq results 
+                (org-map-entries
+                 (lambda ()
+                   (let* ((rubric )
+                          (name (nth 4 (org-heading-components)))
+                          (a-symbol (intern (or (org-entry-get nil  "ORG_LMS_ANAME") 
+                                                (replace-regexp-in-string "[ \n\t]" "" name)))))
+                     (setq rubric  (car (org-map-entries
+                                         (lambda ()
+                                           (let ((e (org-element-at-point )))
+                                             ;; in case at some point we would rather have thewhole element (scary)
+                                             ;; (org-element-at-point)
+                                             (buffer-substring-no-properties
+                                              (org-element-property :contents-begin e)
+                                              (-  (org-element-property :contents-end e) 1))
+                                             ))
+                                         "rubric" 'tree))  )
+                     ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
+                     `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
+                                               :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
+                                               :name ,(nth 4 (org-heading-components)  ) 
+                                               :submission_type ,(or (org-entry-get nil "SUBMISSION_TYPE") "online_upload") 
+                                               :published ,(org-entry-get nil "OL_PUBLISH")
+                                               :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
+                                               :basecommit ,(org-entry-get nil "BASECOMMIT")
+                                               :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
+                                               :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
+                                               :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
+                                               :grade_type "letter_grade" ;; oops fix this!
+                                               :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
+                                               :directory ,(or (org-entry-get nil "OL_DIRECTORY")
+                                                               (downcase
+                                                                (replace-regexp-in-string "[\s]" "-" name )))
+                                               :rubric ,rubric)))
+                                               ) "assignment"))
+          ;;(message "RESULT IS: %s" results)
+          results))) )
+
+  (defun org-lms-save-assignment-map (&optional file)
+    "Map assignments and save el object to FILE, \"assignments.el\" by default."
+    (interactive)
+    (unless file (setq file (expand-file-name "assignments.el")))
+    (let ((output (org-lms-map-assignments)))
+      (with-temp-file (expand-file-name "assignments.el")
+
+        (prin1 output (current-buffer))  )) )
+
+(defun org-lms-read-assignment-map (&optional file)
+  "Read assignments map from optional FILE, `assignments.el' by default."
+  (unless file (setq file (expand-file-name "assignments.el")))
+(with-temp-buffer
+  (insert-file-contents (expand-file-name file))
+  (cl-assert (eq (point) (point-min)))
+  (read (current-buffer)))
+)
+
+;; (defun my-org-element-create (title)
+;;   (interactive)
+;;   (let* ((email t)
+;;         (canvas t)
+;;         (type "canvas")
+;;         (weight "0.10")
+;;         (submission "(online_upload)")
+;;         (publish "hello")
+;;         (standard nil)
+;;         (level 1)
+;;         (tags  )
+;;         (export (replace-regexp-in-string "[ ,::]" "-" (downcase title)))
+;;         )
+;;     (message "hello")
+;;     ;;(org-insert-heading-after-current)
+;;     (org-element-create 'headline
+;;                         (list :raw-value title :title title :level level :ORG_LMS_EMAIL_COMMENTS email
+;;                               :ORG_LMS_CANVAS_COMMENTS canvas :ASSIGNMENT_TYPE type
+;;                               :EXPORT_FILE_NAME export :GRADING_STANDARD_ID standard
+;;                               :PUBLISH t :OL_PUBLISH t :ASSIGNMENT_WEIGHT weight)
+;;                         )
+;;     ))
+;; (setq temp-el (my-org-element-create "my title"))
+;; (org-element-interpret-data temp-el)
+
+
+;; (replace-regexp-in-string "[ ,::]" "-" (downcase "My TItle"))
+
+;; (org-ml-build-headline :title title :level level :ORG_LMS_EMAIL_COMMENTS email
+;;                        :ORG_LMS_CANVAS_COMMENTS canvas :ASSIGNMENT_TYPE type
+;;                        :EXPORT_FILE_NAME export :GRADING_STANDARD_ID standard
+;;                        :PUBLISH t :OL_PUBLISH t :ASSIGNMENT_WEIGHT weight)
+
+(defun org-lms-assignment-add-headline-create (title)
+"Template for making an assignment with default values"
+  (interactive "sAssignment title: ")
+  (let* ((email "t")
+         (canvas "t")
+         (type "canvas")
+         (weight "0.10")
+         (submission "(online_upload)")
+         (publish "hello")
+         (standard "nil")
+         (level 1)
+         (dueat (format-time-string "%Y-%m-%d" (time-add (current-time) (* 7 24 2600))))
+         (export (replace-regexp-in-string "[ ,::]" "-" (downcase title)))
+         (allprops (list "ORG_LMS_EMAIL_COMMENTS" email
+                         "ORG_LMS_CANVAS_COMMENTS"  canvas "ASSIGNMENT_TYPE" type
+                         "DUE_AT" dueat
+                         "EXPORT_FILE_NAME" export "GRADING_STANDARD_ID" standard
+                         "PUBLISH" "t" "OL_PUBLISH" "t" "ASSIGNMENT_WEIGHT" weight))
+         )
+    ;;(org-insert-heading-after-current)
+    (org-insert-heading nil nil t)
+    (insert title)
+    (cl-loop for (propname value) on allprops by 'cddr
+             do
+             (org-entry-put nil propname value))
+    (org-set-tags "assignment")
+    ))
+
+;; (my-org-headline-create "test")
 
 (defun org-lms-inspect-object (method url headers)
     (restclient-http-do method url headers
