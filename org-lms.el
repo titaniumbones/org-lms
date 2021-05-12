@@ -479,6 +479,7 @@ will be moved in this case too."
         (canvas-status nil)
         (json-params (json-encode request-params))
         (target (concat org-lms-baseurl query))
+        (request-backend 'url-retrieve)
         ;; (request-coding-system 'no-conversion)
         ;; (request-conding-system 'no-conversion)
         )
@@ -502,8 +503,8 @@ will be moved in this case too."
                                 (ol-jsonwrapper json-read))
                       :success (cl-function
                                 (lambda (&key data &allow-other-keys)
-                                  ;;(message "SUCCESS: %S" data)
-                                  (message "SUCCESS!!")
+                                  (message "SUCCESS: %S" data)
+                                  ;;(message "SUCCESS!!")
                                   (setq canvas-payload data)
                                   canvas-payload
                                   ))
@@ -841,6 +842,311 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
   ;;         (browse-url (plist-get response-data :html_url)))
   ;;     response)))
 
+(defun org-lms-file-post-request (query   request-params path)
+  "Send QUERY to `org-lms-baseurl' with http request type POST
+  Also send REQUEST-PARAMS as JSON data.  
+
+  Returns a user-error if `org-lms-token' is unset, or if data payload is nil. 
+  Otherwise return a parsed json data payload, with the following settings 
+  wrapping `json-read':
+
+    `json-array-type' 'list
+    `json-object-type' 'plist
+    `json-key-type' 'symbol
+    maybe key-type needs to be keyword though! Still a work in progress.
+    "
+  (let ((canvas-payload nil)
+        (canvas-err nil)
+        (canvas-status nil)
+        (json-params (json-encode request-params))
+        ;;(params )
+        (target (concat org-lms-baseurl query))
+        (request-backend 'url-retrieve )
+        )
+    (if org-lms-token
+        (progn
+          (setq thisrequest
+                (request
+                  target
+                  :type "POST"
+                  :headers `(("Authorization" . ,(concat "Bearer " org-lms-token))
+                             ;: ("Content-Type" . "application/json")
+                             )
+                  :sync t
+                  ;;:data   json-params ;; (or data nil)
+                  :params request-params 
+                  ;;:encoding 'no-conversion
+                  :parser (lambda ()
+                            ;; (if (and (boundp 'file) file)
+                            ;;     (write-region (buffer-string) nil file))
+                            (ol-jsonwrapper json-read  ))
+                  :success (cl-function
+                            (lambda (&key data &allow-other-keys)
+                              (message "FIle Info regrieved: %S" data)
+                              ;;(message "SUCCESS!!")
+                              
+                              ;;(setq canvas-payload data)
+                              data
+                              ))
+                  :error (cl-function (lambda ( &key error-thrown data status &allow-other-keys )
+                                        (setq canvas-err error-thrown)
+                                        (message "ERROR: %s" error-thrown)))))
+               (unless (request-response-data thisrequest)                                   
+                 (message (format "NO PAYLOAD: %s" canvas-err))
+                 (message "Full response: %s" thisrequest))
+               (request-response-data thisrequest) )
+      (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
+
+(defun org-lms-post-new-file (filepath &optional endpoint folder courseid)
+  "Get comments from student headline and post to Canvas LMS.
+If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
+will be extracted from the current environment. Note the
+commented out `dolist' macro, which will upload attachments to
+canvas. THis process is potentially buggy and seems likely to
+lead to race conditions and duplicated uploads and comments. Still
+working on this."
+  (interactive)
+  ;; main loop
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (endpoint (or endpoint (format "courses/%s/files" courseid)))         
+         ;;(storageinfo )
+         (fileinfo)
+         (allinfo)
+         (storageinfo)
+         (name (file-name-nondirectory filepath))
+         (params `(("name" . ,name)))
+         (formstring ""))
+    
+    (when folder (map-put params "parent_folder_path" folder ))
+    (setq fileinfo (org-lms-file-post-request
+                     endpoint
+                     params
+                     filepath))
+    (if fileinfo
+        (org-lms-upload-file-to-storage filepath fileinfo))
+    ;; (if fileinfo
+    ;;     (progn 
+    ;;       (setq storageinfo (org-lms-upload-file-to-storage filepath fileinfo))
+    ;;       (message "storageninfo: %s" storageinfo)
+    ;;       (if  (and  storageinfo (> 0  (length storageinfo )))
+    ;;           (progn (setq storageinfo (map-merge
+    ;;                                     'plist fileinfo
+    ;;                                     (when
+    ;;                                         (and  storageinfo (> 0  (length storageinfo )))
+    ;;                                       (ol-jsonwrapper json-read-from-string storageinfo))))
+    ;;                  storageinfo)
+    ;;         (message "CURL DID NOT SUCCEED")
+    ;;         storageinfo))
+    ;;   (message "FILEINFO DID NOT SUCCEED")
+    ;;   nil)
+    ))
+
+
+(defun org-lms-upload-file-to-storage (filepath fileinfo)
+  "using a canvas file upload response, upload a file to the file storage."
+  (interactive)
+  (let* ((upload-url (map-elt fileinfo :upload_url ))
+         (params-plist (map-elt fileinfo :upload_params))
+         (params-alist (org-lms-plist-to-alist params-plist))
+         (canvas-payload)
+         (canvas-err )
+         (formstring ""))
+    (cl-loop for prop in params-alist
+             do
+             (setq formstring (concat formstring "-F '" (symbol-name (car prop))
+                                      "=" (format "%s" (cdr prop)) "' ")))
+    (setq formstring (concat formstring " -F 'file=@" filepath "' 2> /dev/null"))
+    (let* ((thiscommand  (concat "curl '"
+                                 upload-url
+                                 "' " formstring))
+           (curlres  (shell-command-to-string thiscommand))
+           (file_id (if (> (length curlres) 0 )
+                        (format "%s"
+                                (plist-get
+                                 (ol-jsonwrapper json-read-from-string curlres) :id )))))
+      (message "upload curl command response: %s" curlres)
+      ;;(f-write-text thiscommand 'utf-8 "~/src/org-grading/filecurlcommand.sh")
+      curlres
+      )))
+
+(defun org-lms-get-folders (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/folders" courseid) "GET"))
+
+(defun org-lms-get-single-folder (folderid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/folders/%s" courseid groupid) "GET"))
+
+(defun org-lms-map-folder-from-name (name)
+  (interactive)
+  (let* ((folders (org-lms-get-folders))
+         (match (or (--first (string= (plist-get it :name) name) folders )
+                    (org-lms-set-folder `((name . ,name))))))
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
+
+(defun org-lms-get-files (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request (format "courses/%s/files" courseid) "GET" '(("include" . "content_details" ))))
+
+(defun org-lms-get-single-module-item (itemid moduleid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
+
+(defun org-lms-set-folder (params)
+  "Create a folder from params"
+  (interactive)
+
+  (let* ((canvasid (plist-get params  "CANVASID"))
+         )
+    (let* (
+           (response
+            (org-lms-canvas-request (format "courses/%s/folders"
+                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                            (if canvasid
+                                                (format  "/%s" canvasid) ""))
+                                    (if canvasid "PUT" "POST")
+                                    params))
+           (response-data (or response nil)))
+      response)))
+(defun org-lms-set-file (item module &optional canvasid)
+  "create a module item from an item definition"
+  (let* ((params `(("module_item" . ,item )))
+         (response
+          (org-lms-canvas-request (format "courses/%s/modules/%s/items"
+                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          module
+                                          (if canvasid
+                                              (format  "/%s" canvasid) ""))
+            (if canvasid "PUT" "POST")
+            params)))
+    (response-data (or response nil))
+    ))
+(defun org-lms-module-item-from-headline ()
+  "Extract assignment group data from HEADLINE.
+  HEADLINE is an org-element object."
+  (let* ((canvasid (org-entry-get nil "CANVASID"))
+         (name  (nth 4 (org-heading-components)) )
+         (position (org-entry-get nil "POSITION"))
+         (moduleid (org-lms-map-module-from-name (org-entry-get nil "MODULE")))
+         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
+         (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
+         (weight (org-entry-get nil "WEIGHT"))
+         ;; rules...
+         (params `((title . ,name)
+                   (content_id . ,canvasid)
+                   (module_item_type . ,moduleitemtype)
+                   )))
+    (when position (plist-put params :position position))
+    (when moduleitemid (plist-put params :module_item_id moduleitemid))
+    (let* ((response (org-lms-set-module-item params moduleid moduleitemid))
+           (response-data (or response nil)))
+      
+      (if (plist-get response-data :id)
+          (progn
+            (message "received assignment group response-data")
+            (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
+            (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+            )
+        (message "did not receive assignment group response-data"))
+      response)))
+
+(defun org-lms-get-modules (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/modules" courseid) "GET"))
+
+(defun org-lms-get-single-module (groupid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/modules/%s" courseid groupid) "GET"))
+
+(defun org-lms-map-module-from-name (name)
+  (interactive)
+  (let* ((modules (org-lms-get-modules))
+         (match (or (--first (string= (plist-get it :name) name) modules )
+                    (org-lms-set-module `((name . ,name))))))
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
+
+(defun org-lms-get-module-items (moduleid &optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request (format "courses/%s/modules/%s/items" courseid moduleid) "GET" '(("include" . "content_details" ))))
+
+(defun org-lms-get-single-module-item (itemid moduleid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
+
+(defun org-lms-set-module (params)
+  "Create a module from params"
+  (interactive)
+
+  (let* ((canvasid (plist-get params  "CANVASID"))
+         (org-html-checkbox-type 'unicode ))
+    (let* ((assignment-params  `(("module" . ,params)))
+           (response
+            (org-lms-canvas-request (format "courses/%s/modules%s"
+                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                            (if canvasid
+                                                (format  "/%s" canvasid) ""))
+                                    (if canvasid "PUT" "POST")
+                                    assignment-params))
+           (response-data (or response nil)))
+      response)))
+(defun org-lms-set-module-item (item module &optional canvasid)
+  "create a module item from an item definition"
+  (let* ((params `(("module_item" . ,item )))
+         (response
+          (org-lms-canvas-request (format "courses/%s/modules/%s/items"
+                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          module
+                                          (if canvasid
+                                              (format  "/%s" canvasid) ""))
+            (if canvasid "PUT" "POST")
+            params))
+         (response-data (or response nil)))
+    response-data
+    ))
+(defun org-lms-module-item-from-headline ()
+  "Extract module data from HEADLINE.
+  HEADLINE is an org-element object."
+  (interactive)
+  (let* ((canvasid (org-entry-get nil "CANVASID"))
+         (name  (nth 4 (org-heading-components)) )
+         (position (org-entry-get nil "MODULE_POSITION"))
+         (moduleid (org-lms-map-module-from-name (org-entry-get nil "MODULE")))
+         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
+         (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
+         (weight (org-entry-get nil "WEIGHT"))
+         ;; rules...
+         (params `(("title" . ,name)
+                   ("content_id" . ,canvasid)
+                   ("module_item_type" . ,moduleitemtype)
+                   )))
+    (when position (plist-put params :position position))
+    (when moduleitemid (plist-put params :module_item_id moduleitemid))
+    (let* ((response (org-lms-set-module-item params moduleid moduleitemid))
+           (response-data (or response nil)))
+      
+      (if (plist-get response-data :id)
+          (progn
+            (message "received assignment group response-data")
+            (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
+            (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+            )
+        (message "did not receive assignment group response-data"))
+      response)))
+
 (defun org-lms-get-assignments (&optional courseid)
   (unless courseid
     (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
@@ -978,10 +1284,15 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
          (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
          (gradingtype (or  (org-entry-get nil "GRADING_TYPE") "letter_grade"))
-         (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE") "canvas") "online_upload" "none"))
-         ;;( (org-entry-get nil "DUE_AT"))
+         (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE")
+                             "canvas")
+                      "online_upload" "none"))
+         ;;  (org-entry-get nil "DUE_AT"))
          (publish (org-entry-get nil "OL_PUBLISH"))
          (group (org-entry-get nil "ASSIGNMENT_GROUP"))
+         (group (org-entry-get nil "ASSIGNMENT_GROUP"))
+         (omit (org-entry-get nil "ASSIGNMENT_OMIT"))
+         (position (org-entry-get nil "ASSIGNMENT_POSITION"))
          (reflection (org-entry-get nil "OL_HAS_REFLECTION"))
          (reflection-id (org-entry-get nil "OL_REFLECTION_ID")))
     ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
@@ -1001,8 +1312,10 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                   ("grading_standard_idcomment" . 458)
                                   ("points_possible" . ,(or pointspossible 10))
                                   ("published" . ,(if publish t nil) )
-                                  ("assignment_group_id" . ,(if group (org-lms-map-assignment-group-from-name group) nil))))))
-           )
+                                  (
+                                  ("assignment_group_id" . ,(if group (org-lms-map-assignment-group-from-name group) nil))
+                                  ("position" . ,(if position (string-to-number position) nil))))))
+           ))
       ;; (when group
       ;;   (plist-put assignment-params "assignment_group" group))
 
@@ -1073,12 +1386,24 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   (org-lms-parse-assignment)
   (org-lms-save-assignment-map file))
 
-(defun org-lms-asignment-group-from-headline ()
+(defun org-lms-assignment-update ()
+  "remove previous year's properties to make updating easier."
+  (interactive)
+  (cl-map 'list  (lambda (prop)
+                   (org-entry-delete (point) prop))
+          '("CANVASID" "CANVAS_HTML_URL" "CANVAS_SUBMISSION_URL" "SUBMISSIONS_DOWNLOAD_URL"))
+  )
+
+(defun org-lms-assignment-update-all ()
+  (interactive)
+  (org-map-entries #'org-lms-assignment-update "assignment"))
+
+(defun org-lms-assignment-group-from-headline ()
   "Extract assignment group data from HEADLINE.
   HEADLINE is an org-element object."
   (let* ((canvasid (org-entry-get nil "CANVASID"))
          (name  (nth 4 (org-heading-components)) )
-         (position (org-etry-get nil "POSITION"))
+         (position (org-entry-get nil "POSITION"))
          (weight (org-entry-get nil "WEIGHT"))
          ;; rules...
          (params `((name . ,name)
@@ -1096,7 +1421,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                  (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
                  (org-set-property "GROUP_WEIGHT" (format "%s"(plist-get response-data :group_weight)))
                  )
-             (message "did not receine assignment group response-data"))
+             (message "did not receive assignment group response-data"))
            response))))
 
 (defun org-lms-set-assignment-group (params)
@@ -2438,6 +2763,8 @@ Simultaneously write results to results.csv in current directory."
          (submission "(online_upload)")
          (publish "hello")
          (standard "nil")
+         (position "nil")
+         (group "")
          (level 1)
          (dueat (format-time-string "%Y-%m-%d" (time-add (current-time) (* 7 24 2600))))
          (export (replace-regexp-in-string "[ ,::]" "-" (downcase title)))
@@ -2445,7 +2772,9 @@ Simultaneously write results to results.csv in current directory."
                          "ORG_LMS_CANVAS_COMMENTS"  canvas "ASSIGNMENT_TYPE" type
                          "DUE_AT" dueat
                          "EXPORT_FILE_NAME" export "GRADING_STANDARD_ID" standard
-                         "PUBLISH" "t" "OL_PUBLISH" "t" "ASSIGNMENT_WEIGHT" weight))
+                         "PUBLISH" "t" "OL_PUBLISH" "t" "ASSIGNMENT_WEIGHT" weight
+                         "ASSIGNMENT_GROUP" group "ASSIGNMENT_POSITION" position
+                         "ASSIGNMENT_OMIT" nil ))
          )
     ;;(org-insert-heading-after-current)
     (org-insert-heading nil nil t)
@@ -2454,9 +2783,246 @@ Simultaneously write results to results.csv in current directory."
              do
              (org-entry-put nil propname value))
     (org-set-tags "assignment")
+    (while (< 1 (nth 1 (org-heading-components))) (org-promote-subtree))
     ))
 
 ;; (my-org-headline-create "test")
+
+;; copied directly from ox-hugo;
+;;this function is therefore copyright Kaushal Modi
+(defun org-lms--get-valid-subtree ()
+  "Return the Org element for a valid subtree.
+The condition to check validity is that the EXPORT_FILE_NAME
+property is defined for the subtree element.
+
+As this function is intended to be called inside a valid org-lms subtree, 
+doing so also moves the point to the beginning of
+the heading of that subtree.
+
+Return nil if a valid Hugo post subtree is not found.  The point
+will be moved in this case too."
+  (catch 'break
+    (while :infinite
+      (let* ((entry (org-element-at-point))
+             (fname (org-string-nw-p (org-element-property :EXPORT_FILE_NAME entry)))
+             level)
+        (when fname
+          (throw 'break entry))
+        ;; Keep on jumping to the parent heading if the current
+        ;; entry does not have an EXPORT_FILE_NAME property.
+        (setq level (org-up-heading-safe))
+        ;; If no more parent heading exists, break out of the loop
+        ;; and return nil
+        (unless level
+          (throw 'break nil))))))
+
+(defun org-lms-export-reveal-wim-to-html (&optional all-subtrees async visible-only noerror)
+  "Export the current subtree/all subtrees/current file to a Canvas file.
+
+This is an Export \"What I Mean\" function:
+
+- If the current subtree has the \"EXPORT_FILE_NAME\" property, export
+  that subtree.
+- If the current subtree doesn't have that property, but one of its
+  parent subtrees has, then export from that subtree's scope.
+- If none of the subtrees have that property (or if there are no Org
+  subtrees at all), but the Org #+title keyword is present,
+  export the whole Org file as a post with that title (calls
+  `org-huveal-export-to-html' with its SUBTREEP argument set to nil).
+
+- If ALL-SUBTREES is non-nil, export all valid Hugo post subtrees
+  \(that have the \"EXPORT_FILE_NAME\" property) in the current file
+  to multiple Markdown posts.
+- If ALL-SUBTREES is non-nil, and again if none of the subtrees have
+  that property (or if there are no Org subtrees), but the Org #+title
+  keyword is present, export the whole Org file.
+
+- If the file neither has valid Hugo post subtrees, nor has the
+  #+title present, throw a user error.  If NOERROR is non-nil, use
+  `message' to display the error message instead of signaling a user
+  error.
+
+A non-nil optional argument ASYNC means the process should happen
+asynchronously.  The resulting file should be accessible through
+the `org-export-stack' interface.
+
+When optional argument VISIBLE-ONLY is non-nil, don't export
+contents of hidden elements.
+
+If ALL-SUBTREES is nil, return output file's name.
+If ALL-SUBTREES is non-nil, and valid subtrees are found, return
+a list of output files.
+If ALL-SUBTREES is non-nil, and valid subtrees are not found,
+return the output file's name (exported using file-based
+approach)."
+  (interactive "P")
+  (let ((f-or-b-name (if (buffer-file-name)
+                         (file-name-nondirectory (buffer-file-name))
+                       (buffer-name))))
+    (save-window-excursion
+      (save-restriction
+        (widen)
+        (save-excursion
+          ;; oops, this looks pretty buggy, will make an md file.  need to correct
+          ;;
+          (if all-subtrees
+              (let (ret (iteration 0)
+                    )
+                (setq org-hugo--subtree-count 0)
+                (setq ret (org-map-entries
+                           (lambda ()
+                             (setq iteration (+ 1 iteration))
+                             (message "iteration: %s" iteration)
+                             (org-lms-export-reveal-wim-to-html
+                              nil async visible-only noerror)
+                             (message "%s" (or (org-entry-get (point) "CUSTOM_ID")
+                                               (org-entry-get (point) "ID")))
+                             ;; (sleep-for 6)
+                             )
+                           ;; Export only the subtrees where
+                           ;; EXPORT_FILE_NAME property is not
+                           ;; empty.
+                           "EXPORT_FILE_NAME<>\"\""))
+                (if ret
+                    (message "[org-lms] Exported %d subtree%s from %s"
+                             org-hugo--subtree-count
+                             (if (= 1 org-hugo--subtree-count) "" "s")
+                             f-or-!b-name)
+                  ;; If `ret' is nil, no valid Hugo subtree was found.
+                  ;; So call `org-lms-export-reveal-wim-to-html' directly.  In
+                  ;; that function, it will be checked if the whole
+                  ;; Org file can be exported.
+                  (setq ret (org-lms-export-reveal-wim-to-html
+                             nil async visible-only noerror)))
+                (setq org-hugo--subtree-count nil) ;Reset the variable
+                ret)
+              
+            ;; Upload only the current subtree
+            (ignore-errors
+              (org-back-to-heading :invisible-ok))
+            (let* ((subtree (org-lms--get-valid-subtree))
+                   (info (org-combine-plists
+                          (org-export--get-export-attributes
+                           're-reveal subtree visible-only)
+                          (org-export--get-buffer-attributes)
+                          (org-export-get-environment 're-reveal subtree)))
+                   (exclude-tags (plist-get info :exclude-tags))
+                   is-commented is-excluded matched-exclude-tag do-export)
+              ;; (message "[org-hugo-export-wim-to-md DBG] exclude-tags = %s" exclude-tags)
+              (if subtree
+                  (progn
+                    ;; If subtree is a valid Hugo post subtree, proceed ..
+                    (setq is-commented (org-element-property :commentedp subtree))
+
+                    (let ((all-tags (let ((org-use-tag-inheritance t))
+                                      (org-hugo--get-tags))))
+                      (when all-tags
+                        (dolist (exclude-tag exclude-tags)
+                          (when (member exclude-tag all-tags)
+                            (setq matched-exclude-tag exclude-tag)
+                            (setq is-excluded t)))))
+
+                    ;; (message "[current subtree DBG] subtree: %S" subtree)
+                    ;; (message "[current subtree DBG] is-commented:%S, tags:%S, is-excluded:%S"
+                    ;;          is-commented tags is-excluded)
+                    (let ((title (org-element-property :title subtree)))
+                      (cond
+                       (is-commented
+                        (message "[org-lms] `%s' was not exported as that subtree is commented"
+                                 title))
+                       (is-excluded
+                        (message "[org-lms] `%s' was not exported as it is tagged with an exclude tag `%s'"
+                                 title matched-exclude-tag))
+                       (t
+                        ;; commenting this ount as well until I can manage all-subtrees as a case
+                        (if (numberp org-hugo--subtree-count)
+                            (progn
+                              (setq org-hugo--subtree-count (1+ org-hugo--subtree-count))
+                              (message "[org-lms] %d/ Exporting `%s' .." org-hugo--subtree-count title))
+                          (message "[org-lms] Exporting `%s' .." title))
+
+
+                        ;; Get the current subtree coordinates for
+                        ;; auto-calculation of menu item weight, page
+                        ;; or taxonomy weights.
+                        ;; there might be some similar values that it would be worth
+                        ;; putting in here.  Maybe!
+                        ;; (when (or
+                        ;;        ;; Check if the menu front-matter is specified.
+                        ;;        (or
+                        ;;         (org-entry-get nil "EXPORT_HUGO_MENU" :inherit)
+                        ;;         (save-excursion
+                        ;;           (goto-char (point-min))
+                        ;;           (let ((case-fold-search t))
+                        ;;             (re-search-forward "^#\\+hugo_menu:.*:menu" nil :noerror))))
+                        ;;        ;; Check if auto-calculation is needed
+                        ;;        ;; for page or taxonomy weights.
+                        ;;        (or
+                        ;;         (let ((page-or-taxonomy-weight (org-entry-get nil "EXPORT_HUGO_WEIGHT" :inherit)))
+                        ;;           (and (stringp page-or-taxonomy-weight)
+                        ;;                (string-match-p "auto" page-or-taxonomy-weight)))
+                        ;;         (save-excursion
+                        ;;           (goto-char (point-min))
+                        ;;           (let ((case-fold-search t))
+                        ;;             (re-search-forward "^#\\+hugo_weight:.*auto" nil :noerror)))))
+                        ;;   (setq org-hugo--subtree-coord
+                        ;;         (org-hugo--get-post-subtree-coordinates subtree)))
+                        (setq do-export t)))))
+                ;; If not in a valid subtree, check if the Org file is
+                ;; supposed to be exported as a whole, in which case
+                ;; #+title has to be defined *and* there shouldn't be
+                ;; any valid Hugo post subtree present.
+                (setq org-hugo--subtree-count nil) ;Also reset the subtree count
+                ;; having trouble with this code I think
+                (let ((valid-subtree-found 
+                       (catch 'break
+                         (org-map-entries
+                          (lambda ()
+                            (throw 'break t))
+                          ;; Only map through subtrees where
+                          ;; EXPORT_FILE_NAME property is not
+                          ;; empty.
+                          "EXPORT_FILE_NAME<>\"\""))
+                       )
+                      err msg)
+                  (if valid-subtree-found
+                      (setq msg "Point is not in a valid Hugo post subtree; move to one and try again")
+                    (let ((title (save-excursion
+                                   (goto-char (point-min))
+                                   (let ((case-fold-search t))
+                                     (re-search-forward "^#\\+title:" nil :noerror)))))
+                      (if title
+                          (setq do-export t)
+                        (setq err t)
+                        (setq msg (concat "The file neither contains a valid Hugo post subtree, "
+                                          "nor has the #+title keyword")))))
+                  (unless do-export
+                    (let ((error-fn (if (or (not err)
+                                            noerror)
+                                        #'message
+                                      #'user-error)))
+                      (apply error-fn
+                             (list
+                              (format "%s: %s" f-or-b-name msg)))))))
+              (when do-export
+                (let ((org-re-reveal-single-file t)
+                      (exported-file
+                       (org-re-reveal-export-to-html async subtree visible-only nil nil)))
+                  (if exported-file
+                      (let ((file-info)
+                            (file-location)
+                            (file-folder (or (org-entry-get (point) "ORG_LMS_FILE_FOLDER")
+                                             "Lectures")))
+                        (setq file-info
+                              (json-read-from-string (org-lms-post-new-file exported-file nil file-folder ))
+                              file-location (map-elt file-info "preview_url"))
+                        (message "PREVIEW: %s" file-location)
+                        (when file-location
+                          (org-entry-put (point) "ORG_LMS_FILE_URL" (concat "https://q.utoronto.ca" file-location)))
+                        file-info
+                        )))
+                
+                ))))))))
 
 (defun org-lms-inspect-object (method url headers)
     (restclient-http-do method url headers
@@ -2522,28 +3088,30 @@ maybe key-type needs to be keyword though! Still a work in progress.
 (defun org-lms-announcement-wim ()
   "move point to top level subtree, then, since we want 
 to keep announcement creation super-lightweight, *always* export that 
-headline."
+headline. Need to decide whether this is the best course of action of course.  gaah."
   (interactive)
-  (if (string= (org-lms-get-keyword "ORG_LMS_SECTION") "announcement")
-      (save-excursion
-        (let ((subtree (org-lms--get-valid-subtree)))
-          (org-lms-headline-to-announcement)
-          ))))
+  ;; don't test here because we'll actually do it below.
+  ;;(if (string= (org-lms-get-keyword "ORG_LMS_SECTION") "announcement"))
+  (save-excursion
+    (let ((subtree (org-lms--get-valid-subtree)))
+      (org-lms-headline-to-announcement)
+      )))
 
-(defun mwp-subtree-to-slack-wim ()
-  "move point to top level subtree, then, since we want 
-to keep announcement creation super-lightweight, *always*  
+(defun org-lms-subtree-to-slack-wim ()
+  "don't move point to top level subtree, since we want 
+to keep announcement creation super-lightweight. *always*  
 copy that subtree as slack text for posting to slack."
   (interactive)
     (save-excursion
-    (let ((subtree (org-lms--get-valid-subtree)))
+    (let (;;(subtree (org-lms--get-valid-subtree))
+          )
       (org-mark-subtree)
       (org-slack-export-to-clipboard-as-slack)
       )))
 
 
 (defun org-lms-assignment-wim ()
-  "post current asisgnment to org-lms, using wim criteria"
+  "post current asisgnment to org-lms as an assignment, using wim criteria"
   (interactive)
   (save-window-excursion
     (widen)
@@ -2560,33 +3128,36 @@ copy that subtree as slack text for posting to slack."
   "set grade in current subtree, set state to ready, and advance to next grade"
   (interactive)
   (org-lms-set-grade)
-  (org-todo "READY")
-  (org-forward-heading-same-level 1))
+  ;;(org-todo "READY")
+  ;;(org-forward-heading-same-level 1)
+  )
 
 (defun org-lms-wim-wim ()
   "test for org-lms-section, then perform the appropriate wim function"
   (interactive)
   (pcase (org-lms-get-keyword "ORG_LMS_SECTION")
-    ("announcement" (org-lms-announcement-wim))
-    ("assignment" (org-lms-assignment-wim))
-    ("slides" (org-lms-slides-wim))
-    ("grades" (org-lms-grades-wim))
-    )
+    ((pred (string= "announcement")) (org-lms-announcement-wim))
+    ((pred (string= "assignment")) (org-lms-assignment-wim))
+    ((pred (string= "slides")) (org-lms-slides-wim))
+    ((pred (string= "grades")) (org-lms-grades-wim))
+    ((pred (string= "lecture")) (org-lms-export-reveal-wim-to-html))
+    ((pred (string= "syllabus")) (org-lms-post-syllabus))
+    (- (progn (message "no section foind, please set the \"ORG_LMS_SECTION\" keyword.") nil)))
   )
 
 ;; Minor mode definition. I'm not really using it right now, but it
 ;; might be a worthwhile improvement.
-(defun o-l-set-grade ()
-(call-interactively (org-set-property "GRADE"))) 
+ 
 (define-minor-mode org-lms-mode
   "a mode to get my grading and other lms interacitons in order"
   :init-value nil
   :global nil
   :keymap  (let ((map (make-sparse-keymap))) 
-             (define-key map (kbd "C-c C-x C-g") 'o-l-set-grade )
+             (define-key map (kbd "C-c C-x C-g") 'org-lms-set-grade )
+             (define-key map (kbd "C-c <f12>") 'org-lms-wim-wim)
              map )
-  :lighter " Mark"
-  (mwp-toggle-macros)
+  :lighter " LMS"
+  ;;(mwp-toggle-macros)
   (if org-lms-mode
       (progn
         (add-hook 'org-ctrl-c-ctrl-c-final-hook 'org-lms-wim-wim))
