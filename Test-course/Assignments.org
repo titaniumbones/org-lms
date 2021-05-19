@@ -1,0 +1,86 @@
+#+SETUPFILE: ./setup.org
+#+STARTUP: customtime
+#+HUGO_SECTION: assignment
+#+HUGO_MENU: :menu main :parent Assignments
+#+HUGO_AUTO_SET_LASTMOD: t
+#+ORG_LMS_COURSEID: 184331
+
+
+* Test Auto                                                      :assignment:
+:PROPERTIES:
+:ORG_LMS_EMAIL_COMMENTS: t
+:ORG_LMS_CANVAS_COMMENTS: t
+:ASSIGNMENT_TYPE: canvas
+:EXPORT_FILE_NAME: test-auto
+:GRADING_STANDARD_ID: nil
+:PUBLISH:  t
+:OL_PUBLISH: t
+:ASSIGNMENT_WEIGHT: 0.10
+:CANVASID: 600711
+:CANVAS_HTML_URL: https://q.utoronto.ca/courses/184331/assignments/600711
+:CANVAS_SUBMISSION_URL: https://q.utoronto.ca/courses/184331/assignments/600711/submissions?zip=1
+:SUBMISSIONS_DOWNLOAD_URL: https://q.utoronto.ca/courses/184331/assignments/600711/submissions?zip=1
+:CANVAS_SUBMISSION_TYPES: (online_upload)
+:GRADING_TYPE: letter_grade
+:DUE_AT:   2021-05-04T03:59:59Z
+:END:
+
+Maybe there is some content here let's see. 
+
+* Hello again                                                    :assignment:
+
+* hello third                                                    :assignment:
+:PROPERTIES:
+:ORG_LMS_EMAIL_COMMENTS: t
+:ORG_LMS_CANVAS_COMMENTS: t
+:ASSIGNMENT_TYPE: canvas
+:EXPORT_FILE_NAME: hello-third
+:GRADING_STANDARD_ID: nil
+:OL_PUBLISH: t
+:ASSIGNMENT_WEIGHT: 0.10
+:ASSIGNMENT_GROUP: Tests9
+:CANVASID: 600708
+:CANVAS_HTML_URL: https://q.utoronto.ca/courses/184331/assignments/600708
+:CANVAS_SUBMISSION_URL: https://q.utoronto.ca/courses/184331/assignments/600708/submissions?zip=1
+:SUBMISSIONS_DOWNLOAD_URL: https://q.utoronto.ca/courses/184331/assignments/600708/submissions?zip=1
+:CANVAS_SUBMISSION_TYPES: (online_upload)
+:GRADING_TYPE: letter_grade
+:DUE_AT:   2021-05-07
+:END:
+once again 
+
+* crugt
+#+begin_src emacs-lisp
+(org-lms-get-assignment-groups)
+#+end_src
+
+#+RESULTS:
+dsfs
+
+#+begin_src emacs-lisp
+
+(org-lms-map-assignment-group-from-name "Tests9")
+
+;;(org-lms-set-assignment-group `((name . "Tests")))
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+283475
+#+end_src
+
+
+#+begin_src emacs-lisp
+(--first (string= "hello" it) '("1" "2" "3"))
+#+end_src
+#+RESULTS:
+#+begin_src emacs-lisp
+nil
+#+end_src
+
+* Tests
+:PROPERTIES:
+:CANVASID: 283468
+:POSITION: 3
+:GROUP_WEIGHT: 0.0
+:END:

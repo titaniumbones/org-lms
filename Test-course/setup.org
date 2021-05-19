@@ -1,0 +1,261 @@
+#+AUTHOR: Matt Price
+#+EMAIL: matt.price@utoronto.ca
+#+OPTIONS: toc:nil
+#+SELECT_TAGS: export
+#+EXCLUDE_TAGS: noexport
+#+HUGO_BASE_DIR: ~/WDW235/website
+#+HUGO_STATIC_IMAGES: Images
+#+HUGO_AUTO_SET_LASTMOD: t
+#+MACRO: ts (eval(mwp-get-ts+7  'org-mwp-classtimes-calibrate 1))
+#+PROPERTY: header-args :results code
+# # #+HTML_CONTAINER: section
+#+OPTIONS: ':nil *:t -:t ::t <:t H:4 \n:nil arch:nil
+#+OPTIONS: author:nil c:nil creator:nil d:(not "LOGBOOK") date:nil
+#+OPTIONS: stat:t tags:t tasks:t tex:t timestamp:t toc:nil todo:t |:t
+#+STARTUP: customtime entitiespretty
+#+ORG_LMS_COURSEID: 184331
+#+ORG_LMS_SECTION: lectures
+#+OL_USE_CHITS: nil
+#+CSL_STYLE: /home/matt/Zotero/styles/chicago-manual-of-style-16th-edition-inline-notes-for-syllabi.csl
+#+PROPERTY: header-args:plantuml  :noweb yes :eval no-export :results value file raw
+#+OPTIONS: reveal_single_file:t
+
+* Test a lecture
+:PROPERTIES:
+:EXPORT_FILE_NAME: test-lecture-01
+:ORG_LMS_FILE_URL: https://q.utoronto.ca/courses/184331/files/14333595/file_preview?annotate=0
+:END:
+
+#+begin_src emacs-lisp :exports none
+;;(org-lms-get-single-module (org-lms-map-module-from-name "First Unit"))
+(org-lms-export-reveal-wim-to-html t)
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+(:file_param "file" :progress nil :upload_url "https://inst-fs-yul-prod.inscloudgate.net/files?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2MTk3Mzk4MDgsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJyZXNvdXJjZSI6Ii9maWxlcyIsImNhcHR1cmVfdXJsIjoiaHR0cHM6Ly9xLnV0b3JvbnRvLmNhL2FwaS92MS9maWxlcy9jYXB0dXJlIiwiY2FwdHVyZV9wYXJhbXMiOnsiY29udGV4dF90eXBlIjoiQ291cnNlIiwiY29udGV4dF9pZCI6IjExODM0MDAwMDAwMDE4NDMzMSIsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJmb2xkZXJfaWQiOiIxMTgzNDAwMDAwMDI4NTQ3NzQiLCJyb290X2FjY291bnRfaWQiOiIxMTgzNDAwMDAwMDAwMDAwMDEiLCJxdW90YV9leGVtcHQiOmZhbHNlLCJvbl9kdXBsaWNhdGUiOiJvdmVyd3JpdGUiLCJwcm9ncmVzc19pZCI6bnVsbCwiaW5jbHVkZSI6bnVsbH0sImxlZ2FjeV9hcGlfZGV2ZWxvcGVyX2tleV9pZCI6IjE3MDAwMDAwMDAwMDAxNiIsImxlZ2FjeV9hcGlfcm9vdF9hY2NvdW50X2lkIjoiMTE4MzQwMDAwMDAwMDAwMDAxIiwiZXhwIjoxNjE5NzQwNDA4fQ.mJdDQAUylf4e24fuiF-qqzUrbNAM-C9d82BWauvYh3z--bAxc_Hk74WGMTkfeyQVmSpcaG1-pMbSxNHluVagwQ" :upload_params
+             (:filename "test-lecture-01.html" :content_type "text/html")
+             :location "https://q.utoronto.ca/api/v1/files/14333543?include%5B%5D=enhanced_preview_url" :instfs_uuid "8f09f01c-5f20-4b71-808a-9ad70e855dd2" :id 14333543 :uuid "b0rCKZBJCSF4Jw6yY2URqTb5m2xuDd9cKTYPqKND" :folder_id 2854774 :display_name "test-lecture-01.html" :filename "test-lecture-01.html" :upload_status "success" :content-type "text/html" :url "https://q.utoronto.ca/files/14333543/download?download_frd=1&verifier=b0rCKZBJCSF4Jw6yY2URqTb5m2xuDd9cKTYPqKND" :size 195340 :created_at "2021-04-29T23:43:29Z" :updated_at "2021-04-29T23:43:29Z" :unlock_at nil :locked nil :hidden nil :lock_at nil :hidden_for_user nil :thumbnail_url nil :modified_at "2021-04-29T23:43:29Z" :mime_class "html" :media_entry_id nil :locked_for_user nil :preview_url "/courses/184331/files/14333543/file_preview?annotate=0")
+#+end_src
+
+some stuff
+#+RESULTS:
+#+begin_src emacs-lisp
+(:id 456782 :name "First Unit" :position 1 :unlock_at nil :require_sequential_progress nil :publish_final_grade nil :prerequisite_module_ids nil :published nil :items_count 1 :items_url "https://q.utoronto.ca/api/v1/courses/184331/modules/456782/items")
+#+end_src
+
+* TODO test assignment 0                                         :assignment:
+:PROPERTIES:
+:ORG_LMS_EMAIL_COMMENTS: t
+:ORG_LMS_CANVAS_COMMENTS: t
+:ASSIGNMENT_TYPE: canvas
+:DUE_AT:   2021-05-03
+:EXPORT_FILE_NAME: test-assignment-0
+:GRADING_STANDARD_ID: nil
+:PUBLISH:  t
+:OL_PUBLISH: t
+:ASSIGNMENT_WEIGHT: 0.10
+:CANVASID: 601031
+:MODULE_ITEM_TYPE: Assignment
+:MODULE: second new module
+:CANVAS_HTML_URL: https://q.utoronto.ca/courses/184331/assignments/601031
+:CANVAS_SUBMISSION_URL: https://q.utoronto.ca/courses/184331/assignments/601031/submissions?zip=1
+:SUBMISSIONS_DOWNLOAD_URL: https://q.utoronto.ca/courses/184331/assignments/601031/submissions?zip=1
+:CANVAS_SUBMISSION_TYPES: (online_upload)
+:GRADING_TYPE: letter_grade
+:ORG_LMS_FILE_URL: https://q.utoronto.ca/courses/184331/files/14333602/file_preview?annotate=0
+:END:
+
+#+begin_src emacs-lisp
+;;(org-lms-module-item-from-headline)
+(org-lms-map-module-from-name (org-entry-get nil "MODULE"))
+;;(org-entry-get nil "MODULE")
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+456895
+#+end_src
+
+* testing again                                                  :assignment:
+:PROPERTIES:
+:ORG_LMS_EMAIL_COMMENTS: t
+:ORG_LMS_CANVAS_COMMENTS: t
+:ASSIGNMENT_TYPE: canvas
+:DUE_AT:   2021-05-03
+:GRADING_STANDARD_ID: nil
+:PUBLISH:  t
+:EXPORT_FILE_NAME: testing-again
+:OL_PUBLISH: t
+:ASSIGNMENT_WEIGHT: 0.10
+:ORG_LMS_ANNOUNCEMENT_ID: 1195848
+:ORG_LMS_FILE_URL: https://q.utoronto.ca/courses/184331/files/14333606/file_preview?annotate=0
+:END:
+#+begin_verse
+:ORG_LMS_ANNOUNCEMENT_URL: https://q.utoronto.ca/courses/184331/discussion_topics/1195848
+:ORG_LMS_POSTED_AT: 2021-04-29T21:18:25Z
+:CANVASID: 604177
+:CANVAS_HTML_URL: https://q.utoronto.ca/courses/184331/assignments/604177
+:CANVAS_SUBMISSION_URL: https://q.utoronto.ca/courses/184331/assignments/604177/submissions?zip=1
+:SUBMISSIONS_DOWNLOAD_URL: https://q.utoronto.ca/courses/184331/assignments/604177/submissions?zip=1
+:CANVAS_SUBMISSION_TYPES: (online_upload)
+:GRADING_TYPE: letter_grade
+
+#+end_verse
+** exporting lectures etc. as files.
+
+
+#+begin_src emacs-lisp
+(org-lms--get-valid-subtree)
+;;(org-lms-export-lecture-wim-to-html)
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+nil
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+"/home/matt/src/org-grading/Test-course/testing-again.html"
+#+end_src
+
+
+** fooling around modules and headline
+#+begin_src emacs-lisp
+(org-ml-get-all-properties (org-ml-parse-headline-at (point)))
+#+end_src
+
+#+begin_src emacs-lisp
+(let* ((name "second new module")
+       (newmodule `(("name" . ,name )) ))
+  (org-lms-set-module newmodule)
+  ;;(json-encode `(("module" . ,newmodule)))
+  )
+
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+(:id 456895 :name "second new module" :position 6 :unlock_at nil :require_sequential_progress nil :publish_final_grade nil :prerequisite_module_ids nil :published nil :items_count 0 :items_url "https://q.utoronto.ca/api/v1/courses/184331/modules/456895/items")
+#+end_src
+** modules
+
+
+#+begin_src emacs-lisp
+(org-lms-get-single-module-item 2490143 456782)
+(org-lms-get-module-items  456782)
+(let ((newitem '(:id 2490143 :title "hello third" :position 1 :indent 0 :quiz_lti nil :type "Assignment" :module_id 456782 :html_url "https://q.utoronto.ca/courses/184331/modules/items/2490143" :content_id 600708 :url "https://q.utoronto.ca/api/v1/courses/184331/assignments/600708" :published t :content_details
+      (:due_at "2021-05-07T03:59:59Z" :points_possible 10.0 :locked_for_user nil))))
+  
+  ) 
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+((:id 2490143 :title "hello third" :position 1 :indent 0 :quiz_lti nil :type "Assignment" :module_id 456782 :html_url "https://q.utoronto.ca/courses/184331/modules/items/2490143" :content_id 600708 :url "https://q.utoronto.ca/api/v1/courses/184331/assignments/600708" :published t :content_details
+      (:due_at "2021-05-07T03:59:59Z" :points_possible 10.0 :locked_for_user nil)))
+#+end_src
+
+** Files
+:PROPERTIES:
+:EXPORT_FILE_NAME: testing-file-lecture2
+:ORG_LMS_FILE_URL: https://q.utoronto.ca/courses/184331/files/14333460/file_preview?annotate=0
+:END:
+
+test test
+
+** 
+#+begin_src emacs-lisp
+(save-excursion
+  ;;(org-backward-heading-same-level nil)
+(org-lms-export-reveal-wim-to-html t))
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+"all-sbutrees is currently disabled, sorry!"
+#+end_src
+
+** 
+Tried a fewother options and all suck, better just forget it for now.  
+#+begin_src emacs-lisp
+(defun do-something-async (value)
+  "Return `Promise' to resolve the value asynchronously."
+  (promise-new (lambda (resolve _reject)
+                 (lambda ()
+                     (funcall resolve value)))))
+
+(promise-chain
+    (do-something-async (lambda () (org-lms-post-new-file
+                                            "/home/matt/src/org-grading/Test-course/setup.html" nil
+                                            "A fourth folder I made")
+                          (sleep-for 10)
+                          (message "done now")))
+  (then (lambda (result) (message "maybe this worked")) )
+  ) 
+#+end_src
+#+RESULTS:
+#+begin_src emacs-lisp
+;;(org-lms-post-new-file "/home/matt/test.org")
+(org-lms-export-reveal-wim-to-html)
+#+end_src
+** another one
+#+RESULTS:
+#+begin_src emacs-lisp
+(:file_param "file" :progress nil :upload_url "https://inst-fs-yul-prod.inscloudgate.net/files?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2MTk3MzcyNDcsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJyZXNvdXJjZSI6Ii9maWxlcyIsImNhcHR1cmVfdXJsIjoiaHR0cHM6Ly9xLnV0b3JvbnRvLmNhL2FwaS92MS9maWxlcy9jYXB0dXJlIiwiY2FwdHVyZV9wYXJhbXMiOnsiY29udGV4dF90eXBlIjoiQ291cnNlIiwiY29udGV4dF9pZCI6IjExODM0MDAwMDAwMDE4NDMzMSIsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJmb2xkZXJfaWQiOm51bGwsInJvb3RfYWNjb3VudF9pZCI6IjExODM0MDAwMDAwMDAwMDAwMSIsInF1b3RhX2V4ZW1wdCI6ZmFsc2UsIm9uX2R1cGxpY2F0ZSI6Im92ZXJ3cml0ZSIsInByb2dyZXNzX2lkIjpudWxsLCJpbmNsdWRlIjpudWxsfSwibGVnYWN5X2FwaV9kZXZlbG9wZXJfa2V5X2lkIjoiMTcwMDAwMDAwMDAwMDE2IiwibGVnYWN5X2FwaV9yb290X2FjY291bnRfaWQiOiIxMTgzNDAwMDAwMDAwMDAwMDEiLCJleHAiOjE2MTk3Mzc4NDd9.s75PJJUgdMKJqvHlNKjpTPpg3N7zvtI4tLPK52gLmBM6-ca0-Inync29UDFTKRLvNHkXLfAli7_vPKzIz5Yeog" :upload_params
+             (:filename "test.org" :content_type "unknown/unknown")
+             :location "https://q.utoronto.ca/api/v1/files/14333381?include%5B%5D=enhanced_preview_url" :instfs_uuid "86ea1c8a-a3b6-45d1-8865-9aacf0c5a03c" :id 14333381 :uuid "7LDiDlWCVwhLMqu3LP8K9XdWNUpWQE3Vgx4eFn0I" :folder_id 2854556 :display_name "test.org" :filename "test.org" :upload_status "success" :content-type "application/octet-stream" :url "https://q.utoronto.ca/files/14333381/download?download_frd=1&verifier=7LDiDlWCVwhLMqu3LP8K9XdWNUpWQE3Vgx4eFn0I" :size 76 :created_at "2021-04-29T23:00:47Z" :updated_at "2021-04-29T23:00:47Z" :unlock_at nil :locked nil :hidden nil :lock_at nil :hidden_for_user nil :thumbnail_url nil :modified_at "2021-04-29T23:00:47Z" :mime_class "file" :media_entry_id nil :locked_for_user nil :preview_url "/courses/184331/files/14333381/file_preview?annotate=0")
+#+end_src
+
+some other stuff
+#+begin_src emacs-lisp
+(org-lms-upload-file-to-storage "~/WDW235/01-intro.html"
+                                '(:file_param "file" :progress nil :upload_url "https://inst-fs-yul-prod.inscloudgate.net/files?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2MTk3MjQ0MzgsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJyZXNvdXJjZSI6Ii9maWxlcyIsImNhcHR1cmVfdXJsIjoiaHR0cHM6Ly9xLnV0b3JvbnRvLmNhL2FwaS92MS9maWxlcy9jYXB0dXJlIiwiY2FwdHVyZV9wYXJhbXMiOnsiY29udGV4dF90eXBlIjoiQ291cnNlIiwiY29udGV4dF9pZCI6IjExODM0MDAwMDAwMDE4NDMzMSIsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJmb2xkZXJfaWQiOm51bGwsInJvb3RfYWNjb3VudF9pZCI6IjExODM0MDAwMDAwMDAwMDAwMSIsInF1b3RhX2V4ZW1wdCI6ZmFsc2UsIm9uX2R1cGxpY2F0ZSI6Im92ZXJ3cml0ZSIsInByb2dyZXNzX2lkIjpudWxsLCJpbmNsdWRlIjpudWxsfSwibGVnYWN5X2FwaV9kZXZlbG9wZXJfa2V5X2lkIjoiMTcwMDAwMDAwMDAwMDE2IiwibGVnYWN5X2FwaV9yb290X2FjY291bnRfaWQiOiIxMTgzNDAwMDAwMDAwMDAwMDEiLCJleHAiOjE2MTk3MjUwMzh9.dMn-slHqD67v8uo6VXq2nH71tlZwnUhzpjfzgJ7HWk_7agHxUw5CA0wHPPICPLjkOOsUGVWG_YvjE47wJbtvUw" :upload_params
+             (:filename "01-intro.html" :content_type "text/html")))
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+nil
+#+end_src
+
+#+begin_src emacs-lisp
+(map-elt '(:file_param "file" :progress nil :upload_url "https://inst-fs-yul-prod.inscloudgate.net/files?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2MTk3MjI3ODUsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJyZXNvdXJjZSI6Ii9maWxlcyIsImNhcHR1cmVfdXJsIjoiaHR0cHM6Ly9xLnV0b3JvbnRvLmNhL2FwaS92MS9maWxlcy9jYXB0dXJlIiwiY2FwdHVyZV9wYXJhbXMiOnsiY29udGV4dF90eXBlIjoiQ291cnNlIiwiY29udGV4dF9pZCI6IjExODM0MDAwMDAwMDE4NDMzMSIsInVzZXJfaWQiOiIxMTgzNDAwMDAwMDAwODQ0MTIiLCJmb2xkZXJfaWQiOm51bGwsInJvb3RfYWNjb3VudF9pZCI6IjExODM0MDAwMDAwMDAwMDAwMSIsInF1b3RhX2V4ZW1wdCI6ZmFsc2UsIm9uX2R1cGxpY2F0ZSI6Im92ZXJ3cml0ZSIsInByb2dyZXNzX2lkIjpudWxsLCJpbmNsdWRlIjpudWxsfSwibGVnYWN5X2FwaV9kZXZlbG9wZXJfa2V5X2lkIjoiMTcwMDAwMDAwMDAwMDE2IiwibGVnYWN5X2FwaV9yb290X2FjY291bnRfaWQiOiIxMTgzNDAwMDAwMDAwMDAwMDEiLCJleHAiOjE2MTk3MjMzODV9.RoDrxgPitSkHY4IQrHWoOqFcJUFJv_ZZU7mk-lLzO__Tg6hMDuk2lE_MV7028uCC7PKvtIlbxvPvjEUkEH8dIQ" :upload_params
+             (:filename "01-intro.html" :content_type "text/html"))
+         :upload_params)
+#+end_src
+
+#+RESULTS:
+#+begin_src emacs-lisp
+(:filename "01-intro.html" :content_type "text/html")
+#+end_src
+
+#+begin_src js
+{
+  "location": "https://q.utoronto.ca/api/v1/files/14331694?include%5B%5D=enhanced_preview_url",
+  "instfs_uuid": "dd3890ec-af2c-418a-a404-c9e5f95b31dd",
+  "id": 14331694,
+  "uuid": "TxId4GNlCG2lfOhmIg30tQ0leLH1IYljC1RGAvev",
+  "folder_id": 2854556,
+  "display_name": "01-intro.html",
+  "filename": "01-intro.html",
+  "upload_status": "success",
+  "content-type": "text/html",
+  "url": "https://q.utoronto.ca/files/14331694/download?download_frd=1&verifier=TxId4GNlCG2lfOhmIg30tQ0leLH1IYljC1RGAvev",
+  "size": 27240,
+  "created_at": "2021-04-29T19:28:27Z",
+  "updated_at": "2021-04-29T19:28:27Z",
+  "unlock_at": null,
+  "locked": false,
+  "hidden": false,
+  "lock_at": null,
+  "hidden_for_user": false,
+  "thumbnail_url": null,
+  "modified_at": "2021-04-29T19:28:27Z",
+  "mime_class": "html",
+  "media_entry_id": null,
+  "locked_for_user": false,
+  "preview_url": "/courses/184331/files/14331694/file_preview?annotate=0"
+}
+#+end_src
