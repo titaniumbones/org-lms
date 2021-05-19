@@ -676,15 +676,15 @@ These are basically wrappers around ~request.el~ that allow some of the requests
     `json-key-type' 'symbol
     maybe key-type needs to be keyword though! Still a work in progress.
     "
-  (declare (indent defun))
+  (message "LISP PARAMS: %s" request-params)
   (unless request-type (setq request-type "GET"))
   (let ((canvas-payload nil)
         (canvas-err nil)
         (canvas-status nil)
         (json-params (json-encode request-params))
         (target (concat org-lms-baseurl query))
-        ;; (request-coding-system 'no-conversion)
-        ;; (request-conding-system 'no-conversion)
+        ;;(request-backend 'url-retrieve)
+        ;;(request-coding-system 'no-conversion)
         )
     (message (concat target "   " request-type))
     ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
@@ -699,15 +699,17 @@ These are basically wrappers around ~request.el~ that allow some of the requests
                                  ("Content-Type" . "application/json")
                                  )
                       :sync t
-                      :data   (if  json-params json-params  nil) ;; (or data nil)
+                      ;;:data   (if  json-params (encode-coding-string json-params 'utf-8)  nil) ;; (or data nil)
+                      :data   (if  json-params json-params  nil)
                       ;;:encoding 'no-conversion
+                      :encoding 'utf-8
                       :parser (lambda ()
                                 (if (and (boundp 'file) file) (write-region (buffer-string) nil file))
                                 (ol-jsonwrapper json-read))
                       :success (cl-function
                                 (lambda (&key data &allow-other-keys)
-                                  ;;(message "SUCCESS: %S" data)
-                                  (message "SUCCESS!!")
+                                  (message "SUCCESS: %S" data)
+                                  ;;(message "SUCCESS!!")
                                   (setq canvas-payload data)
                                   canvas-payload
                                   ))
@@ -716,7 +718,7 @@ These are basically wrappers around ~request.el~ that allow some of the requests
                                             (message "ERROR: %s" error-thrown)))))
                (unless (request-response-data thisrequest)                                   
                  (message (format "NO PAYLOAD: %s" canvas-err)) )
-               (request-response-data thisrequest) )
+               (or (request-response-data thisrequest) thisrequest) )
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 #+end_src
 
@@ -767,7 +769,7 @@ In order to rewrite the basic requests from REST to GraphQL, we'll need a basic 
           (semester (plist-get course :semester))
           (result nil)
           )
-      (loop for can in-ref canvas-courses
+      (cl-loop for can in-ref canvas-courses
             do
             ;;(prin1 can)
             (let ((course-code (plist-get can :sis_course_id)))
@@ -973,7 +975,7 @@ No Setters here! We don't add or remove students from the class via the API.
                                       ("per_page" . 500 )))))
       ;;(message "RESULTS")
       ;;(with-temp-file "students-canvas.json" (insert result))
-      (loop for student in-ref result
+      (cl-loop for student in-ref result
             do
             (if (string-match "," (plist-get student :sortable_name))
                 (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
@@ -1014,10 +1016,10 @@ We set the local student list, though we can't/shouldn't set the upstream studen
 
   ;;(message "%s" local)
  (if local 
-  (loop for c in-ref canvas
+  (cl-loop for c in-ref canvas
         do (let* ((defn c)
                   (email (plist-get defn :email)))
-             (loop for l in-ref local
+             (cl-loop for l in-ref local
                    if (string=  email  (plist-get l :email))
                    do
                    (progn 
