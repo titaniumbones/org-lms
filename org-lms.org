@@ -56,9 +56,9 @@ THere's some stuff I should get rid of. Trying to track it down.
 
 #+begin_src emacs-lisp
   (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
-    'org-lms~send-subtree-with-attachments)
+    'org-lms~send-subtree-with-attachments "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
-    'org-lms-mail-all)
+    'org-lms-mail-all "a pretty long time ago")
 #+end_src
 * STARTED Variable definitions
 The underlying data structure has changed a bit :-) as I start to understand what information needs to be stored in non-textual data structures and what doesn't. A lot of this has not been documented yet!
