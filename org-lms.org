@@ -1622,7 +1622,7 @@ Assignments first.
   ;; (prin1 local)
   ;; (prin1 canvas)
   (let ((result '()))
-    (loop for l in-ref local
+    (cl-loop for l in-ref local
           do (let* ((defn (cdr l))
                     (name (plist-get defn :name)))
                (message "LLLLLLLLL")
@@ -2221,7 +2221,7 @@ working on this."
 #+RESULTS:
 : org-lms-put-single-submission-from-headline
 
-** ACTION Set up local environment
+*** ACTION Set up local environment
 Need to assess usefulness of all this. 
 
 org-lms-setup especially is useful here; and "get-local-students" parses ~students.csv~ (kinda on its way to being deprecated eventually). 
@@ -2277,7 +2277,7 @@ variables must be set or errors will result."
 #+RESULTS:
 : org-lms-get-local-students
 
-** Assignments Table
+*** Assignments Table
 This function prints out a helpful table with links to various locations (e.g., LMS URLs for assignments & submissions) and elisp functions (e.g., grading headline generation).
 #+begin_src emacs-lisp
   (defun org-lms-assignments-table (&optional assignments students)
@@ -2329,8 +2329,8 @@ This function prints out a helpful table with links to various locations (e.g., 
 #+RESULTS:
 : org-lms-assignments-table
 
-** Making headings
-*** Principal headline-making functions
+*** Making headings
+**** Principal headline-making functions
 ~org-lms-make-headings~ used to be the main thing we did here. Now ther's a bunch more. 
 
 #+begin_src emacs-lisp
@@ -2578,7 +2578,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
 #+RESULTS:
 : org-lms-make-headings
 
-*** ACTION OBSOLETE github-specific function
+**** ACTION OBSOLETE github-specific function
 
 #+begin_src emacs-lisp
 ;; org make headings, but for github assignments
@@ -2668,7 +2668,7 @@ the structure of the the alist, and the means of attachment
 
 #+end_src
 
-** Ad-hoc function to make some assignment sub-headings
+**** Ad-hoc function to make some assignment sub-headings
 #+begin_src emacs-lisp :tangle no
 (defun org-lms-make-participation-headings-here (a students)
   "Create a set of headlines for grading.
@@ -2773,10 +2773,10 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
 : org-lms-make-participation-headings-here
 
 
-** Integration with Mail systems
+**** Integration with Mail systems
 I like to mail my marks back to my students.  These are the functions that manage that.  
 
-*** Attachments 
+***** Attachments 
 
 Make sure to get all the attachments.  I think that org-mime now takes care of this so it might be a good idea to refactor.  
 
@@ -2801,7 +2801,7 @@ Make sure to get all the attachments.  I think that org-mime now takes care of t
 
 #+end_src
 
-*** ACTION Sending Subtrees
+***** ACTION Sending Subtrees
 Huh, interesting. I have two versions of this code and no idea which of them is actually used where!! +In fact, it kind of looks like neither is being used.  Source of much confusion!!+
 
 *UPDATE <2018-11-08 Thu>:* ~org-mime-lms-send-subtree-with-attachments~ is an obsolete function which has been replaced by ~org-lms-mime-org-subtree-htmlize~.  I'm too chicken to delete it right now but should do so soon.
@@ -2868,7 +2868,7 @@ you have not received a grade for work that you have handed in,
 #+RESULTS:
 : org-lms-send-subtree-with-attachments
 
-*** ACTION Mail Multiple Trees
+***** ACTION Mail Multiple Trees
 
 Once again, I've written multiple functions to do two very similar tasks. Need to refactor!!!
 
@@ -2975,7 +2975,7 @@ you have not received a grade for work that you have handed in,
 : org-lms-send-missing-subtree
 
 
-*** Even more Mail -- org-mime rewrite functions. 
+***** Even more Mail -- org-mime rewrite functions. 
 
 Actually *this* is the real real work... 
 
@@ -3148,7 +3148,7 @@ The cursor is left in the TO field."
 
 #+end_src 
 
-** Set Grades and Overlays
+***** Set Grades and Overlays
 These are for showing grades in the org buffer
 
 #+begin_src emacs-lisp
@@ -3282,7 +3282,7 @@ These are for showing grades in the org buffer
 #+RESULTS:
 : org-lms-set-all-grades-boolean
 
-*** More grading, for pass/fail 
+****** More grading, for pass/fail 
 These fuctions hould be up with the other grading stuff
 
 #+begin_src emacs-lisp
@@ -3307,7 +3307,7 @@ These fuctions hould be up with the other grading stuff
 
 #+end_src
 
-** Grade Report Tables
+****** Grade Report Tables
 Generates a tables of marks for export to csv or direct manipulation within org. I don't find this that useful yet, needs some work. 
 #+begin_src emacs-lisp
 (defun org-lms-generate-tables ()
@@ -3461,7 +3461,7 @@ Simultaneously write results to results.csv in current directory."
 #+RESULTS:
 : org-lms-generate-tables
 
-** ACTION Github-related helper functions
+****** ACTION Github-related helper functions
 I think these are obsolete, but I'm not sure. 
 #+begin_src emacs-lisp
 ;; helper functions for github repos
