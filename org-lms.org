@@ -1189,8 +1189,230 @@ Rewritten <2019-10-01 Tue> to use let-alist.  Function to create and update page
 #+end_src
 
 #+RESULTS:
+: org-lms-post-page
 
-** MISSING Modules
+** ACTION [[https://canvas.instructure.com/doc/api/files.html#method.folders.api_index][Files and Folders]]
+I now want this so I can store HTML files easily and then add to modules (again, easily)
+
+Some of this is rather more complex because of the way folders are conceptualized in Canvas. Might not be trivial to implement. [[https://canvas.instructure.com/doc/api/files.html#method.folders.api_index][cf. api info]]
+
+- [ ] org-lms-get-folders (list all oflders, or list folders in a folder
+- [ ] org-lms-get-files (list all files)
+- [ ] org-lms-get-single-file
+- [ ] org-lms-set-folder
+- [ ] org-lms-set-file
+- [ ] org-lms-set-file-from-attachment ? 
+*** Getters
+
+Start with folders, which are simple and very similar to modules in that they ave simple content items. Files, however, [[https://canvas.instructure.com/doc/api/file.file_uploads.html#method.file_uploads.post][are much more complex]], because they are stored off site (mostly AWS) and therefore require a multi-stage process. This was previously implemented in org-lms-get-submissions, now generalizing in order to keep code DRYer.
+#+begin_src emacs-lisp
+(defun org-lms-file-post-request (query   request-params path)
+  "Send QUERY to `org-lms-baseurl' with http request type POST
+  Also send REQUEST-PARAMS as JSON data.  
+
+  Returns a user-error if `org-lms-token' is unset, or if data payload is nil. 
+  Otherwise return a parsed json data payload, with the following settings 
+  wrapping `json-read':
+
+    `json-array-type' 'list
+    `json-object-type' 'plist
+    `json-key-type' 'symbol
+    maybe key-type needs to be keyword though! Still a work in progress.
+    "
+  (let ((canvas-payload nil)
+        (canvas-err nil)
+        (canvas-status nil)
+        (json-params (json-encode request-params))
+        ;;(params )
+        (target (concat org-lms-baseurl query))
+        (request-backend 'url-retrieve )
+        )
+    (if org-lms-token
+        (progn
+          (setq thisrequest
+                (request
+                  target
+                  :type "POST"
+                  :headers `(("Authorization" . ,(concat "Bearer " org-lms-token))
+                             ;: ("Content-Type" . "application/json")
+                             )
+                  :sync t
+                  ;;:data   json-params ;; (or data nil)
+                  :params request-params 
+                  ;;:encoding 'no-conversion
+                  :parser (lambda ()
+                            ;; (if (and (boundp 'file) file)
+                            ;;     (write-region (buffer-string) nil file))
+                            (ol-jsonwrapper json-read  ))
+                  :success (cl-function
+                            (lambda (&key data &allow-other-keys)
+                              (message "FIle Info regrieved: %S" data)
+                              ;;(message "SUCCESS!!")
+                              ;;(setq canvas-payload data)
+                              data
+                              ))
+                  :error (cl-function (lambda ( &key error-thrown data status &allow-other-keys )
+                                        (setq canvas-err error-thrown)
+                                        (message "ERROR: %s" error-thrown)))))
+               (unless (request-response-data thisrequest)                                   
+                 (message (format "NO PAYLOAD: %s" canvas-err))
+                 (message "Full response: %s" thisrequest))
+               (request-response-data thisrequest) )
+      (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
+
+(defun org-lms-post-new-file (filepath &optional endpoint folder courseid)
+  "Get comments from student headline and post to Canvas LMS.
+If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
+will be extracted from the current environment. Note the
+commented out `dolist' macro, which will upload attachments to
+canvas. THis process is potentially buggy and seems likely to
+lead to race conditions and duplicated uploads and comments. Still
+working on this."
+  (interactive)
+  ;; main loop
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (endpoint (or endpoint (format "courses/%s/files" courseid)))         
+         ;;(storageinfo )
+         (fileinfo)
+         (allinfo)
+         (storageinfo)
+         (name (file-name-nondirectory filepath))
+         (params `(("name" . ,name)))
+         (formstring ""))
+    
+    (when folder (map-put params "parent_folder_path" folder ))
+    (setq fileinfo (org-lms-file-post-request
+                     endpoint
+                     params
+                     filepath))
+    (if fileinfo
+        (org-lms-upload-file-to-storage filepath fileinfo))
+    ;; (if fileinfo
+    ;;     (progn 
+    ;;       (setq storageinfo (org-lms-upload-file-to-storage filepath fileinfo))
+    ;;       (message "storageninfo: %s" storageinfo)
+    ;;       (if  (and  storageinfo (> 0  (length storageinfo )))
+    ;;           (progn (setq storageinfo (map-merge
+    ;;                                     'plist fileinfo
+    ;;                                     (when
+    ;;                                         (and  storageinfo (> 0  (length storageinfo )))
+    ;;                                       (ol-jsonwrapper json-read-from-string storageinfo))))
+    ;;                  storageinfo)
+    ;;         (message "CURL DID NOT SUCCEED")
+    ;;         storageinfo))
+    ;;   (message "FILEINFO DID NOT SUCCEED")
+    ;;   nil)
+    ))
+
+
+(defun org-lms-upload-file-to-storage (filepath fileinfo)
+  "using a canvas file upload response, upload a file to the file storage."
+  (interactive)
+  (let* ((upload-url (map-elt fileinfo :upload_url ))
+         (params-plist (map-elt fileinfo :upload_params))
+         (params-alist (org-lms-plist-to-alist params-plist))
+         (canvas-payload)
+         (canvas-err )
+         (formstring ""))
+    (cl-loop for prop in params-alist
+             do
+             (setq formstring (concat formstring "-F '" (symbol-name (car prop))
+                                      "=" (format "%s" (cdr prop)) "' ")))
+    (setq formstring (concat formstring " -F 'file=@" filepath "' 2> /dev/null"))
+    (let* ((thiscommand  (concat "curl '"
+                                 upload-url
+                                 "' " formstring))
+           (curlres  (shell-command-to-string thiscommand))
+           (file_id (if (> (length curlres) 0 )
+                        (format "%s"
+                                (plist-get
+                                 (ol-jsonwrapper json-read-from-string curlres) :id )))))
+      (message "upload curl command response: %s" curlres)
+      ;;(f-write-text thiscommand 'utf-8 "~/src/org-grading/filecurlcommand.sh")
+      curlres
+      )))
+#+end_src
+
+#+RESULTS:
+: org-lms-upload-file-to-storage
+
+
+
+#+begin_src emacs-lisp
+(defun org-lms-get-folders (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/folders" courseid) "GET"))
+
+(defun org-lms-get-single-folder (folderid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/folders/%s" courseid groupid) "GET"))
+
+(defun org-lms-map-folder-from-name (name)
+  (interactive)
+  (let* ((folders (org-lms-get-folders))
+         (match (or (--first (string= (plist-get it :name) name) folders )
+                    (org-lms-set-folder `((name . ,name))))))
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
+
+(defun org-lms-get-files (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request (format "courses/%s/files" courseid) "GET" '(("include" . "content_details" ))))
+
+(defun org-lms-get-single-module-item (itemid moduleid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
+#+end_src
+
+#+RESULTS:
+: org-lms-get-single-module-item
+
+*** ACTION Setters
+
+Files are complicated!
+
+#+begin_src emacs-lisp
+(defun org-lms-set-folder (params)
+  "Create a folder from params"
+  (interactive)
+
+  (let* ((canvasid (plist-get params  "CANVASID"))
+         )
+    (let* (
+           (response
+            (org-lms-canvas-request (format "courses/%s/folders"
+                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                            (if canvasid
+                                                (format  "/%s" canvasid) ""))
+                                    (if canvasid "PUT" "POST")
+                                    params))
+           (response-data (or response nil)))
+      response)))
+(defun org-lms-set-file (item module &optional canvasid)
+  "create a module item from an item definition"
+  (let* ((params `(("module_item" . ,item )))
+         (response
+          (org-lms-canvas-request (format "courses/%s/modules/%s/items"
+                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          module
+                                          (if canvasid
+                                              (format  "/%s" canvasid) ""))
+            (if canvasid "PUT" "POST")
+            params)))
+    (response-data (or response nil))
+    ))
+
+#+end_src
+
+#+RESULTS:
+: org-lms-set-file
+
 
 [[https://community.canvaslms.com/docs/DOC-10735][modules]] are collections of content intended to structure a course into sections ([[https://canvas.instructure.com/doc/api/modules.html][see api docs]]).  They don't map all that well onto my course docs organization, and they're likely to be difficult to maintain.  It wil ltake a lot of work to do this properly, but probably want to start with 
 - [ ] an *accessor* that downloads module(s) using the [[https://canvas.instructure.com/doc/api/modules.html#method.context_modules_api.index][list modules]] function, and iterate through the results to create a tree with module item attributes stored in subtree properties.
