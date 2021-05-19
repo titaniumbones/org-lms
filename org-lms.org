@@ -1414,11 +1414,184 @@ Files are complicated!
 : org-lms-set-file
 
 
+** STARTED Modules
+:PROPERTIES:
+:DUE_AT:   "hello" "what about this"
+:END:
+
+#+RESULTS:
+| "hello" | "what | about | this" |
+
 [[https://community.canvaslms.com/docs/DOC-10735][modules]] are collections of content intended to structure a course into sections ([[https://canvas.instructure.com/doc/api/modules.html][see api docs]]).  They don't map all that well onto my course docs organization, and they're likely to be difficult to maintain.  It wil ltake a lot of work to do this properly, but probably want to start with 
 - [ ] an *accessor* that downloads module(s) using the [[https://canvas.instructure.com/doc/api/modules.html#method.context_modules_api.index][list modules]] function, and iterate through the results to create a tree with module item attributes stored in subtree properties.
 - [ ] a *translator* that captures the lms item at point and stores its attributes in an org-element object that can be pasted into an existing module.  
 
-The UI for this is likely to be a bit finicky so maybe don't make a lot of decisions right now.  
+The UI for this is likely to be a bit finicky so maybe don't make a lot of decisions right now.
+
+We don't plan to support all the module options for now
+
+The main function here is to 
+*** Getters
+#+begin_src emacs-lisp
+(defun org-lms-get-modules (&optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/modules" courseid) "GET"))
+
+(defun org-lms-get-single-module (moduleid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (let ((params '(("include" . ("items")))))
+    (org-lms-canvas-request (format "courses/%s/modules/%s" courseid moduleid) "GET" params)))
+
+(defun org-lms-map-module-from-name (name)
+  (interactive)
+  (let* ((modules (org-lms-get-modules))
+         (match (or (--first (string= (plist-get it :name) name) modules )
+                    (org-lms-set-module `((name . ,name))))))
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
+
+(defun org-lms-get-module-items (moduleid &optional courseid)
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request (format "courses/%s/modules/%s/items" courseid moduleid) "GET" '(("include" . "content_details" ))))
+
+(defun org-lms-get-single-module-item (itemid moduleid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
+#+end_src
+
+#+RESULTS:
+: org-lms-get-single-module-item
+*** ACTION Setters
+
+I don't believe these are working! Need to get it done so that can be added as a hook to the end of other setters. 
+
+Here are the module possibilities
+module[name] 	Required 	string 	
+
+The name of the module
+module[unlock_at] 		DateTime 	
+module[position] 		integer 	
+module[require_sequential_progress] 		boolean 	
+module[prerequisite_module_ids][] 
+module[publish_final_grade]
+
+
+#+begin_src emacs-lisp
+(defun org-lms-set-module (params)
+  "Create a module from params"
+  (interactive)
+
+  (let* ((canvasid (plist-get params  "CANVASID"))
+         (org-html-checkbox-type 'unicode ))
+    (let* ((assignment-params  `(("module" . ,params)))
+           (response
+            (org-lms-canvas-request (format "courses/%s/modules%s"
+                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                            (if canvasid
+                                                (format  "/%s" canvasid) ""))
+                                    (if canvasid "PUT" "POST")
+                                    assignment-params))
+           (response-data (or response nil)))
+      response)))
+
+;; just acopy of assignment-grou-pfrom-headline.  oos!
+(defun org-lms-module-from-headline ()
+  "Create a Module from HEADLINE.
+  HEADLINE is an org-element object."
+  (interactive)
+  (let* ((canvasid (org-entry-get nil "CANVASID"))
+         (name  (nth 4 (org-heading-components)) )
+         (position (org-entry-get nil "MODULE_POSITION"))
+         (moduleid (org-lms-map-module-from-name (org-entry-get nil "MODULE")))
+         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
+         (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
+         (pageurl (org-entry-get nil "CANVAS_PAGE_URL"))
+         (weight (org-entry-get nil "WEIGHT"))
+         ;; rules...
+         (params `(("title" . ,name)
+                   ("content_id" . ,(string-to-number canvasid))
+                   ("type" . ,moduleitemtype)
+                   )))
+    (when position (add-to-list  'params `("position" .  ,position)))
+    (when pageurl (add-to-list  'params `("page_url" .  ,pageurl)))
+
+    (when moduleitemid (add-to-list 'params `("module_item_id" . ,moduleitemid)))
+    (if (and moduleid (or moduleitemtype pageurl ))
+        (let* ((response (org-lms-set-module-item params moduleid moduleitemid))
+               (response-data (or response nil)))
+          
+          (if (plist-get response-data :id)
+              (progn
+                (message "received module response-data")
+                (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
+                (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+                )
+            (message "did not receive assignment group response-data"))
+          response)
+      (message "Please ensure that MODULE and MODULE_TIEM_TYPE are both set"))))
+
+(defun org-lms-set-module-item (item module &optional canvasid)
+  "create a module item from an item definition"
+  (let* ((params `(("module_item" . ,item )))
+         response)
+    (message "MODULEPARAMS: %s" item)
+    (message "MODULEJSON: %s" (json-encode item))
+    
+    (setq response
+     (org-lms-canvas-request (format "courses/%s/modules/%s/items%s"
+                                     (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                     module
+                                     (if canvasid
+                                         (format  "/%s" canvasid) ""))
+       (if canvasid "PUT" "POST")
+       params))
+    
+    (or  response (request-response-error-thrown response) "Something's wrong")
+    ))
+(defun org-lms-module-item-from-headline ()
+  "Extract module data from HEADLINE.
+  HEADLINE is an org-element object."
+  (interactive)
+  (let* ((canvasid (org-entry-get nil "CANVASID"))
+         (name  (nth 4 (org-heading-components)) )
+         (position (org-entry-get nil "MODULE_POSITION"))
+         (moduleid (org-lms-map-module-from-name (org-entry-get nil "MODULE")))
+         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
+         (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
+         (pageurl (org-entry-get nil "CANVAS_PAGE_URL"))
+         (weight (org-entry-get nil "WEIGHT"))
+         ;; rules...
+         (params `(("title" . ,name)
+                   ("content_id" . ,(string-to-number canvasid))
+                   ("type" . ,moduleitemtype)
+                   )))
+    (when position (add-to-list  'params `("position" .  ,position)))
+    (when pageurl (add-to-list  'params `("page_url" .  ,pageurl)))
+
+    (when moduleitemid (add-to-list 'params `("module_item_id" . ,moduleitemid)))
+    (if (and moduleid (or moduleitemtype pageurl ))
+        (let* ((response (org-lms-set-module-item params moduleid moduleitemid))
+               (response-data (or response nil)))
+          
+          (if (plist-get response-data :id)
+              (progn
+                (message "received module response-data")
+                (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
+                (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+                )
+            (message "did not receive assignment group response-data"))
+          response)
+      (message "Please ensure that MODULE and MODULE_TIEM_TYPE are both set"))))
+#+end_src
+
+#+RESULTS:
+: org-lms-module-item-from-headline
 
 ** Assignments, Submissions, and Attachments
 Assignments first.  
