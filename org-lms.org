@@ -2358,7 +2358,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
            (assignment-type (plist-get body :assignment-type))
-           ;; (email-response (plist-get body :email-response))
+           (email-response (plist-get body :email-response))
+	   (canvas-response (plist-get body :canvas-response))
            (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
            (grading-type (or (plist-get body :grading-type) "letter_grade"))
@@ -2374,7 +2375,9 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (org-set-property "BASECOMMIT" basecommit)
       (org-set-property "GRADING_TYPE" grading-type)
-      (org-set-property "NUMBER" number)
+      ;;(org-set-property "NUMBER" number)
+      (org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
+      (org-set-property "OEG_LMS_CANVAS_RESPONSE" "t")
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
@@ -2825,7 +2828,7 @@ you have not received a grade for work that you have handed in,
 #+RESULTS:
 : org-lms-send-subtree-with-attachments
 
-***** ACTION Mail Multiple Trees
+***** ACTION Mail and Post Multiple Trees
 
 Once again, I've written multiple functions to do two very similar tasks. Need to refactor!!!
 
@@ -2833,12 +2836,13 @@ Once again, I've written multiple functions to do two very similar tasks. Need t
 
 #+begin_src emacs-lisp
 
-;;; NOTE I may have broken this via SEND-ALL condition !!! 2018-11-08
+
+
 (cl-defun org-lms-return-all-assignments (&optional (send-all nil) (also-mail nil) (post-to-lms t) )
   "By default mail all subtrees 'READY' to student recipients, unless SEND-ALL is non-nil.
 In that case, send all marked 'READY' or 'TODO'."
   (interactive)
-  (message "Mailing all READY subtrees to students")
+  (message "Returning all READY subtrees to students")
   
   (let* ((ol-status-org-msg org-msg-mode)
         
