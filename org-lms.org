@@ -1754,13 +1754,13 @@ Just getting started with this. The idea is mostly to enable adding assignments 
 #+end_src
 
 *** ACTION Setters -- Creating Assignments
-*rename -parse-assignment to -post-assignment*
++*rename -parse-assignment to -post-assignment*+ DONE  
 
 Functions to create announcements and assignments. Actually the crucial assignment code is still languishing in ~grading-template.org~. That's one of the reasons I made this org file - -to try to avoid that kind of junk!
 
 **** Assignments
 #+begin_src emacs-lisp 
-(defun org-lms-parse-assignment ()
+(defun org-lms-post-assignment ()
   "Extract assignment data from HEADLINE.
   HEADLINE is an org-element object."
   (interactive)
