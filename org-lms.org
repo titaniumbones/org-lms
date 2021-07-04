@@ -2100,6 +2100,37 @@ Sorta belongs with submissions above, but am trying to separate out stuff that i
 
 #+begin_src emacs-lisp
 
+
+(defun org-lms-put-single-grade-from-headline (&optional studentid assignmentid courseid)
+  "Get grade only (!) from student headline and post to Canvas LMS.
+If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
+will be extracted from the current environment, as the GRADE alwyas will be"
+  (interactive)
+  ;; main loop
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (assignmentid (or assignmentid (save-excursion (org-up-heading-safe) (org-entry-get (point) "ASSIGNMENTID"))))
+         (studentid (or studentid (org-entry-get (point) "STUDENTID")))
+         (grade (org-entry-get (point) "GRADE"))
+         (returnval '()))
+    ;; loop over attachments
+    
+    (let* ((grade-params `(("submission" . (("posted_grade" . ,grade)))))
+           (comment-response ;;(request-response-data)
+            (org-lms-canvas-request
+             (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
+             "PUT" grade-params)))
+      (org-entry-put nil "ORG_LMS_SPEEDGRADER_URL"
+                     (format
+                      "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
+                      courseid assignmentid studentid))
+      
+      (message "%s" (plist-get  (car (plist-get comment-response
+                                                :submission_comments)) :id))
+      (message "NO PROBLEMS HERE")
+      ;; (message "Response: %s" comment-response )
+      comment-response)))
+
+
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
 If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
@@ -2895,8 +2926,31 @@ In that case, send all marked 'READY' or 'TODO'."
       )
     ))
 
+(cl-defun org-lms-post-all-grades (&optional (send-all nil) (also-mail nil) (post-to-lms t) )
+  "By default post all  'READY' to student recipients, unless SEND-ALL is non-nil.
+In that case, send all marked 'READY' or 'TODO'."
+  (interactive)
+  (message "Returning all READY subtrees to students")
+  
+  (let* ((ol-status-org-msg org-msg-mode)
+         
+         (send-condition
+          (if send-all
+              `(or (string= (org-element-property :todo-keyword item) "READY")
+                   (string= (org-element-property :todo-keyword item) "TODO") )
+            `(string= (org-element-property :todo-keyword item) "READY")
+            )))
+    (org-map-entries 
+     #'ol-post-just-one-grade))
+  (org-cycle-hide-drawers 'all)
+  )
 
-
+(cl-defun ol-post-just-one-grade )
+  ;; (print (nth 0 (org-element-property :todo-keyword item)))
+  (interactive)
+  (when (string= (nth 2 (org-heading-components) ) "READY")
+    (org-lms-put-single-grade-from-headline)
+    (org-todo "SENT")))
 
 ;; doesn't seem to actually be used... 
 (defun org-lms-send-missing-subtree ()
