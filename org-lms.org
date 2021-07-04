@@ -1874,12 +1874,9 @@ Functions to create announcements and assignments. Actually the crucial assignme
   "First post the assignment, then save the value to FILE."
   (interactive)
   (unless file (setq file (expand-file-name "assignments.el")))
-  (org-lms-parse-assignment)
+  (org-lms-post-assignment)
   (org-lms-save-assignment-map file))
 #+end_src
-
-#+RESULTS:
-: org-lms-post-assignment-and-save
 
 Adding these functions to update all assignments for the new year.  But actually just need to somehow update the ids -- this isn't really all that helpful acttually. Ended up going through by hand.  
 #+begin_src emacs-lisp
