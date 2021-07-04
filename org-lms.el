@@ -17,6 +17,10 @@
 (require 'org-mime) ;; Unfortunately I require this somewhat outdated library for mailing
 (require 'dash) ;; modern syntax
 (require 'ts) ;; easy time manipulation
+(require 'oc) ;; citations
+(require 'oc-csl) ;; csl citaiont processor
+(require 'citeproc) ;; citeproc dependency
+(require 'ox-canvashtml) ;; new canvas html processor (experimental)
 ;; (require 's) ;; modern strings
 ;; (require 'org-ql) ;; faster, easier query syntax
 ;;(require 'ov) ;; for grade overlays
@@ -25,6 +29,8 @@
     'org-lms~send-subtree-with-attachments "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
     'org-lms-mail-all "a pretty long time ago")
+(define-obsolete-function-alias 'org-lms-parse-assignment 
+    'org-lms-post-assignment "2021-06-20" "calling this`parse` was misleading")
 
 ;; variables
   ;; most of these are used for canvas interactions...
@@ -78,6 +84,42 @@
 (defcustom ol-make-headings-final-hook nil
   "list of functions to run just after a heading has been created"
   :safe t)
+
+(defcustom org-lms-citeproc-fmt-alist
+  `((unformatted . citeproc-fmt--xml-escape)
+    (cited-item-no . ,(lambda (x y) x ))
+    (bib-item-no . ,(lambda (x y) (concat "<a name=\"citeproc_bib_item_" y "\"></a>"
+					  x)))
+    (font-style-italic . ,(lambda (x) (concat "<i>" x "</i>")))
+    (font-style-oblique . ,(lambda (x)
+			     (concat "<span style=\"font-style:oblique;\"" x "</span>")))
+    (font-variant-small-caps . ,(lambda (x)
+				  (concat
+				   "<span style=\"font-variant:small-caps;\">" x "</span>")))
+    (font-weight-bold . ,(lambda (x) (concat "<b>" x "</b>")))
+    (text-decoration-underline .
+                               ,(lambda (x)
+	                          (concat
+	                           "<span style=\"text-decoration:underline;\">" x "</span>")))
+    (rendered-var-url . ,(lambda (x) (concat "<a href=\"" x "\">" x "</a>")))
+    (rendered-var-doi . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--doi-link-prefix
+					     x "\">" x "</a>")))
+    (rendered-var-pmid . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--pmid-link-prefix
+					      x "\">" x "</a>")))
+    (rendered-var-pmcid . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--pmcid-link-prefix
+					       x "\">" x "</a>")))
+    ;;(rendered-var-title . ,(lambda (x) (concat "<a href=\"" x "\">" x "</a>")))
+    (vertical-align-sub . ,(lambda (x) (concat "<sub>" x "</sub>")))
+    (vertical-align-sup . ,(lambda (x) (concat "<sup>" x "</sup>")))
+    (vertical-align-baseline . ,(lambda (x) (concat "<span style=\"baseline\">" x "</span>")))
+    (display-left-margin . ,(lambda (x) (concat "\n    <div class=\"csl-left-margin\">"
+						x "</div>")))
+    (display-right-inline . ,(lambda (x) (concat "<div class=\"csl-right-inline\">"
+						 x "</div>\n  ")))
+    (display-block . ,(lambda (x) (concat "\n\n    <div class=\"csl-block\">"
+					  x "</div>\n")))
+    (display-indent . ,(lambda (x) (concat "<div class=\"csl-indent\">" x "</div>\n  "))))
+    "Alist of CSL properties and lambda functions that wrap them in HTML elements." )
 
 (defun org-lms-global-props (&optional property buffer)
   "Get the plists of global org properties of current buffer."
@@ -481,7 +523,6 @@ will be moved in this case too."
         (target (concat org-lms-baseurl query))
         ;;(request-backend 'url-retrieve)
         ;;(request-coding-system 'no-conversion)
-        ;; (request-conding-system 'no-conversion)
         )
     (message (concat target "   " request-type))
     ;; (message "%s" `(("Authorization" . ,(concat "Bearer " org-lms-token))))
@@ -590,11 +631,18 @@ will be moved in this case too."
          (org-html-head-include-default-style nil)
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
-         (atext (org-export-as 'html subtreep nil t))
+         (citeproc-fmt--doi-link-prefix
+           "https://doi-org.myaccess.library.utoronto.ca/")
+         (citeproc-fmt--formatters-alist
+          `((html . ,(citeproc-formatter-create
+	              :rt (citeproc-formatter-fun-create org-re-reveal-citeproc-fmt-alist)
+	              :bib #'citeproc-fmt--html-bib-formatter))))
+         (atext (org-export-as 'canvas-html subtreep nil t))
          (is_public (or (org-lms-get-keyword "IS_PUBLIC") t))
          (license (or (org-lms-get-keyword "LICENSE") "cc_by_nc_sa"))
          (default_view (or (org-lms-get-keyword "DEFAULT_VIEW" )"syllabus"))
          (grading_standard_id (or (org-lms-get-keyword "GRADING_STANDARD_ID") 15 ))
+         
          ;;(response (org-lms-get-single-course courseid))
          (data-structure `(("course" . (
                                          ("syllabus_body" . ,atext)
@@ -747,7 +795,7 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
       (let* ((org-export-with-tags nil)
              (page-params `(("wiki_page" .
                              (("title" .  ,(identity .item) )
-                              ("body" . ,(org-export-as 'html t nil t))
+                              ("body" . ,(org-export-as 'canvas-html t nil t))
                               ("editing_roles" . ,(or .editing_roles "teachers"))
                               ("published" . ,(if (and .ol_publish
                                                        (not (string= .ol_publish "nil")))
@@ -782,67 +830,6 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
         (if (plist-get response-data :html_url)
             (browse-url (plist-get response-data :html_url)))
         response))))
-
-;; (defun org-lms-post-page ()
-  ;; "Extract page data from HEADLINE.
-  ;; HEADLINE is an org-element object."
-  ;; (interactive)
-
-  ;; (let* ((canvasid (org-entry-get nil "CANVASID"))
-  ;;        (canvas-page-url (org-entry-get nil "CANVAS_PAGE_URL"))
-  ;;        ;; (duedate (org-entry-get nil "DUE_AT"))
-  ;;        (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
-  ;;        ;; (pointspossible (if (org-entry-get nil "PAGE_WEIGHT") (* 100 (string-to-number (org-entry-get nil "PAGE_WEIGHT")))))
-  ;;        (editing-roles  (or  (org-entry-get nil "CANVAS_EDITING_ROLES") "teachers"))
-  ;;        (subtype (if (equal (org-entry-get nil "PAGE_TYPE") "canvas") "online_upload" "none"))
-  ;;        ;;( (org-entry-get nil "DUE_AT"))
-  ;;        (publish (org-entry-get nil "OL_PUBLISH")))
-  ;;   ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
-  ;;   ;;(prin1 canvasid)
-  ;;   (let* ((org-export-with-tags nil)
-  ;;          (page-params `(("wiki_page" .
-  ;;                                (("title" .  ,(nth 4 (org-heading-components)) )
-  ;;                                 ("body" . ,(org-export-as 'html t nil t))
-  ;;                                 ;; ("submission_types" . ,subtype)
-  ;;                                 ;; ("grading_type" . ,gradingtype)
-  ;;                                 ;; ("grading_standard_idcomment" . 458)
-  ;;                                 ("editing_roles" . ,editing-roles)
-  ;;                                 ;; ("points_possible" . ,(or pointspossible 10))
-  ;;                                 ("published" . ,(if publish t nil) )))))
-
-  ;;          (response
-  ;;           (org-lms-canvas-request (format "courses/%s/pages%s"
-  ;;                                           (org-lms-get-keyword "ORG_LMS_COURSEID");; (plist-get org-lms-course :id)
-  ;;                                           (if canvas-page-url
-  ;;                                               (format  "/%s" canvas-page-url) "")
-  ;;                                           )
-  ;;                                   (if canvas-page-url "PUT" "POST")
-  ;;                                   page-params
-  ;;                                   ))
-  ;;          (response-data (or response nil))
-  ;;          )
-  ;;     ;; (message "HERE COMES THE PARAMS %s" (request-response-data response) )
-  ;;     ;; (prin1 (assq-delete-all "page[description]" page-params))
-  ;;     (if (plist-get response-data :url)
-  ;;         (progn
-  ;;           (message "received response-data")
-  ;;           (org-set-property "CANVASID" (format "%s"(plist-get response-data :page_id)))
-  ;;           (org-set-property "CANVAS_PAGE_URL" (format "%s"(plist-get response-data :url)))
-  ;;           (org-set-property "OL_PUBLISH" (format "%s"(plist-get response-data :published)))
-  ;;           (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
-  ;;           (org-set-property "CANVAS_EDITING_ROLES" (format "%s" (plist-get response-data :editing_roles)))
-  ;;           ;; (org-set-property "SUBMISSIONS_DOWNLOAD_URL" (format "%s"(plist-get response-data :submissions_download_url)))
-  ;;           ;; (org-set-property "GRADING_STANDARD_ID" (format "%s"(plist-get response-data :grading_standard_id)))
-  ;;           ;; (org-set-property "CANVAS_SUBMISSION_TYPES" (format "%s"(plist-get response-data :submission_types)))
-  ;;           ;; (org-set-property "GRADING_TYPE" (format "%s"(plist-get response-data :grading_type)))
-  ;;           ;; (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
-
-  ;;           ) )
-  ;;     ;; (message "PAGE_TYPE is canvas %s" (equal "canvas" (org-entry-get nil "PAGE_TYPE")))
-  ;;     ;; (message "RESPONSE IS %s" response)
-  ;;     (if (plist-get response-data :html_url)
-  ;;         (browse-url (plist-get response-data :html_url)))
-  ;;     response)))
 
 (defun org-lms-file-post-request (query   request-params path)
   "Send QUERY to `org-lms-baseurl' with http request type POST
@@ -886,7 +873,6 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
                             (lambda (&key data &allow-other-keys)
                               (message "FIle Info regrieved: %S" data)
                               ;;(message "SUCCESS!!")
-                              
                               ;;(setq canvas-payload data)
                               data
                               ))
@@ -1295,7 +1281,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                      ))
   (org-lms-canvas-request (format "courses/%s/assignment_groups/%s" courseid groupid) "GET"))
 
-(defun org-lms-parse-assignment ()
+(defun org-lms-post-assignment ()
   "Extract assignment data from HEADLINE.
   HEADLINE is an org-element object."
   (interactive)
@@ -1409,7 +1395,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
   "First post the assignment, then save the value to FILE."
   (interactive)
   (unless file (setq file (expand-file-name "assignments.el")))
-  (org-lms-parse-assignment)
+  (org-lms-post-assignment)
   (org-lms-save-assignment-map file))
 
 (defun org-lms-assignment-update ()
@@ -1564,6 +1550,36 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
             (org-lms-canvas-request (format "courses/%s/grading_standards" courseid) "GET" )))
       result))
 
+(defun org-lms-put-single-grade-from-headline (&optional studentid assignmentid courseid)
+  "Get grade only (!) from student headline and post to Canvas LMS.
+If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
+will be extracted from the current environment, as the GRADE alwyas will be"
+  (interactive)
+  ;; main loop
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (assignmentid (or assignmentid (save-excursion (org-up-heading-safe) (org-entry-get (point) "ASSIGNMENTID"))))
+         (studentid (or studentid (org-entry-get (point) "STUDENTID")))
+         (grade (org-entry-get (point) "GRADE"))
+         (returnval '()))
+    ;; loop over attachments
+    
+    (let* ((grade-params `(("submission" . (("posted_grade" . ,grade)))))
+           (comment-response ;;(request-response-data)
+            (org-lms-canvas-request
+             (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
+             "PUT" grade-params)))
+      (org-entry-put nil "ORG_LMS_SPEEDGRADER_URL"
+                     (format
+                      "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
+                      courseid assignmentid studentid))
+      
+      (message "%s" (plist-get  (car (plist-get comment-response
+                                                :submission_comments)) :id))
+      (message "NO PROBLEMS HERE")
+      ;; (message "Response: %s" comment-response )
+      comment-response)))
+
+
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
 If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
@@ -1619,7 +1635,7 @@ working on this."
                                          ;; EDIT 2018=11-07 -- untested switch from alist to plist
                                          ("file_ids" . ,returnval)
                                          ;; alas, doesn't seem to update the previous comment! drat
-                                         ("id" . (or (org-entry-get nil "OL_COMMENT_ID" ) nil)))) ))
+                                         ("id" . (or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
            (comment-response ;;(request-response-data)
             (org-lms-canvas-request
              (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
@@ -1794,7 +1810,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
            (assignment-type (plist-get body :assignment-type))
-           ;; (email-response (plist-get body :email-response))
+           (email-response (plist-get body :email-response))
+	   (canvas-response (plist-get body :canvas-response))
            (basecommit (or (plist-get body :basecommit) "none"))
            (repo-basename (or  (plist-get body :repo-basename) ""))
            (grading-type (or (plist-get body :grading-type) "letter_grade"))
@@ -1810,7 +1827,9 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (org-set-property "BASECOMMIT" basecommit)
       (org-set-property "GRADING_TYPE" grading-type)
-      (org-set-property "NUMBER" number)
+      ;;(org-set-property "NUMBER" number)
+      (org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
+      (org-set-property "OEG_LMS_CANVAS_RESPONSE" "t")
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
@@ -2121,12 +2140,11 @@ you have not received a grade for work that you have handed in,
     (message-goto-to)
     ))
 
-;;; NOTE I may have broken this via SEND-ALL condition !!! 2018-11-08
 (cl-defun org-lms-return-all-assignments (&optional (send-all nil) (also-mail nil) (post-to-lms t) )
   "By default mail all subtrees 'READY' to student recipients, unless SEND-ALL is non-nil.
 In that case, send all marked 'READY' or 'TODO'."
   (interactive)
-  (message "Mailing all READY subtrees to students")
+  (message "Returning all READY subtrees to students")
   
   (let* ((ol-status-org-msg org-msg-mode)
         
@@ -2138,13 +2156,12 @@ In that case, send all marked 'READY' or 'TODO'."
            )))
     (if ol-status-org-msg (org-msg-mode))
     (org-map-entries 
-     #'ol-send-just-one)
+     #'ol-return-just-one)
     (if ol-status-org-msg (org-msg-mode)))
-  (org-cycle-hide-drawers 'all)
-  )
+  (org-cycle-hide-drawers 'all))
 
 
-(cl-defun ol-send-just-one (&optional (also-mail nil) (post-to-lms t))
+(cl-defun ol-return-just-one (&optional (also-mail nil) (post-to-lms t))
   ;; (print (nth 0 (org-element-property :todo-keyword item)))
   (interactive)
   (let ((also-mail (org-entry-get nil "ORG_LMS_EMAIL_COMMENTS" t))
@@ -2160,7 +2177,7 @@ In that case, send all marked 'READY' or 'TODO'."
                          ))
       (org-todo "SENT"))))
 ;; should get rid of this & just add a flag to ~org-lms-mail-all~
-(defun org-lms-mail-all-undone ()
+(defun org-lms-return-all-undone ()
   (interactive)
   "Mail all subtrees marked 'TODO' to student recipients."
   (org-element-map (org-element-parse-buffer) 'headline
@@ -2174,13 +2191,32 @@ In that case, send all marked 'READY' or 'TODO'."
           (save-excursion
             (org-lms-send-missing-subtree)
             (message-send-and-exit))
-          (org-todo )
-          ))
-      )
-    ))
+          (org-todo ))))))
 
+(cl-defun org-lms-post-all-grades (&optional (send-all nil) (also-mail nil) (post-to-lms t) )
+  "By default post all  'READY' to student recipients, unless SEND-ALL is non-nil.
+In that case, send all marked 'READY' or 'TODO'."
+  (interactive)
+  (message "Returning all READY subtrees to students")
+  
+  (let* ((ol-status-org-msg org-msg-mode)
+         
+         (send-condition
+          (if send-all
+              `(or (string= (org-element-property :todo-keyword item) "READY")
+                   (string= (org-element-property :todo-keyword item) "TODO") )
+            `(string= (org-element-property :todo-keyword item) "READY")
+            )))
+    (org-map-entries 
+     #'ol-post-just-one-grade))
+  (org-cycle-hide-drawers 'all))
 
-
+(cl-defun ol-post-just-one-grade ()
+  "post only the grade for current headline"
+  (interactive)
+  (when (string= (nth 2 (org-heading-components) ) "READY")
+    (org-lms-put-single-grade-from-headline)
+    (org-todo "SENT")))
 
 ;; doesn't seem to actually be used... 
 (defun org-lms-send-missing-subtree ()
