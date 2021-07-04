@@ -48,11 +48,15 @@ Source blocks are tangled using org-babel.
 (require 'oc) ;; citations
 (require 'oc-csl) ;; csl citaiont processor
 (require 'citeproc) ;; citeproc dependency
+(require 'ox-canvashtml) ;; new canvas html processor (experimental)
 ;; (require 's) ;; modern strings
 ;; (require 'org-ql) ;; faster, easier query syntax
 ;;(require 'ov) ;; for grade overlays
 
 #+end_src
+
+#+RESULTS:
+: ox-canvashtml
 
 * Define obsolete functions
 THere's some stuff I should get rid of. Trying to track it down.  
@@ -1144,7 +1148,7 @@ Rewritten <2019-10-01 Tue> to use let-alist.  Function to create and update page
       (let* ((org-export-with-tags nil)
              (page-params `(("wiki_page" .
                              (("title" .  ,(identity .item) )
-                              ("body" . ,(org-export-as 'html t nil t))
+                              ("body" . ,(org-export-as 'canvas-html t nil t))
                               ("editing_roles" . ,(or .editing_roles "teachers"))
                               ("published" . ,(if (and .ol_publish
                                                        (not (string= .ol_publish "nil")))
