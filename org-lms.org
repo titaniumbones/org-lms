@@ -133,41 +133,24 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   "list of functions to run just after a heading has been created"
   :safe t)
 
+(defcustom org-lms-citeproc-doi-prefix
+  "https://dx.doi.org/"
+  "Local DOI resolver for student bibliography links")
+
 (defcustom org-lms-citeproc-fmt-alist
-  `((unformatted . citeproc-fmt--xml-escape)
-    (cited-item-no . ,(lambda (x y) x ))
-    (bib-item-no . ,(lambda (x y) (concat "<a name=\"citeproc_bib_item_" y "\"></a>"
-					  x)))
-    (font-style-italic . ,(lambda (x) (concat "<i>" x "</i>")))
-    (font-style-oblique . ,(lambda (x)
-			     (concat "<span style=\"font-style:oblique;\"" x "</span>")))
-    (font-variant-small-caps . ,(lambda (x)
-				  (concat
-				   "<span style=\"font-variant:small-caps;\">" x "</span>")))
-    (font-weight-bold . ,(lambda (x) (concat "<b>" x "</b>")))
-    (text-decoration-underline .
-                               ,(lambda (x)
-	                          (concat
-	                           "<span style=\"text-decoration:underline;\">" x "</span>")))
-    (rendered-var-url . ,(lambda (x) (concat "<a href=\"" x "\">" x "</a>")))
-    (rendered-var-doi . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--doi-link-prefix
-					     x "\">" x "</a>")))
-    (rendered-var-pmid . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--pmid-link-prefix
-					      x "\">" x "</a>")))
-    (rendered-var-pmcid . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--pmcid-link-prefix
-					       x "\">" x "</a>")))
-    ;;(rendered-var-title . ,(lambda (x) (concat "<a href=\"" x "\">" x "</a>")))
-    (vertical-align-sub . ,(lambda (x) (concat "<sub>" x "</sub>")))
-    (vertical-align-sup . ,(lambda (x) (concat "<sup>" x "</sup>")))
-    (vertical-align-baseline . ,(lambda (x) (concat "<span style=\"baseline\">" x "</span>")))
-    (display-left-margin . ,(lambda (x) (concat "\n    <div class=\"csl-left-margin\">"
-						x "</div>")))
-    (display-right-inline . ,(lambda (x) (concat "<div class=\"csl-right-inline\">"
-						 x "</div>\n  ")))
-    (display-block . ,(lambda (x) (concat "\n\n    <div class=\"csl-block\">"
-					  x "</div>\n")))
-    (display-indent . ,(lambda (x) (concat "<div class=\"csl-indent\">" x "</div>\n  "))))
-    "Alist of CSL properties and lambda functions that wrap them in HTML elements." )
+  ;; oops, requires dash library!!
+  (and (boundp 'citeproc-fmt--html-alist)
+       (--map-when (eq  (car it) 'cited-item-no)
+                   '(cited-item-no
+                     . ;; (lambda (x y) (concat "<a href=\"#slide-bibliography\">" x "</a>"))
+                     (lambda (x y) x))
+                   citeproc-fmt--html-alist))
+  "Alist matching CSL properties to lambda functions that wrap the property values
+  in HTML tags; or nil, if CITEPROC-FMT--HTML-ALIST is not defined."
+  :group 'org-export-re-reveal
+  :type '(alist :key-type symbol :value-type function ))
+
+
 #+end_src
 
 #+RESULTS:
@@ -933,7 +916,7 @@ Not Implemented
            "https://doi-org.myaccess.library.utoronto.ca/")
          (citeproc-fmt--formatters-alist
           `((html . ,(citeproc-formatter-create
-	              :rt (citeproc-formatter-fun-create org-re-reveal-citeproc-fmt-alist)
+	              :rt (citeproc-formatter-fun-create org-lms-citeproc-fmt-alist)
 	              :bib #'citeproc-fmt--html-bib-formatter))))
          (atext (org-export-as 'canvas-html subtreep nil t))
          (is_public (or (org-lms-get-keyword "IS_PUBLIC") t))
