@@ -85,41 +85,22 @@
   "list of functions to run just after a heading has been created"
   :safe t)
 
+(defcustom org-lms-citeproc-doi-prefix
+  "https://dx.doi.org/"
+  "Local DOI resolver for student bibliography links")
+
 (defcustom org-lms-citeproc-fmt-alist
-  `((unformatted . citeproc-fmt--xml-escape)
-    (cited-item-no . ,(lambda (x y) x ))
-    (bib-item-no . ,(lambda (x y) (concat "<a name=\"citeproc_bib_item_" y "\"></a>"
-					  x)))
-    (font-style-italic . ,(lambda (x) (concat "<i>" x "</i>")))
-    (font-style-oblique . ,(lambda (x)
-			     (concat "<span style=\"font-style:oblique;\"" x "</span>")))
-    (font-variant-small-caps . ,(lambda (x)
-				  (concat
-				   "<span style=\"font-variant:small-caps;\">" x "</span>")))
-    (font-weight-bold . ,(lambda (x) (concat "<b>" x "</b>")))
-    (text-decoration-underline .
-                               ,(lambda (x)
-	                          (concat
-	                           "<span style=\"text-decoration:underline;\">" x "</span>")))
-    (rendered-var-url . ,(lambda (x) (concat "<a href=\"" x "\">" x "</a>")))
-    (rendered-var-doi . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--doi-link-prefix
-					     x "\">" x "</a>")))
-    (rendered-var-pmid . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--pmid-link-prefix
-					      x "\">" x "</a>")))
-    (rendered-var-pmcid . ,(lambda (x) (concat "<a href=\"" citeproc-fmt--pmcid-link-prefix
-					       x "\">" x "</a>")))
-    ;;(rendered-var-title . ,(lambda (x) (concat "<a href=\"" x "\">" x "</a>")))
-    (vertical-align-sub . ,(lambda (x) (concat "<sub>" x "</sub>")))
-    (vertical-align-sup . ,(lambda (x) (concat "<sup>" x "</sup>")))
-    (vertical-align-baseline . ,(lambda (x) (concat "<span style=\"baseline\">" x "</span>")))
-    (display-left-margin . ,(lambda (x) (concat "\n    <div class=\"csl-left-margin\">"
-						x "</div>")))
-    (display-right-inline . ,(lambda (x) (concat "<div class=\"csl-right-inline\">"
-						 x "</div>\n  ")))
-    (display-block . ,(lambda (x) (concat "\n\n    <div class=\"csl-block\">"
-					  x "</div>\n")))
-    (display-indent . ,(lambda (x) (concat "<div class=\"csl-indent\">" x "</div>\n  "))))
-    "Alist of CSL properties and lambda functions that wrap them in HTML elements." )
+  ;; oops, requires dash library!!
+  (and (boundp 'citeproc-fmt--html-alist)
+       (--map-when (eq  (car it) 'cited-item-no)
+                   '(cited-item-no
+                     . ;; (lambda (x y) (concat "<a href=\"#slide-bibliography\">" x "</a>"))
+                     (lambda (x y) x))
+                   citeproc-fmt--html-alist))
+  "Alist matching CSL properties to lambda functions that wrap the property values
+  in HTML tags; or nil, if CITEPROC-FMT--HTML-ALIST is not defined."
+  :group 'org-export-re-reveal
+  :type '(alist :key-type symbol :value-type function ))
 
 (defun org-lms-global-props (&optional property buffer)
   "Get the plists of global org properties of current buffer."
@@ -622,7 +603,7 @@ will be moved in this case too."
   ;;              (lambda (&rest args) "")))
   ;;     ;; (prin1 (symbol-function  'org-html--build-meta-info))
   ;; )
-  (let* ((org-export-with-toc nil)
+  (let* (;;(org-export-with-toc nil)
          ;;(org-export-with-smart-quotes nil)
          (org-html-postamble nil)
          (org-html-preamble nil)
@@ -635,7 +616,7 @@ will be moved in this case too."
            "https://doi-org.myaccess.library.utoronto.ca/")
          (citeproc-fmt--formatters-alist
           `((html . ,(citeproc-formatter-create
-	              :rt (citeproc-formatter-fun-create org-re-reveal-citeproc-fmt-alist)
+	              :rt (citeproc-formatter-fun-create org-lms-citeproc-fmt-alist)
 	              :bib #'citeproc-fmt--html-bib-formatter))))
          (atext (org-export-as 'canvas-html subtreep nil t))
          (is_public (or (org-lms-get-keyword "IS_PUBLIC") t))
@@ -649,7 +630,7 @@ will be moved in this case too."
                                         ("is_public" . ,is_public)
                                         ("grading_standard_id" . ,grading_standard_id)
                                         ("license" . ,license)
-                                        ("default_view" . ,default_view)
+                                        ;;("default_view" . ,default_view)
                                         ("license" . ,license)
                                         ))))
          (response (org-lms-canvas-request
@@ -1048,11 +1029,23 @@ working on this."
                      ))
   (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
 
+(defun org-lms-match-emoji (category)
+  (string= (downcase category)
+           (downcase (org-property-get nil "ORG_LMS_CATEGORY"))
+           ))
+
+(defcustom org-lms-emoji-alist
+  `(("Assignment" . "💯")
+    ("Video" . "")
+    (""))
+  "Assoc between emoji and predicates")
+(defcustom org-lms-emoji-p t
+  "whether or not to insert emoji in module item titles")
 (defun org-lms-set-module (params)
   "Create a module from params"
   (interactive)
-
-  (let* ((canvasid (plist-get params  "CANVASID"))
+  (message "module params: %s" params)
+  (let* ((canvasid (map-elt params "moduleid" nil 'equal))
          (org-html-checkbox-type 'unicode ))
     (let* ((assignment-params  `(("module" . ,params)))
            (response
@@ -1065,41 +1058,44 @@ working on this."
            (response-data (or response nil)))
       response)))
 
+(defun org-lms-module-delete (id)
+  "Delete the given module from canvas (careful!)"
+  (org-lms-canvas-request (format "courses/%s/modules/%s"
+                                  (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                  id
+                                  )
+                            "DELETE" 
+                          )
+  )
 ;; just acopy of assignment-grou-pfrom-headline.  oos!
 (defun org-lms-module-from-headline ()
   "Create a Module from HEADLINE.
   HEADLINE is an org-element object."
   (interactive)
-  (let* ((canvasid (org-entry-get nil "CANVASID"))
-         (name  (nth 4 (org-heading-components)) )
-         (position (org-entry-get nil "MODULE_POSITION"))
-         (moduleid (org-lms-map-module-from-name (org-entry-get nil "MODULE")))
-         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
-         (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
-         (pageurl (org-entry-get nil "CANVAS_PAGE_URL"))
-         (weight (org-entry-get nil "WEIGHT"))
-         ;; rules...
-         (params `(("title" . ,name)
-                   ("content_id" . ,(string-to-number canvasid))
-                   ("type" . ,moduleitemtype)
-                   )))
+  (let* ((name  (nth 4 (org-heading-components)) )
+         (position (org-entry-get nil "POSITION"))
+         (moduleid (or (org-entry-get nil "MODULE_ID")
+                       (and (org-entry-get nil "MODULE")
+                            (org-lms-map-module-from-name (org-entry-get nil "MODULE")))))
+         (published (org-entry-get nil "PUBLISHED"))
+         (params `(("name" . ,name))))
     (when position (add-to-list  'params `("position" .  ,position)))
-    (when pageurl (add-to-list  'params `("page_url" .  ,pageurl)))
-
-    (when moduleitemid (add-to-list 'params `("module_item_id" . ,moduleitemid)))
-    (if (and moduleid (or moduleitemtype pageurl ))
-        (let* ((response (org-lms-set-module-item params moduleid moduleitemid))
-               (response-data (or response nil)))
-          
-          (if (plist-get response-data :id)
-              (progn
-                (message "received module response-data")
-                (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
-                (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
-                )
-            (message "did not receive assignment group response-data"))
-          response)
-      (message "Please ensure that MODULE and MODULE_TIEM_TYPE are both set"))))
+    (when moduleid (add-to-list  'params `("moduleid" .  ,moduleid)))
+    (when published (add-to-list  'params `("published" .  ,published)))
+        (let* ((response (org-lms-set-module params))
+           (response-data (or response nil)))
+      (if (plist-get response-data :id)
+          (progn
+            (message "received module response-data %s" response-data)
+            (org-set-property "MODULE_ID" (format "%s"(plist-get response-data :id)))
+            (org-set-property "MODULE" (format "%s"(plist-get response-data :name)))
+            (org-set-property "PUBLISHED" (format "%s"(plist-get response-data :published)))
+            (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+            )
+        (message "did not receive module group response-data"))
+      response)
+    ;; (message "Please ensure that MODULE and MODULE_ITEM_TYPE are both set")
+    ))
 
 (defun org-lms-set-module-item (item module &optional canvasid)
   "create a module item from an item definition"
@@ -1126,33 +1122,42 @@ working on this."
   (let* ((canvasid (org-entry-get nil "CANVASID"))
          (name  (nth 4 (org-heading-components)) )
          (position (org-entry-get nil "MODULE_POSITION"))
-         (moduleid (org-lms-map-module-from-name (org-entry-get nil "MODULE")))
+         (moduleid (or (org-entry-get nil "MODULE_ID")
+                       (org-lms-map-module-from-name (org-entry-get nil "MODULE"))))
          (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
          (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
+         (externalurl (org-entry-get nil "MODULE_ITEM_EXTERNAL_URL"))
          (pageurl (org-entry-get nil "CANVAS_PAGE_URL"))
-         (weight (org-entry-get nil "WEIGHT"))
+         (newtab t)
+         (published  (org-entry-get nil "MODULE_ITEM_PUBLISHED") )
          ;; rules...
          (params `(("title" . ,name)
-                   ("content_id" . ,(string-to-number canvasid))
                    ("type" . ,moduleitemtype)
-                   )))
+                   ("new_tab" . t)
+                   ("published" . ,published))))
+    (when canvasid (add-to-list 'params  `("content_id" . ,(string-to-number canvasid))))
     (when position (add-to-list  'params `("position" .  ,position)))
     (when pageurl (add-to-list  'params `("page_url" .  ,pageurl)))
-
+    (when externalurl (add-to-list  'params `("external_url" .  ,externalurl)))
+    ;; (when newtab (add-to-list  'params `("new_tab" .  ,newtab)))
     (when moduleitemid (add-to-list 'params `("module_item_id" . ,moduleitemid)))
     (if (and moduleid (or moduleitemtype pageurl ))
         (let* ((response (org-lms-set-module-item params moduleid moduleitemid))
-               (response-data (or response nil)))
+               (response-data (or response nil))
+               (html_url (plist-get response-data :html_url))
+               (external_url (plist-get response-data :external_url)))
           
           (if (plist-get response-data :id)
               (progn
                 (message "received module response-data")
                 (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
-                (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+                (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
+                (org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
+                (org-set-property "MODULE_ITEM_PUBLISHED" (format "%s"(plist-get response-data :published)))
                 )
-            (message "did not receive assignment group response-data"))
+            (message "did not receive module item response-data"))
           response)
-      (message "Please ensure that MODULE and MODULE_TIEM_TYPE are both set"))))
+      (message "Please ensure that MODULE and MODULE_ITEM_TYPE are both set"))))
 
 (defun org-lms-get-assignments (&optional courseid)
   (unless courseid
@@ -1353,6 +1358,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                                                     0 10)))
           (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
           (org-set-property "OL_PUBLISH" (format "%s"(plist-get response-data :published)))
+          (org-set-property "ORG_LMS_CATEGORY" "Assignment")
           (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
           (org-set-property "CANVAS_SUBMISSION_URL" (format "%s" (plist-get response-data :submissions_download_url)))
           (org-set-property "SUBMISSIONS_DOWNLOAD_URL" (format "%s"(plist-get response-data :submissions_download_url)))
