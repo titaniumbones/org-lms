@@ -1,7 +1,56 @@
 #+PROPERTY: header-args    :tangle yes 
-* test tree
+* Some background about Quercus CSS
+:PROPERTIES:
+:header-args: :tangle no
+:END:
 
-some content
+Here's a short list of classes & some smaple code to give a bit of a sense of what is possible.
+
+- there's an ~element toggler~ script that allows elements to toggle display of some other element on click by virtue of ~aria~ attributes. The code looks like this:
+
+  #+begin_quote
+ aria-label="Toggler toggle list visibility" aria-expanded="true" aria-controls="group_n"
+  #+end_quote
+
+  Here's some actual (bloated) code:
+  #+begin_src html
+<h2 class="content-box pad-box-mini border border-trbl border-round" style="background-color: #0e3c67;"><span class="element_toggler" aria-controls="group_1" aria-label="Toggler toggle list visibility" aria-expanded="true"><span class="element_toggler" aria-controls="group_1" aria-label="Toggler toggle list visibility" aria-expanded="true"><span style="color: #ffffff;">Librarians</span></span></span></h2>
+<div id="group_1" style="display: none;">
+<p>Librarians are an indispensable resource for helping your students gain confidence and skill in locating and evaluating information. Consult the list of <a href="https://onesearch.library.utoronto.ca/liaison-librarians">Faculty Liaison Librarians</a> to see who could act as a resource to help you prepare your course syllabus (e.g. identify and locate e-resources and readings), help students understand and navigate research tools in your field (e.g. demo a search tool for your students), or assist with teaching your students key information literacy skills (provide information to be included in an online module in Quercus, or as part of an assignment, etc.).</p>
+  #+end_src
+
+  I'm not going to try to deal with those ~img~ tags today, as they're a uge time suck.  But we can simplify a fair bitmap
+  #+begin_src html
+  <h2 class="content-box pad-box-mini border border-trbl border-round element_toggler"
+      style="background-color: #0e3c67; color: #ffffff;"
+      aria-controls="group_1" aria-label="Toggler toggle list visibility">
+      Librarians
+  </h2>
+  <div id="group_1" style="display: none;">
+      <p>
+          Librarians are an indispensable resource for helping your students gain confidence and skill in locating and evaluating information. Consult the list of
+  
+          <a href="https://onesearch.library.utoronto.ca/liaison-librarians">Faculty Liaison Librarians</a>
+  
+          to see who could act as a resource to help you prepare your course syllabus (e.g. identify and locate e-resources and readings), help students understand and navigate research tools in your field (e.g. demo a search tool for your students), or assist with teaching your students key information literacy skills (provide information to be included in an online module in Quercus, or as part of an assignment, etc.).
+      </p>
+  </div>
+  #+end_src
+with an ~ATTR_CANVAS: togglesection~ it wouldn't be too hard to do those toggling bits somewhat.
+
+#+RESULTS:
+: org-canvashtml-toggler-make-aria
+
+Meanwhile, we could also cluster some of the classes to make set of options, e.g.:
+
+| class name   | function           |
+|--------------+--------------------|
+| content-box  | fat margins        |
+| pad-box-mini | fat padding        |
+| border-round | mild borde-rradius |
+| border       | 1px greay borer    |
+|              |                    |
+make a ~ATTR_CANVASHTML: :fat t~ or something like that.  
 * Derived backend for Canvas LMS Pages
 
 Canvas LMS accepts HTML text, but it quite frustratingly strips out ~link~ and ~style~ tags, so all css has to be inlined.  going to try now to add an inliner, let's see how it goes.
@@ -56,13 +105,23 @@ holding contextual information."
 		    #'number-to-string
 		    (org-export-get-headline-number parent info) "-"))))
         ;; Build return value.
-        (if (org-element-property :CANVAS_NO_INNERDIV parent)
+        ;; at least for now, we have two special conditions
+        ;; the CANVAS_NO_INNERDIV property is set; in this case
+        ;; there's no enclosing foldable section, so the two are incompatible
+        ;; the second special conditions is that the headline has a
+        ;; CANVAS_FAT property.  BUt that's nothing to worry about here actually --
+        ;; nothing to change!
+        (if  (org-element-property :CANVAS_NO_INNERDIV parent)
             (format "%s\n" (or contents ""))    
-	  (format "<div class=\"outline-text-%d\" id=\"text-%s\">\n%s</div>\n"
+	  (format "<div class=\"outline-text-%d\" id=\"text-%s\"%s>\n%s</div>\n"
 		  class-num
 		  (or (org-element-property :CUSTOM_ID parent)
 		      section-number
 		      (org-export-get-reference parent info))
+                  "" ;; for now, moving this to the new div
+                  ;; (when (or (org-element-property :CANVAS_HTML_TOGGLE parent)
+                  ;;           (org-export-read-attribute :attr_canvashtml parent :toggle))
+                  ;;   "style=\"display:none;\"")
 		  (or contents "")))))))
 
 #+end_src
@@ -70,10 +129,32 @@ holding contextual information."
 #+RESULTS:
 : org-canvas-html-section
 
+** Define some options here 
+
+#+begin_src emacs-lisp
+(defvar org-canvas-html-fat-classes
+  "content-box pad-box-mini border border-round"
+  "Classs that together make a nice fat block element")
+(defvar org-canvas-html-toggler-classes
+  "element_toggler"
+  "class to turn on toggling in a headline")
+
+(defun org-canvashtml-toggler-make-aria (id)
+  "assemble the aria-classes for the element toggler"
+  (format " aria-controls=\"contents-%s\" aria-label=\"Toggler toggle list visibility\""
+          id))
+
+#+end_src
+
+#+RESULTS:
+: org-canvashtml-toggler-make-aria
+
 ** Unfortunately, have to replace the headline function too :-(
 .. to use the new section function...
 
 also gonna add the capacity to just add an additional div to that sweeps the whoe section up
+
+Good thing we did ahtat before though as we have to modify it now anyway for folding
 #+begin_src emacs-lisp
 ;;;; Headline
 
@@ -99,6 +180,12 @@ holding contextual information."
                                todo todo-type priority text tags info))
            (contents (or contents ""))
 	   (id (org-html--reference headline info))
+           (fat-classes (when (or (org-export-read-attribute :attr_canvashtml headline :fat)
+                                  (org-element-property :CANVAS_HTML_FAT headline)
+                                  (org-export-read-attribute :attr_canvashtml headline :fat))
+                          org-canvas-html-fat-classes))
+           (add-toggler (or (org-element-property :CANVAS_HTML_TOGGLE headline)
+                            (org-export-read-attribute :attr_canvashtml headline :toggle)))
 	   (formatted-text
 	    (if (plist-get info :html-self-link-headlines)
 		(format "<a href=\"#%s\">%s</a>" id full-text)
@@ -117,22 +204,32 @@ holding contextual information."
 	     (and (org-export-last-sibling-p headline info)
 		  (format "</%s>\n" html-type))))
 	;; Standard headline.  Export it as a section.
-        (let ((extra-class
+        (let* ((extra-class
+               
 	       (org-element-property :HTML_CONTAINER_CLASS headline))
-	      (headline-class
-	       (org-element-property :HTML_HEADLINE_CLASS headline))
+               (headline-class (org-element-property :HTML_HEADLINE_CLASS headline))
+	      (headline-all-classes
+               (concat (and  fat-classes " ")
+                       fat-classes
+                       (and add-toggler " ")
+                       (when add-toggler org-canvas-html-toggler-classes)
+                       (and headline-class " ")
+                       headline-class))
               (first-content (car (org-element-contents headline))))
+          
           (format "<%s id=\"%s\" class=\"%s\">%s%s</%s>\n"
                   (org-html--container headline info)
                   (format "outline-container-%s" id)
                   (concat (format "outline-%d" level)
                           (and extra-class " ")
                           extra-class)
-                  (format "\n<h%d id=\"%s\"%s>%s</h%d>\n"
+                  (format "\n<h%d id=\"%s\"%s%s>%s</h%d>\n"
                           level
                           id
-			  (if (not headline-class) ""
-			    (format " class=\"%s\"" headline-class))
+			  (if (not headline-all-classes) ""
+			    (format " class=\"%s\"" headline-all-classes))
+                          (if (not add-toggler) ""
+                              (org-canvashtml-toggler-make-aria id))
                           (concat
                            (and numberedp
                                 (format
@@ -145,8 +242,17 @@ holding contextual information."
                   ;; empty one to get the correct <div
                   ;; class="outline-...> which is needed by
                   ;; `org-info.js'.
-                  (if (eq (org-element-type first-content) 'section) contents
-                    (concat (org-canvas-html-section first-content "" info) contents))
+
+                  ;; also, for now add an extra div (!)
+                  ;; which could mess things up
+                  (concat
+                   (format "<div id=\"contents-%s\"%s>"
+                           id
+                           (when add-toggler " style=\"display:none\""))
+                   (if (eq (org-element-type first-content) 'section) contents
+                     (concat (org-canvas-html-section first-content "" info) contents))
+                   "</div>")
+                  
                   (org-html--container headline info)))))))
 
 #+end_src

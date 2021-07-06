@@ -903,7 +903,7 @@ Not Implemented
   ;;              (lambda (&rest args) "")))
   ;;     ;; (prin1 (symbol-function  'org-html--build-meta-info))
   ;; )
-  (let* ((org-export-with-toc nil)
+  (let* (;;(org-export-with-toc nil)
          ;;(org-export-with-smart-quotes nil)
          (org-html-postamble nil)
          (org-html-preamble nil)
@@ -1464,24 +1464,46 @@ module[require_sequential_progress] 		boolean
 module[prerequisite_module_ids][] 
 module[publish_final_grade]
 
+Edit <2021-07-05 Mon>: An interesting little piece of code from Tyson, who uses emoji to code his module titles. which is kinda cool.
+
+#+begin_quote
+For /Teaching Presence/, I've aimed for consistency in how materials are organised and labelled in modules but also in handouts, live classes, and recorded lessons. You'll notice:
+
+-🔰in front of course documents\\
+-💯in front of assessments\\
+📖in front of core texts\\
+-📝in front of handouts that require activity\\
+-👁 in front of videos (recorded lessons or outside videos)\\
+-✍🏼in front of asynchronous independent tasks students are assigned
+ 
+#+end_quote
+
 
 #+begin_src emacs-lisp
+;; -🔰in front of course documents\\
+;; -💯in front of assessments\\
+;; 📖in front of core texts\\
+;; -📝in front of handouts that require activity\\
+;; -👁 in front of videos (recorded lessons or outside videos)\\
+;; -✍🏼in front of asynchronous independent tasks students are assigned
+
+
 (defun org-lms-set-module (params)
   "Create a module from params"
   (interactive)
-
-  (let* ((canvasid (plist-get params  "CANVASID"))
-         (org-html-checkbox-type 'unicode ))
-    (let* ((assignment-params  `(("module" . ,params)))
-           (response
-            (org-lms-canvas-request (format "courses/%s/modules%s"
-                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
-                                            (if canvasid
-                                                (format  "/%s" canvasid) ""))
-                                    (if canvasid "PUT" "POST")
-                                    assignment-params))
-           (response-data (or response nil)))
-      response)))
+  (message "module params: %s" params)
+  (let* ((canvasid (map-elt params "moduleid" nil 'equal))
+         (org-html-checkbox-type 'unicode )
+         (assignment-params  `(("module" . ,params)))
+         (response
+          (org-lms-canvas-request (format "courses/%s/modules%s"
+                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          (if canvasid
+                                              (format  "/%s" canvasid) ""))
+                                  (if canvasid "PUT" "POST")
+                                  assignment-params))
+         (response-data (or response nil)))
+    response))
 
 (defun org-lms-module-delete (id)
   "Delete the given module from canvas (careful!)"
@@ -1522,6 +1544,18 @@ module[publish_final_grade]
     ;; (message "Please ensure that MODULE and MODULE_ITEM_TYPE are both set")
     ))
 
+
+(defun org-lms-match-emoji (category)
+  (string= (downcase category)
+           (downcase (org-property-get nil "ORG_LMS_CATEGORY"))
+           ))
+
+
+
+(defcustom org-lms-emojify t
+  "whether or not to insert emoji in module item titles")
+
+
 (defun org-lms-set-module-item (item module &optional canvasid)
   "create a module item from an item definition"
   (let* ((params `(("module_item" . ,item )))
@@ -1540,19 +1574,44 @@ module[publish_final_grade]
     
     (or  response (request-response-error-thrown response) "Something's wrong")
     ))
+
+(defcustom org-lms-emoji-alist
+  '(("Assignment" . "💯")
+    ("Coursedoc" . "🔰")
+    ("Reading" . "📖")
+    ("Task" . "✍🏼" )
+    ("Discussion" . "❓")
+    ("Video" . "👁")
+    ("Urgent" . "❗"))
+  "Assoc between emoji and predicates")
+
+
 (defun org-lms-module-item-from-headline ()
   "Extract module data from HEADLINE.
   HEADLINE is an org-element object."
   (interactive)
   (let* ((canvasid (org-entry-get nil "CANVASID"))
-         (name  (nth 4 (org-heading-components)) )
+         (cat (or  (org-entry-get nil "ORG_LMS_CATEGORY" t)
+                   (org-entry-get nil "MODULE_ITEM_TYPE" t)))
+         (emoji (when (and  org-lms-emojify cat)
+                  (concat  (alist-get cat  org-lms-emoji-alist  nil  nil 'string=) " ")))
+         (name  (concat emoji  (nth 4 (org-heading-components))) )
          (position (org-entry-get nil "MODULE_POSITION"))
-         (moduleid (or (org-entry-get nil "MODULE_ID")
-                       (org-lms-map-module-from-name (org-entry-get nil "MODULE"))))
-         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
+         (moduleid (or (org-entry-get nil "MODULE_ID" t)
+                       (org-lms-map-module-from-name (org-entry-get nil "MODULE" t))
+))
+         (moduleitemtype (or
+                          (org-entry-get nil "MODULE_ITEM_TYPE" t)
+                          (let ((assignmentp  (org-entry-get nil "CANVAS_SUBMISSION_URL"))
+                                (pagep (org-entry-get nil "CANVAS_PAGE_URL") ))
+                            (cond (assignmentp "Assignment")
+                                  (pagep "Page")))))
          (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
          (externalurl (org-entry-get nil "MODULE_ITEM_EXTERNAL_URL"))
          (pageurl (org-entry-get nil "CANVAS_PAGE_URL"))
+         (content_id (or 
+                      (org-entry-get nil "CANVAS_ID")
+                      (org-entry-get nil "CONTENT_ID"))) ;; a bit risky keeping thesethe same
          (newtab t)
          (published  (org-entry-get nil "MODULE_ITEM_PUBLISHED") )
          ;; rules...
@@ -1578,6 +1637,7 @@ module[publish_final_grade]
                 (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
                 (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
                 (org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
+                (org-set-property "CONTENT_ID" (format "%s"(plist-get response-data :content_id)))
                 (org-set-property "MODULE_ITEM_PUBLISHED" (format "%s"(plist-get response-data :published)))
                 )
             (message "did not receive module item response-data"))
@@ -1820,6 +1880,7 @@ Functions to create announcements and assignments. Actually the crucial assignme
                                                     0 10)))
           (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
           (org-set-property "OL_PUBLISH" (format "%s"(plist-get response-data :published)))
+          (org-set-property "ORG_LMS_CATEGORY" "Assignment")
           (org-set-property "CANVAS_HTML_URL" (format "%s"(plist-get response-data :html_url)))
           (org-set-property "CANVAS_SUBMISSION_URL" (format "%s" (plist-get response-data :submissions_download_url)))
           (org-set-property "SUBMISSIONS_DOWNLOAD_URL" (format "%s"(plist-get response-data :submissions_download_url)))
@@ -1865,6 +1926,9 @@ Functions to create announcements and assignments. Actually the crucial assignme
   (org-lms-post-assignment)
   (org-lms-save-assignment-map file))
 #+end_src
+
+#+RESULTS:
+: org-lms-post-assignment-and-save
 
 Adding these functions to update all assignments for the new year.  But actually just need to somehow update the ids -- this isn't really all that helpful acttually. Ended up going through by hand.  
 #+begin_src emacs-lisp
