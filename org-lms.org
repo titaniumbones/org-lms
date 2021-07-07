@@ -1580,8 +1580,9 @@ For /Teaching Presence/, I've aimed for consistency in how materials are organis
     ("Coursedoc" . "🔰")
     ("Reading" . "📖")
     ("Task" . "✍🏼" )
+    ("Quiz" . "✍🏼" )
     ("Discussion" . "❓")
-    ("Video" . "👁")
+    ("Video" . "👀")
     ("Urgent" . "❗"))
   "Assoc between emoji and predicates")
 
@@ -1818,9 +1819,12 @@ Functions to create announcements and assignments. Actually the crucial assignme
          (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
          (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
          (gradingtype (or  (org-entry-get nil "GRADING_TYPE") "letter_grade"))
-         (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE")
-                             "canvas")
-                      "online_upload" "none"))
+         (subtype (or (and (org-entry-get nil "CANVAS_SUBMISSION_TYPES")
+                           (replace-regexp-in-string "(\\([^()]*\\))" "\\1"
+                                                     (org-entry-get nil "CANVAS_SUBMISSION_TYPES")  ))
+                      (if (equal (org-entry-get nil "ASSIGNMENT_TYPE")
+                                 "canvas")
+                          "online_upload" "none")))
          ;;  (org-entry-get nil "DUE_AT"))
          (publish (org-entry-get nil "OL_PUBLISH"))
          (group (org-entry-get nil "ASSIGNMENT_GROUP"))
@@ -2065,7 +2069,7 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
          ;;(courseid (plist-get course :id))
-         (atext (org-export-as 'html t nil t))
+         (atext (org-export-as 'canvas-html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
          )
@@ -3935,10 +3939,13 @@ approach)."
                                              "Lectures")))
                         (setq file-info
                               (json-read-from-string (org-lms-post-new-file exported-file nil file-folder ))
-                              file-location (map-elt file-info "preview_url"))
+                              file-location (alist-get   'preview_url file-info))
                         (message "PREVIEW: %s" file-location)
                         (when file-location
-                          (org-entry-put (point) "ORG_LMS_FILE_URL" (concat "https://q.utoronto.ca" file-location)))
+                          (org-entry-put (point) "CANVASID"
+                                        (format "%s" (alist-get 'id file-info)))
+                          (org-entry-put (point) "ORG_LMS_FILE_URL"
+                                         (concat "https://q.utoronto.ca" file-location)))
                         file-info
                         )))
                 
@@ -4025,6 +4032,28 @@ maybe key-type needs to be keyword though! Still a work in progress.
           ) 
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 #+end_src
+
+
+** Paste zoom recording links
+Lately I have to paste these links a lot. It gets tedious. Here's a solution.
+
+#+begin_src emacs-lisp
+(defun org-lms-munge-zoom-link ()
+  "Turn the zoom link from an email into an org list item"
+  (interactive)
+  (let ((today (format-time-string "%B %d"))
+        (s (or (and (use-region-p)
+                    (buffer-substring-no-properties (region-beginning) (region-end)))
+               (current-kill 0 t))))
+    (insert   (replace-regexp-in-string "^.*?\\(https://.*?\\) \\(Passcode: \\)\\(.*?\\) ?$"
+                                        (concat "
+- [[\\1][Recording from " today ":]] \\2 *\\3*") s))))
+
+
+#+end_src
+
+#+RESULTS:
+: org-lms-munge-zoom-link
 
 * Moribund minor-mode
 It would be nice to define a minor mode that set the coure up properly, but there's a bit of a ways to go before I do that .
@@ -4120,6 +4149,12 @@ copy that subtree as slack text for posting to slack."
   :keymap  (let ((map (make-sparse-keymap))) 
              (define-key map (kbd "C-c C-x C-g") 'org-lms-set-grade )
              (define-key map (kbd "C-c <f12>") 'org-lms-wim-wim)
+             (define-key map (kbd "C-c 0 a") 'org-lms-post-assignment)
+             (define-key map (kbd "C-c 0 p") 'org-lms-post-page)
+             (define-key map (kbd "C-c 0 n") 'org-lms-headline-to-announcement)
+             (define-key map (kbd "C-c 0 i") 'org-lms-module-item-from-headline)
+
+             (define-key map (kbd "C-c o z") 'org-lms-munge-zoom-link)
              map )
   :lighter " LMS"
   ;;(mwp-toggle-macros)
@@ -4129,7 +4164,6 @@ copy that subtree as slack text for posting to slack."
 
     (remove-hook 'org-ctrl-c-ctrl-c-hinal-hook 'org-lms-wim-wim))
   )
-
 
 
 
