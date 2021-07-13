@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "name": "default",
+      "type": "node",
+      "command": "node",
+      "inspect-brk": true
+    }
+  ]
+}

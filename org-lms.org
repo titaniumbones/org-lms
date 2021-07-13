@@ -3931,7 +3931,8 @@ approach)."
               (when do-export
                 (let ((org-re-reveal-single-file t)
                       (exported-file
-                       (org-re-reveal-export-to-html async subtree visible-only nil nil)))
+                       (org-re-reveal-export-to-html async subtree visible-only nil
+                                                     '(:org-re-reveal-single-file t :re-reveal-single-file t :reveal-single-file t))))
                   (if exported-file
                       (let ((file-info)
                             (file-location)
