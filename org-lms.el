@@ -1551,7 +1551,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
          ;;(courseid (plist-get course :id))
-         (atext (org-export-as 'html t nil t))
+         (atext (org-export-as 'canvas-html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
          )
@@ -3125,10 +3125,13 @@ approach)."
                                              "Lectures")))
                         (setq file-info
                               (json-read-from-string (org-lms-post-new-file exported-file nil file-folder ))
-                              file-location (map-elt file-info "preview_url"))
+                              file-location (alist-get   'preview_url file-info))
                         (message "PREVIEW: %s" file-location)
                         (when file-location
-                          (org-entry-put (point) "ORG_LMS_FILE_URL" (concat "https://q.utoronto.ca" file-location)))
+                          (org-entry-put (point) "CANVASID"
+                                        (format "%s" (alist-get 'id file-info)))
+                          (org-entry-put (point) "ORG_LMS_FILE_URL"
+                                         (concat "https://q.utoronto.ca" file-location)))
                         file-info
                         )))
                 
@@ -3194,6 +3197,17 @@ maybe key-type needs to be keyword though! Still a work in progress.
             (error (format "NO PAYLOAD: %s" canvas-err)))
           ) 
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
+
+(defun org-lms-munge-zoom-link ()
+  "Turn the zoom link from an email into an org list item"
+  (interactive)
+  (let ((today (format-time-string "%B %d"))
+        (s (or (and (use-region-p)
+                    (buffer-substring-no-properties (region-beginning) (region-end)))
+               (current-kill 0 t))))
+    (insert   (replace-regexp-in-string "^.*?\\(https://.*?\\) \\(Passcode: \\)\\(.*?\\) ?$"
+                                        (concat "
+- [[\\1][Recording from " today ":]] \\2 *\\3*") s))))
 
 (defun org-lms-announcement-wim ()
   "move point to top level subtree, then, since we want 
@@ -3267,6 +3281,12 @@ copy that subtree as slack text for posting to slack."
   :keymap  (let ((map (make-sparse-keymap))) 
              (define-key map (kbd "C-c C-x C-g") 'org-lms-set-grade )
              (define-key map (kbd "C-c <f12>") 'org-lms-wim-wim)
+             (define-key map (kbd "C-c 0 a") 'org-lms-post-assignment)
+             (define-key map (kbd "C-c 0 p") 'org-lms-post-page)
+             (define-key map (kbd "C-c 0 n") 'org-lms-headline-to-announcement)
+             (define-key map (kbd "C-c 0 i") 'org-lms-module-item-from-headline)
+
+             (define-key map (kbd "C-c o z") 'org-lms-munge-zoom-link)
              map )
   :lighter " LMS"
   ;;(mwp-toggle-macros)
