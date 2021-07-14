@@ -1029,34 +1029,30 @@ working on this."
                      ))
   (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
 
-(defun org-lms-match-emoji (category)
-  (string= (downcase category)
-           (downcase (org-property-get nil "ORG_LMS_CATEGORY"))
-           ))
+;; -🔰in front of course documents\\
+;; -💯in front of assessments\\
+;; 📖in front of core texts\\
+;; -📝in front of handouts that require activity\\
+;; -👁 in front of videos (recorded lessons or outside videos)\\
+;; -✍🏼in front of asynchronous independent tasks students are assigned
 
-(defcustom org-lms-emoji-alist
-  `(("Assignment" . "💯")
-    ("Video" . "")
-    (""))
-  "Assoc between emoji and predicates")
-(defcustom org-lms-emoji-p t
-  "whether or not to insert emoji in module item titles")
+
 (defun org-lms-set-module (params)
   "Create a module from params"
   (interactive)
   (message "module params: %s" params)
   (let* ((canvasid (map-elt params "moduleid" nil 'equal))
-         (org-html-checkbox-type 'unicode ))
-    (let* ((assignment-params  `(("module" . ,params)))
-           (response
-            (org-lms-canvas-request (format "courses/%s/modules%s"
-                                            (org-lms-get-keyword "ORG_LMS_COURSEID")
-                                            (if canvasid
-                                                (format  "/%s" canvasid) ""))
-                                    (if canvasid "PUT" "POST")
-                                    assignment-params))
-           (response-data (or response nil)))
-      response)))
+         (org-html-checkbox-type 'unicode )
+         (assignment-params  `(("module" . ,params)))
+         (response
+          (org-lms-canvas-request (format "courses/%s/modules%s"
+                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          (if canvasid
+                                              (format  "/%s" canvasid) ""))
+                                  (if canvasid "PUT" "POST")
+                                  assignment-params))
+         (response-data (or response nil)))
+    response))
 
 (defun org-lms-module-delete (id)
   "Delete the given module from canvas (careful!)"
@@ -1097,6 +1093,18 @@ working on this."
     ;; (message "Please ensure that MODULE and MODULE_ITEM_TYPE are both set")
     ))
 
+
+(defun org-lms-match-emoji (category)
+  (string= (downcase category)
+           (downcase (org-property-get nil "ORG_LMS_CATEGORY"))
+           ))
+
+
+
+(defcustom org-lms-emojify t
+  "whether or not to insert emoji in module item titles")
+
+
 (defun org-lms-set-module-item (item module &optional canvasid)
   "create a module item from an item definition"
   (let* ((params `(("module_item" . ,item )))
@@ -1115,19 +1123,45 @@ working on this."
     
     (or  response (request-response-error-thrown response) "Something's wrong")
     ))
+
+(defcustom org-lms-emoji-alist
+  '(("Assignment" . "💯")
+    ("Coursedoc" . "🔰")
+    ("Reading" . "📖")
+    ("Task" . "✍🏼" )
+    ("Quiz" . "✍🏼" )
+    ("Discussion" . "❓")
+    ("Video" . "👀")
+    ("Urgent" . "❗"))
+  "Assoc between emoji and predicates")
+
+
 (defun org-lms-module-item-from-headline ()
   "Extract module data from HEADLINE.
   HEADLINE is an org-element object."
   (interactive)
   (let* ((canvasid (org-entry-get nil "CANVASID"))
-         (name  (nth 4 (org-heading-components)) )
+         (cat (or  (org-entry-get nil "ORG_LMS_CATEGORY" t)
+                   (org-entry-get nil "MODULE_ITEM_TYPE" t)))
+         (emoji (when (and  org-lms-emojify cat)
+                  (concat  (alist-get cat  org-lms-emoji-alist  nil  nil 'string=) " ")))
+         (name  (concat emoji  (nth 4 (org-heading-components))) )
          (position (org-entry-get nil "MODULE_POSITION"))
-         (moduleid (or (org-entry-get nil "MODULE_ID")
-                       (org-lms-map-module-from-name (org-entry-get nil "MODULE"))))
-         (moduleitemtype (org-entry-get nil "MODULE_ITEM_TYPE"))
+         (moduleid (or (org-entry-get nil "MODULE_ID" t)
+                       (org-lms-map-module-from-name (org-entry-get nil "MODULE" t))
+))
+         (moduleitemtype (or
+                          (org-entry-get nil "MODULE_ITEM_TYPE" t)
+                          (let ((assignmentp  (org-entry-get nil "CANVAS_SUBMISSION_URL"))
+                                (pagep (org-entry-get nil "CANVAS_PAGE_URL") ))
+                            (cond (assignmentp "Assignment")
+                                  (pagep "Page")))))
          (moduleitemid (org-entry-get nil "MODULE_ITEM_ID"))
          (externalurl (org-entry-get nil "MODULE_ITEM_EXTERNAL_URL"))
          (pageurl (org-entry-get nil "CANVAS_PAGE_URL"))
+         (content_id (or 
+                      (org-entry-get nil "CANVAS_ID")
+                      (org-entry-get nil "CONTENT_ID"))) ;; a bit risky keeping thesethe same
          (newtab t)
          (published  (org-entry-get nil "MODULE_ITEM_PUBLISHED") )
          ;; rules...
@@ -1153,6 +1187,7 @@ working on this."
                 (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
                 (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
                 (org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
+                (org-set-property "CONTENT_ID" (format "%s"(plist-get response-data :content_id)))
                 (org-set-property "MODULE_ITEM_PUBLISHED" (format "%s"(plist-get response-data :published)))
                 )
             (message "did not receive module item response-data"))
@@ -1296,9 +1331,12 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
          (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
          (gradingtype (or  (org-entry-get nil "GRADING_TYPE") "letter_grade"))
-         (subtype (if (equal (org-entry-get nil "ASSIGNMENT_TYPE")
-                             "canvas")
-                      "online_upload" "none"))
+         (subtype (or (and (org-entry-get nil "CANVAS_SUBMISSION_TYPES")
+                           (replace-regexp-in-string "(\\([^()]*\\))" "\\1"
+                                                     (org-entry-get nil "CANVAS_SUBMISSION_TYPES")  ))
+                      (if (equal (org-entry-get nil "ASSIGNMENT_TYPE")
+                                 "canvas")
+                          "online_upload" "none")))
          ;;  (org-entry-get nil "DUE_AT"))
          (publish (org-entry-get nil "OL_PUBLISH"))
          (group (org-entry-get nil "ASSIGNMENT_GROUP"))
