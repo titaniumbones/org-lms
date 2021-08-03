@@ -1855,8 +1855,7 @@ Functions to create announcements and assignments. Actually the crucial assignme
                           "online_upload" "none")))
          ;;  (org-entry-get nil "DUE_AT"))
          (publish (org-entry-get nil "OL_PUBLISH"))
-         (group (org-entry-get nil "ASSIGNMENT_GROUP"))
-         (group (org-entry-get nil "ASSIGNMENT_GROUP"))
+         (group (org-entry-get nil "ASSIGNMENT_GROUP" t))
          (omit (org-entry-get nil "ASSIGNMENT_OMIT"))
          (position (org-entry-get nil "ASSIGNMENT_POSITION"))
          (reflection (org-entry-get nil "OL_HAS_REFLECTION"))
@@ -1985,27 +1984,30 @@ Adding these functions to update all assignments for the new year.  But actually
 (defun org-lms-assignment-group-from-headline ()
   "Extract assignment group data from HEADLINE.
   HEADLINE is an org-element object."
-  (let* ((canvasid (org-entry-get nil "MODULE_ID"))
+  (interactive)
+  (let* ((canvasid (org-entry-get nil "GROUP_ID"))
          (name  (nth 4 (org-heading-components)) )
-         (position (org-entry-get nil "MODULE_POSITION"))
-         (weight (org-entry-get nil "MODULE_WEIGHT"))
+         (position (org-entry-get nil "GROUP_POSITION"))
+         (weight (org-entry-get nil "GROUP_WEIGHT"))
          ;; rules...
+
          (params `((name . ,name)
-                   ))
+                   )))
          (when position (add-to-list 'params `("position" ,(string-to-number position))))
          (when weight (plist-put params `("group_weight" ,(string-to-number weight))))
-         (let* ((response (org-lms-set-assignment-group params))
-               (response-data (or response nil)))
-           
-           (if (plist-get response-data :id)
-               (progn
-                 (message "received assignment group response-data")
-                 (org-set-property "MODULE_ID" (format "%s"(plist-get response-data :id)))
-                 (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
-                 (org-set-property "MODULE_WEIGHT" (format "%s"(plist-get response-data :group_weight)))
-                 )
-             (message "did not receive assignment group response-data"))
-           response))))
+
+    (let* ((response (org-lms-set-assignment-group params))
+           (response-data (or response nil)))
+      
+      (if (plist-get response-data :id)
+          (progn
+            (message "received assignment group response-data")
+            (org-set-property "GROUP_ID" (format "%s"(plist-get response-data :id)))
+            (org-set-property "GROUP_POSITION" (format "%s"(plist-get response-data :position)))
+            (org-set-property "GROUP_WEIGHT" (format "%s"(plist-get response-data :group_weight)))
+            )
+        (message "did not receive assignment group response-data"))
+      response)))
 
 (defun org-lms-set-assignment-group (params)
   "Create an asignment group from params"
