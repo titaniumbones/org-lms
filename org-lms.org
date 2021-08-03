@@ -1304,6 +1304,7 @@ working on this."
 (defun org-lms-upload-file-to-storage (filepath fileinfo)
   "using a canvas file upload response, upload a file to the file storage."
   (interactive)
+  (message "uploading file. fileinfo: %s" fileinfo)
   (let* ((upload-url (map-elt fileinfo :upload_url ))
          (params-plist (map-elt fileinfo :upload_params))
          (params-alist (org-lms-plist-to-alist params-plist))
@@ -1507,15 +1508,20 @@ For /Teaching Presence/, I've aimed for consistency in how materials are organis
   (message "module params: %s" params)
   (let* ((canvasid (map-elt params "moduleid" nil 'equal))
          (org-html-checkbox-type 'unicode )
+         (course (org-lms-get-keyword "ORG_LMS_COURSEID"))
          (assignment-params  `(("module" . ,params)))
          (response
           (org-lms-canvas-request (format "courses/%s/modules%s"
-                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          course
                                           (if canvasid
                                               (format  "/%s" canvasid) ""))
                                   (if canvasid "PUT" "POST")
                                   assignment-params))
          (response-data (or response nil)))
+    (if response-data
+    (browse-url (format "%s/courses/%s/modules#%s"
+                        org-lms-public-baseurl course
+                        (plist-get response-data :id) )))
     response))
 
 (defun org-lms-module-delete (id)
@@ -1570,21 +1576,28 @@ For /Teaching Presence/, I've aimed for consistency in how materials are organis
 
 
 (defun org-lms-set-module-item (item module &optional canvasid)
-  "create a module item from an item definition"
+  "create a module item from an item definition, then open modules page at item modules"
   (let* ((params `(("module_item" . ,item )))
+         (course (org-lms-get-keyword "ORG_LMS_COURSEID"))
          response)
     (message "MODULEPARAMS: %s" item)
     (message "MODULEJSON: %s" (json-encode item))
     
     (setq response
      (org-lms-canvas-request (format "courses/%s/modules/%s/items%s"
-                                     (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                     course
                                      module
                                      (if canvasid
                                          (format  "/%s" canvasid) ""))
        (if canvasid "PUT" "POST")
        params))
     
+    ;; this opens at the *module*. Would it be better to link directly to the 
+    ;; item itself at e.g. context_module_item_MODULEITEMID?
+    ;; in which case replace 'module' with
+    ;; (format "context_module_item_%s" (plist-get response-data :id)
+    (browse-url (format "%s/courses/%s/modules#%s" org-lms-public-baseurl course module ))
+
     (or  response (request-response-error-thrown response) "Something's wrong")
     ))
 
@@ -1612,8 +1625,7 @@ For /Teaching Presence/, I've aimed for consistency in how materials are organis
          (name  (concat emoji  (nth 4 (org-heading-components))) )
          (position (org-entry-get nil "MODULE_POSITION"))
          (moduleid (or (org-entry-get nil "MODULE_ID" t)
-                       (org-lms-map-module-from-name (org-entry-get nil "MODULE" t))
-))
+                       (org-lms-map-module-from-name (org-entry-get nil "MODULE" t))))
          (moduleitemtype (or
                           (org-entry-get nil "MODULE_ITEM_TYPE" t)
                           (let ((assignmentp  (org-entry-get nil "CANVAS_SUBMISSION_URL"))
@@ -1650,8 +1662,11 @@ For /Teaching Presence/, I've aimed for consistency in how materials are organis
                 (message "received module response-data")
                 (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
                 (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
-                (org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
-                (org-set-property "CONTENT_ID" (format "%s"(plist-get response-data :content_id)))
+
+                ;; actually this doesn't get sent back for some reason? huh
+                ;;(org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
+                ;; ditto here
+                (org-set-property "CONTENT_ID" (format "%s"(or (plist-get response-data :content_id) canvasid "") ))
                 (org-set-property "MODULE_ITEM_PUBLISHED" (format "%s"(plist-get response-data :published)))
                 )
             (message "did not receive module item response-data"))
