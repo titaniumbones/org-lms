@@ -80,11 +80,11 @@ The underlying data structure has changed a bit :-) as I start to understand wha
 - need to give a better default value to org-lms-courses
 
 #+begin_src emacs-lisp
-  ;; variables
-  ;; most of these are used for canvas interactions...
+;; variables
+;; most of these are used for canvas interactions...
 
-  (defvar org-lms-courses nil
-    "Alist in which each car is a symbol, and each cdr is a plist.
+(defvar org-lms-courses nil
+  "Alist in which each car is a symbol, and each cdr is a plist.
 
   Value of this variable must be set beforeusing the library. The
   plist should include at least the following attributes in order
@@ -95,38 +95,44 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   - `:semester'
   ")
 
-  (defcustom org-lms-baseurl nil
-    "Baseurl for canvas API queries. 
+(defcustom org-lms-baseurl nil
+  "Baseurl for canvas API queries. 
     Should have the form \"https://canvas.instance.at.school/api/v1/\"."
-    :type '(string)
-    )
+  :type '(string)
+  )
 
-  (defcustom org-lms-token nil
-    "Secret oauth token for Canvas. DO NOT SHARE THIS INFO.
+(defcustom org-lms-public-baseurl nil
+  "Baseurl for canvas API queries. 
+    Should have the form \"https://canvas.instance.at.school/api/v1/\"."
+  :type '(string)
+  )
+
+(defcustom org-lms-token nil
+  "Secret oauth token for Canvas. DO NOT SHARE THIS INFO.
     Probably customize is a rotten place to put this!"
-    :type '(string))
+  :type '(string))
 
-  (defvar-local org-lms-course nil
-    "Locally-set variable representing the local course.")
+(defvar-local org-lms-course nil
+  "Locally-set variable representing the local course.")
 
-  (defvar-local org-lms-local-assignments nil
-    "List of assignments for the current course. 
+(defvar-local org-lms-local-assignments nil
+  "List of assignments for the current course. 
 
     Intended to be updated automatically somehow, but for now just
     being set in grading page")
 
-  (defvar-local org-lms-merged-assignments nil
-    "Buffer-local plist of students in this course, merging cnavas and local info. 
+(defvar-local org-lms-merged-assignments nil
+  "Buffer-local plist of students in this course, merging cnavas and local info. 
 
     Intended to be set automatically. Should always be buffer-local")
 
-  (defvar-local org-lms-local-students nil
-    "Buffer-local plist of students in this course, using local csv file. 
+(defvar-local org-lms-local-students nil
+  "Buffer-local plist of students in this course, using local csv file. 
 
     Intended to be set automatically. Should always be buffer-local")
 
-  (defvar-local org-lms-merged-students nil
-    "Buffer-local plist of students in this course, merging cnavas and local info. 
+(defvar-local org-lms-merged-students nil
+  "Buffer-local plist of students in this course, merging cnavas and local info. 
 
     Intended to be set automatically. Should always be buffer-local")
 (defcustom ol-make-headings-final-hook nil
