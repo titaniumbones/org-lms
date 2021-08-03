@@ -297,14 +297,15 @@ From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre 
           (kill-line)
           (when value
             (insert (format "#+%s: %s" tag value))))
+      (goto-char (point-min))
       ;; add new filetag
       (if (looking-at "^$") 		;empty line
           ;; at beginning of line
           (when value
-            (insert (format "#+%s: %s" tag value)))
+            (insert (format "#+%s: %s\n" tag value)))
         ;; at end of some line, so add a new line
         (when value
-          (insert (format "\n#+%s: %s" tag value)))))))
+          (insert (format "#+%s: %s\n" tag value)))))))
 #+end_src
 
 ** ACTION CSV Parsers
