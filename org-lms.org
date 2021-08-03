@@ -2058,11 +2058,63 @@ also a utility for adding a group if needed
 
 
 ** ACTION Calendar Events
-Right now I have no way to generate calendar events & therefore put stuff into the "upcoming events' stream in Canvas.  [[https://canvas.instructure.com/doc/api/calendar_events.html][The API for Calendar Events is described here]]. It won't be easy for me to accommodate this mode of organization, unfortunately.  Probably won't happen for a while.   
-*** Setters -- not implemented
+Right now I have no way to generate calendar events & therefore put stuff into the "upcoming events' stream in Canvas.  [[https://canvas.instructure.com/doc/api/calendar_events.html][The API for Calendar Events is described here]]. It won't be easy for me to accommodate this mode of organization, unfortunately.  Probably won't happen for a while.
+
+Here is some info form the web:
+
+
+**** [[https://canvas.instructure.com/doc/api/calendar_events.html#method.calendar_events_api.set_course_timetable][Set a course timetable]] [[https://github.com/instructure/canvas-lms/blob/master/app/controllers/calendar_events_api_controller.rb][CalendarEventsApiController#set_course_timetable]]
+   
+***** POST /api/v1/courses/:course_id/calendar_events/timetable
+ *Scope:* =url:POST|/api/v1/courses/:course_id/calendar_events/timetable=
+
+Creates and updates “timetable” events for a course. Can automaticaly generate a series of calendar events based on simple schedules (e.g. “Monday and Wednesday at 2:00pm” )
+
+Existing timetable events for the course and course sections will be updated if they still are part of the timetable. Otherwise, they will be deleted.
+
+****** Request Parameters:
+timetables[course_section_id][] 		Array 	
+
+An array of timetable objects for the course section specified by course_section_id. If course_section_id is set to “all”, events will be created for the entire course.
+timetables[course_section_id][][weekdays] 		string 	
+
+A comma-separated list of abbreviated weekdays (Mon-Monday, Tue-Tuesday, Wed-Wednesday, Thu-Thursday, Fri-Friday, Sat-Saturday, Sun-Sunday)
+timetables[course_section_id][][start_time] 		string 	
+
+Time to start each event at (e.g. “9:00 am”)
+timetables[course_section_id][][end_time] 		string 	
+
+Time to end each event at (e.g. “9:00 am”)
+timetables[course_section_id][][location_name] 		string 	
+
+A location name to set for each event
+#+end_quote 
 *** Getters -- not implemented
+*** Setters -- not implemented
+ok, let's start with a very simple basic function modled on modules
+*BLA*. This really sucks actually. It doesn't seem very useful.
+#+begin_src emacs-lisp :tangle no
+(defun org-lms-set-timetable (params)
+  "Create a timetable from params"
+  (interactive)
+  (message "timetable params: %s" params)
+  (let* ((canvasid (map-elt params "timetableid" nil 'equal))
+         (org-html-checkbox-type 'unicode )
+         (event-params  `(("course_id" . ,(org-lms-get-keyword "ORG_LMS_COURSEID"))
+                          ("events" . (,params))))
+         (response
+          (org-lms-canvas-request
+           (format "courses/%s/calendar_events/timetable_events"
+                   (org-lms-get-keyword "ORG_LMS_COURSEID")
+                   (if canvasid
+                       (format  "/%s" canvasid) ""))
+           (if canvasid "PUT" "POST")
+           evebt-params))
+         (response-data (or response nil)))
+    response))
+#+end_src
 ** ACTION Announcements
-*** ACTION Setters -- headline to announcement
+*** ACTION Setters -- headlineto announcement
 todo: docstrings!!; also, need to switch to CANVASID from ORG_LMS_ANNOUNCEMENT_ID for consistency, in order to use ~org-lms-propertize-thingie~. 
 
 Also, looks like it isn't reading heading properties before posting!! Needs to be rewritten on model of other setters.
