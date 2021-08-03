@@ -2519,13 +2519,18 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
     ;; (mapcar (lambda (x)))
     (let* ((body a)
            ;; rewrite this part wit horg-process-props? 
-           ;; nmaybe not possible as written. 
-           (atitle (plist-get body :name ))
+           ;; nmaybe not possible as written.
+           (aname (plist-get body :name))
+           (org-id (plist-get body :org-id))
+           (atitle (format "[[id:%s][%s]]"
+                           org-id
+                           (plist-get body :name)))
            (number (plist-get body :assignment_number))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
+           
            (assignment-type (plist-get body :assignment-type))
            (email-response (plist-get body :email-response))
 	   (canvas-response (plist-get body :canvas-response))
@@ -2541,12 +2546,15 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
+      (org-set-property "ASSIGNMENT_NAME" aname)
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (org-set-property "BASECOMMIT" basecommit)
       (org-set-property "GRADING_TYPE" grading-type)
       ;;(org-set-property "NUMBER" number)
       (org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
-      (org-set-property "OEG_LMS_CANVAS_RESPONSE" "t")
+      (org-set-property "ORG_LMS_CANVAS_RESPONSE" "t")
+      (org-set-property "ORG_LMS_EMAIL_COMMENTS" "t")
+      (org-set-property "ORG_LMS_CANVAS_COMMENTS" "t")
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
@@ -2591,7 +2599,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                       (if coursenum
                                           (format "[%s] " coursenum)
                                         "")
-                                      atitle nname lname ))
+                                      aname nname lname ))
                             ))
                          )
                     ;; (message "COURSENUM: %s" coursenum)
@@ -3152,7 +3160,10 @@ The cursor is left in the TO field."
     ;; (funcall org-mime-up-subtree-heading)
     (cl-flet ((mp (p) (org-entry-get nil p org-mime-use-property-inheritance)))
       (let* ((file (buffer-file-name (current-buffer)))
-             (subject (or (mp "MAIL_SUBJECT") (nth 4 (org-heading-components))))
+             (subject (or (mp "MAIL_SUBJECT")
+                          (replace-regexp-in-string "\\[\\[.*?\\]\\[\\(.*?\\)\\]\\]"
+                                                   "\\1"
+                                                   (nth 4 (org-heading-components)))))
              (to (mp "MAIL_TO"))
              (cc (mp "MAIL_CC"))
              (bcc (mp "MAIL_BCC"))
