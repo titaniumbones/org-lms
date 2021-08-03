@@ -945,8 +945,14 @@ Not Implemented
          )
     (write-region (json-encode data-structure) nil "/home/matt/syl.json")
     ;;(setq response)
+    
     (message "Response: %s" response)
-    response
+    ( if response
+        (org-lms-set-keyword "SYLLABUS_URL" (format "%s/%s/assignments/syllabus"
+                                                    ;;org-lms-baseurl
+                                                    ;;fix this!
+                                                    "https://q.utoronto.ca/courses"
+                                                    courseid))) 
     ))
 
 #+end_src
