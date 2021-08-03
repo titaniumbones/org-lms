@@ -1557,6 +1557,7 @@ For /Teaching Presence/, I've aimed for consistency in how materials are organis
             (org-set-property "MODULE" (format "%s"(plist-get response-data :name)))
             (org-set-property "PUBLISHED" (format "%s"(plist-get response-data :published)))
             (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+            
             )
         (message "did not receive module group response-data"))
       response)
@@ -4029,17 +4030,25 @@ approach)."
                   (if exported-file
                       (let ((file-info)
                             (file-location)
+                            (file-view-in-canvas)
                             (file-folder (or (org-entry-get (point) "ORG_LMS_FILE_FOLDER")
                                              "Lectures")))
                         (setq file-info
                               (json-read-from-string (org-lms-post-new-file exported-file nil file-folder ))
-                              file-location (alist-get   'preview_url file-info))
+                              file-location (format "%s%s" org-lms-public-baseurl (alist-get   'preview_url file-info))
+                              file-actual-preview (and file-location
+                                                       (replace-regexp-in-string
+                                                        "\\(/.*/\\)\\(file_preview\\?\\)\\(.*\\)"
+                                                        "\\1"
+                                                        file-location)))
                         (message "PREVIEW: %s" file-location)
                         (when file-location
                           (org-entry-put (point) "CANVASID"
                                         (format "%s" (alist-get 'id file-info)))
+                          (org-entry-put (point) "ORG_LMS_PREVIEW_URL"
+                                         file-actual-preview)
                           (org-entry-put (point) "ORG_LMS_FILE_URL"
-                                         (concat "https://q.utoronto.ca" file-location)))
+                                         file-location))
                         file-info
                         )))
                 
