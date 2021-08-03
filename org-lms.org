@@ -937,7 +937,7 @@ Not Implemented
                                         ("is_public" . ,is_public)
                                         ("grading_standard_id" . ,grading_standard_id)
                                         ("license" . ,license)
-                                        ("default_view" . ,default_view)
+                                        ;;("default_view" . ,default_view)
                                         ("license" . ,license)
                                         ))))
          (response (org-lms-canvas-request
