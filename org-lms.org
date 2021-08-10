@@ -659,6 +659,20 @@ will be moved in this case too."
 #+RESULTS:
 : org-lms--get-valid-subtree
 
+** Filter attachments
+I have a bunch of  attachment-gathering functions that all need to be changed; might as well do it in one place
+#+begin_src emacs-lisp
+(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
+  "regexp of file names to ignore.  a bit clumsy but hey.")
+
+
+(defun org-lms-attach-file-list ()
+  "get the filtered attachments list" 
+  (seq-filter (lambda (a)
+                (not (string-match org-lms-attach-ignore a)))
+              (org-attach-file-list (org-attach-dir t))))
+#+end_src
+
 * Talking to Canvas - Fundamentals
 Everything in here should be generically useful, and segregated from my unique workflow. That means, among other things, that there should be a specific relationship to an API endpoint. 
 ** Doc: Functions to interact with specific parts of the Canvas API
@@ -2294,7 +2308,7 @@ working on this."
                      (org-export-as 'ascii t nil t)))
          (returnval '()))
     ;; loop over attachments
-    (dolist (a (org-attach-file-list (org-attach-dir t)))
+    (dolist (a  (org-lms-attach-file-list))
       (let* ((path (expand-file-name a (org-attach-dir t) ))
              (fileinfo (org-lms-canvas-request
                         (format "courses/%s/assignments/%s/submissions/%s/comments/files"
@@ -2963,7 +2977,7 @@ Huh, interesting. I have two versions of this code and no idea which of them is 
   "org-mime-subtree and HTMLize"
   (interactive)
   ;; (org-mark-subtree)
-  (let ((attachments (org-lms~attachment-list)))
+  (let ((attachments (org-lms-attach-file-list)))
     (save-excursion
       (org-lms-mime-org-subtree-htmlize attachments))
     ))
