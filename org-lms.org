@@ -63,7 +63,7 @@ THere's some stuff I should get rid of. Trying to track it down.
 
 #+begin_src emacs-lisp
   (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
-    'org-lms~send-subtree-with-attachments "a pretty long time ago")
+    'org-lms--send-subtree-with-attachments "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
     'org-lms-mail-all "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-parse-assignment 
@@ -143,6 +143,9 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   "https://dx.doi.org/"
   "Local DOI resolver for student bibliography links")
 
+;; in the syllabus, "citations" are actually full bibliography entries.
+;; therefore, don't wrap them in links that will create useless HTML
+;; and probably also don't create a full biblipgraphy. 
 (defcustom org-lms-citeproc-fmt-alist
   ;; oops, requires dash library!!
   (and (boundp 'citeproc-fmt--html-alist)
@@ -155,6 +158,10 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   in HTML tags; or nil, if CITEPROC-FMT--HTML-ALIST is not defined."
   :group 'org-export-re-reveal
   :type '(alist :key-type symbol :value-type function ))
+
+(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
+  "regexp of file names to ignore.  a bit clumsy but hey.")
+
 
 
 #+end_src
@@ -1271,13 +1278,8 @@ Start with folders, which are simple and very similar to modules in that they av
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 
 (defun org-lms-post-new-file (filepath &optional endpoint folder courseid)
-  "Get comments from student headline and post to Canvas LMS.
-If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
-will be extracted from the current environment. Note the
-commented out `dolist' macro, which will upload attachments to
-canvas. THis process is potentially buggy and seems likely to
-lead to race conditions and duplicated uploads and comments. Still
-working on this."
+  "Upload FILEPATH to canvas storage. Default ENDPOINT is `/courses/COURSEID/files`
+but there are other possible endpoints; see the API for details. Optionally organize into FOLDER."
   (interactive)
   ;; main loop
   (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
@@ -1289,8 +1291,10 @@ working on this."
          (name (file-name-nondirectory filepath))
          (params `(("name" . ,name)))
          (formstring ""))
-    
-    (when folder (map-put params "parent_folder_path" folder ))
+    ;; note -- just updated to map-put! from map-put, but that  didn't seem to
+    ;; work
+    ;; it's all ok now that I'm using map-insert instead  
+    (when folder (setq params (map-insert params "parent_folder_path" folder )))
     (setq fileinfo (org-lms-file-post-request
                      endpoint
                      params
@@ -1476,8 +1480,6 @@ The main function here is to
   (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
 #+end_src
 
-#+RESULTS:
-: org-lms-get-single-module-item
 *** ACTION Setters
 
 I don't believe these are working! Need to get it done so that can be added as a hook to the end of other setters. 
@@ -1781,6 +1783,7 @@ Attachments. These functions are a little complicated because attachments are st
             (org-up-heading-safe)
             (org-entry-get (point) "ASSIGNMENTID")
             ))
+         (org-lms-merged-students (or org-lms-merged-students (org-lms-get-students)))
          (studentid (or (org-entry-get (point) "STUDENTID") (org-entry-get (point) "ID")))
          (submission (org-lms-get-single-submission studentid assid))
          (student (org-lms-find-local-user studentid))
@@ -1788,8 +1791,8 @@ Attachments. These functions are a little complicated because attachments are st
          (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
-             (message "%s%s"(downcase (plist-get student :lastname))
-                      (downcase (plist-get student :firstname)) )
+             (message "%s%s" (plist-get student :lastname)
+                      (plist-get student :firstname) )
              (let* ((downloadurl (plist-get attachment :url))
                     (filename
                      (format "%s%s_%s%s_%s_%s"
@@ -1877,7 +1880,7 @@ Functions to create announcements and assignments. Actually the crucial assignme
          (reflection-id (org-entry-get nil "OL_REFLECTION_ID"))
          (org-export-with-tags nil)
          (assignment-params `(("name" .  ,(nth 4 (org-heading-components)) )
-                              ("description" . ,(org-export-as 'html t nil t))
+                              ("description" . ,(org-export-as 'canvas-html t nil t))
                               ("due_at" . ,(o-l-date-to-timestamp
                                             (or duedate
                                                 (format-time-string "%Y-%m-%d"
@@ -2251,6 +2254,10 @@ Needs to be segregated and maybe re-namespaced, and potentially made more genera
 Sorta belongs with submissions above, but am trying to separate out stuff that is specific to my workflow (as opposed to just part of the Canvas API).
 *** Setters - post submissions from headlines
 
+TODO <2021-08-10 Tue>: add submission comment updating -- need to use the [[https://canvas.instructure.com/doc/api/submissions.html#SubmissionComment][submissioncomments]] endpoint. 
+
+CF [[https://github.com/titaniumbones/org-lms/issues/42][github issue]]
+
 #+begin_src emacs-lisp
 
 
@@ -2283,6 +2290,7 @@ will be extracted from the current environment, as the GRADE alwyas will be"
       ;; (message "Response: %s" comment-response )
       comment-response)))
 
+;; not that if you want to update a comment instead, it's necessary to use a different request mechanism
 
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
@@ -2303,7 +2311,7 @@ working on this."
          (grade (org-entry-get (point) "GRADE"))
          (comments (let*((org-export-with-toc nil)
                          ;;(atext (org-export-as 'html t))
-                         (atitle (nth 4 (org-heading-components)))
+                         ;;(atitle (nth 4 (org-heading-components)))
                          (org-ascii-text-width 23058430000))
                      (org-export-as 'ascii t nil t)))
          (returnval '()))
@@ -2339,6 +2347,8 @@ working on this."
                                          ;; EDIT 2018=11-07 -- untested switch from alist to plist
                                          ("file_ids" . ,returnval)
                                          ;; alas, doesn't seem to update the previous comment! drat
+                                         ;; it's a different API endpoint
+                                         ;; this is a todo item
                                          ("id" . (or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
            (comment-response ;;(request-response-data)
             (org-lms-canvas-request
@@ -2528,6 +2538,8 @@ directly from Canvas LMS. UPDATE: seems to work well with
 Canvas LMS allows for export of student information; the
 resultant csv file has a certain shape, bu this may all be irrelevant now."
   (message "running org-lms-make-headings")
+  (unless students
+    (setq students (org-lms-get-students)))
   (save-excursion
     (goto-char (point-max))
     ;; (message "students=%s" students)
@@ -2566,8 +2578,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "BASECOMMIT" basecommit)
       (org-set-property "GRADING_TYPE" grading-type)
       ;;(org-set-property "NUMBER" number)
-      (org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
-      (org-set-property "ORG_LMS_CANVAS_RESPONSE" "t")
+      ;;(org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
+      ;;(org-set-property "ORG_LMS_CANVAS_RESPONSE" "t")
       (org-set-property "ORG_LMS_EMAIL_COMMENTS" "t")
       (org-set-property "ORG_LMS_CANVAS_COMMENTS" "t")
       (make-directory directory t)
@@ -2930,7 +2942,9 @@ I like to mail my marks back to my students.  These are the functions that manag
 
 ***** Attachments 
 
-Make sure to get all the attachments.  I think that org-mime now takes care of this so it might be a good idea to refactor.  
+Make sure to get all the attachments.  I think that org-mime now takes care of this so it might be a good idea to refactor.
+
+I don't think I use this anymore?
 
 
 #+begin_src emacs-lisp
@@ -2973,7 +2987,7 @@ Huh, interesting. I have two versions of this code and no idea which of them is 
   )
 
 ;; mail integration. Only tested with mu4e.
-(defun org-lms~send-subtree-with-attachments ()
+(defun org-lms--send-subtree-with-attachments ()
   "org-mime-subtree and HTMLize"
   (interactive)
   ;; (org-mark-subtree)
@@ -3061,7 +3075,7 @@ In that case, send all marked 'READY' or 'TODO'."
       (when post-to-lms (org-lms-put-single-submission-from-headline))
       (when also-mail  (save-excursion
                          ;;(org-lms-mime-org-subtree-htmlize )
-                         (org-lms~send-subtree-with-attachments)
+                         (org-lms--send-subtree-with-attachments)
                          (sleep-for 1)
                          ;; (message-send-and-exit)
                          ))
@@ -3146,172 +3160,172 @@ you have not received a grade for work that you have handed in,
 : org-lms-send-missing-subtree
 
 
-***** Even more Mail -- org-mime rewrite functions. 
+***** WONTDO Even more Mail -- org-mime rewrite functions. 
+ *OBSOLETE*
++Actually *this* is the real real work...+ 
 
-Actually *this* is the real real work... 
++More mail-related functions -- rewwrite sof org-mime functions+
++i needed to modify stuff in the middle of the org-mime process, so I modified these fns lightly.+
 
-More mail-related functions -- rewwrite sof org-mime functions
-i needed to modify stuff in the middle of the org-mime process, so I modified these fns lightly.
+#+begin_src emacs-lisp :tangle no
 
-#+begin_src emacs-lisp
+;; ;; more helpers
+;; (defun org-lms-mime-org-subtree-htmlize (&optional attachments)
+;;   "Create an email buffer of the current subtree.
+;; The buffer will contain both html and in org formats as mime
+;; alternatives.
 
-;; more helpers
-(defun org-lms-mime-org-subtree-htmlize (&optional attachments)
-  "Create an email buffer of the current subtree.
-The buffer will contain both html and in org formats as mime
-alternatives.
+;; The following headline properties can determine the headers.\n* subtree heading
+;;    :PROPERTIES:
+;;    :MAIL_SUBJECT: mail title
+;;    :MAIL_TO: person1@gmail.com
+;;    :MAIL_CC: person2@gmail.com
+;;    :MAIL_BCC: person3@gmail.com
+;;    :END:
 
-The following headline properties can determine the headers.\n* subtree heading
-   :PROPERTIES:
-   :MAIL_SUBJECT: mail title
-   :MAIL_TO: person1@gmail.com
-   :MAIL_CC: person2@gmail.com
-   :MAIL_BCC: person3@gmail.com
-   :END:
+;; The cursor is left in the TO field."
+;;   (interactive)
+;;   (save-excursion
+;;     ;; (funcall org-mime-up-subtree-heading)
+;;     (cl-flet ((mp (p) (org-entry-get nil p org-mime-use-property-inheritance)))
+;;       (let* ((file (buffer-file-name (current-buffer)))
+;;              (subject (or (mp "MAIL_SUBJECT")
+;;                           (replace-regexp-in-string "\\[\\[.*?\\]\\[\\(.*?\\)\\]\\]"
+;;                                                    "\\1"
+;;                                                    (nth 4 (org-heading-components)))))
+;;              (to (mp "MAIL_TO"))
+;;              (cc (mp "MAIL_CC"))
+;;              (bcc (mp "MAIL_BCC"))
+;;              (addressee (or (mp "NICKNAME") (mp "FIRSTNAME") ) )
+;;              ;; Thanks to Matt Price for improving handling of cc & bcc headers
+;;              (other-headers (cond
+;;                              ((and cc bcc) `((cc . ,cc) (bcc . ,bcc)))
+;;                              (cc `((cc . ,cc)))
+;;                              (bcc `((bcc . ,bcc)))
+;;                              (t nil)))
+;;              (subtree-opts (when (fboundp 'org-export--get-subtree-options)
+;; 			     (org-export--get-subtree-options)))
+;; 	     (org-export-show-temporary-export-buffer nil)
+;; 	     (org-major-version (string-to-number
+;; 				 (car (split-string  (org-release) "\\."))))
+;; 	     (org-buf  (save-restriction
+;; 			   (org-narrow-to-subtree)
+;; 			   (let ((org-export-preserve-breaks org-mime-preserve-breaks)
+;;                                  )
+;; 			     (cond
+;; 			      ((= 8 org-major-version)
+;; 			       (org-org-export-as-org
+;; 			        nil t nil
+;; 			        (or org-mime-export-options subtree-opts)))
+;; 			      ((= 9 org-major-version)
+;; 			       (org-org-export-as-org
+;; 			        nil t nil t
+;; 			        (or org-mime-export-options subtree-opts)))))))
+;; 	     (html-buf (save-restriction
+;; 			 (org-narrow-to-subtree)
+;; 			 (org-html-export-as-html
+;; 			  nil t nil t
+;; 			  (or org-mime-export-options subtree-opts))))
+;; 	     ;; I wrap these bodies in export blocks because in org-mime-compose
+;; 	     ;; they get exported again. This makes each block conditionally
+;; 	     ;; exposed depending on the backend.
+;; 	     (org-body (prog1
+;; 			   (with-current-buffer org-buf
+;; 			     ;; (format "#+BEGIN_EXPORT org\n%s\n#+END_EXPORT"
+;; 				   ;;   (buffer-string))
+;;            (buffer-string))
+;; 			 (kill-buffer org-buf)))
+;; 	     (html-body (prog1
+;; 			    (with-current-buffer html-buf
+;; 			      (format "#+BEGIN_EXPORT html\n%s\n#+END_EXPORT"
+;; 				      (buffer-string))
+;;             ;; (buffer-string)
+;;             )
+;; 			  (kill-buffer html-buf)))
+;; 	     ;; (body (concat org-body "\n" html-body))
+;;        (body org-body))
+;; 	(save-restriction
+;; 	  (org-narrow-to-subtree)
+;; 	  (org-lms-mime-compose body file to subject other-headers
+;; 			            (or org-mime-export-options subtree-opts)
+;;                                     addressee))
+;;         (if (eq org-mime-library 'mu4e)
+;;         (advice-add 'mu4e~switch-back-to-mu4e-buffer :after
+;;                     `(lambda ()
+;;                        (switch-to-buffer (get-buffer ,(buffer-name) ))
+;;                        (advice-remove 'mu4e~switch-back-to-mu4e-buffer "om-temp-advice"))
+;;                     '((name . "om-temp-advice"))))
+;;         (dolist (a attachments)  (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
 
-The cursor is left in the TO field."
-  (interactive)
-  (save-excursion
-    ;; (funcall org-mime-up-subtree-heading)
-    (cl-flet ((mp (p) (org-entry-get nil p org-mime-use-property-inheritance)))
-      (let* ((file (buffer-file-name (current-buffer)))
-             (subject (or (mp "MAIL_SUBJECT")
-                          (replace-regexp-in-string "\\[\\[.*?\\]\\[\\(.*?\\)\\]\\]"
-                                                   "\\1"
-                                                   (nth 4 (org-heading-components)))))
-             (to (mp "MAIL_TO"))
-             (cc (mp "MAIL_CC"))
-             (bcc (mp "MAIL_BCC"))
-             (addressee (or (mp "NICKNAME") (mp "FIRSTNAME") ) )
-             ;; Thanks to Matt Price for improving handling of cc & bcc headers
-             (other-headers (cond
-                             ((and cc bcc) `((cc . ,cc) (bcc . ,bcc)))
-                             (cc `((cc . ,cc)))
-                             (bcc `((bcc . ,bcc)))
-                             (t nil)))
-             (subtree-opts (when (fboundp 'org-export--get-subtree-options)
-			     (org-export--get-subtree-options)))
-	     (org-export-show-temporary-export-buffer nil)
-	     (org-major-version (string-to-number
-				 (car (split-string  (org-release) "\\."))))
-	     (org-buf  (save-restriction
-			   (org-narrow-to-subtree)
-			   (let ((org-export-preserve-breaks org-mime-preserve-breaks)
-                                 )
-			     (cond
-			      ((= 8 org-major-version)
-			       (org-org-export-as-org
-			        nil t nil
-			        (or org-mime-export-options subtree-opts)))
-			      ((= 9 org-major-version)
-			       (org-org-export-as-org
-			        nil t nil t
-			        (or org-mime-export-options subtree-opts)))))))
-	     (html-buf (save-restriction
-			 (org-narrow-to-subtree)
-			 (org-html-export-as-html
-			  nil t nil t
-			  (or org-mime-export-options subtree-opts))))
-	     ;; I wrap these bodies in export blocks because in org-mime-compose
-	     ;; they get exported again. This makes each block conditionally
-	     ;; exposed depending on the backend.
-	     (org-body (prog1
-			   (with-current-buffer org-buf
-			     ;; (format "#+BEGIN_EXPORT org\n%s\n#+END_EXPORT"
-				   ;;   (buffer-string))
-           (buffer-string))
-			 (kill-buffer org-buf)))
-	     (html-body (prog1
-			    (with-current-buffer html-buf
-			      (format "#+BEGIN_EXPORT html\n%s\n#+END_EXPORT"
-				      (buffer-string))
-            ;; (buffer-string)
-            )
-			  (kill-buffer html-buf)))
-	     ;; (body (concat org-body "\n" html-body))
-       (body org-body))
-	(save-restriction
-	  (org-narrow-to-subtree)
-	  (org-lms-mime-compose body file to subject other-headers
-			            (or org-mime-export-options subtree-opts)
-                                    addressee))
-        (if (eq org-mime-library 'mu4e)
-        (advice-add 'mu4e~switch-back-to-mu4e-buffer :after
-                    `(lambda ()
-                       (switch-to-buffer (get-buffer ,(buffer-name) ))
-                       (advice-remove 'mu4e~switch-back-to-mu4e-buffer "om-temp-advice"))
-                    '((name . "om-temp-advice"))))
-        (dolist (a attachments)  (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
+;; 	(message-goto-to)
+;;         (message-send-and-exit)
+;;         ))))
 
-	(message-goto-to)
-        (message-send-and-exit)
-        ))))
-
-(defun org-lms-mime-compose (body file &optional to subject headers opts addressee)
-  "Create mail BODY in FILE with TO, SUBJECT, HEADERS and OPTS."
-  (when org-mime-debug (message "org-mime-compose called => %s %s" file opts))
-  (setq body (format "Hello%s, \n\nAttached are the comments from your assignment.\n%s\nBest,\nMP.\n----------\n" (if addressee (concat " " addressee) "")  (replace-regexp-in-string "\\`\\(\\*\\)+.*$" "" body)))
-  (let* ((fmt 'html)
-	 ;; we don't want to convert org file links to html
-	 (org-html-link-org-files-as-html nil)
-	 ;; These are file links in the file that are not images.
-	 (files
-	  (if (fboundp 'org-element-map)
-	      (org-element-map (org-element-parse-buffer) 'link
-		(lambda (link)
-		  (when (and (string= (org-element-property :type link) "file")
-			     (not (string-match
-				   (cdr (assoc "file" org-html-inline-image-rules))
-				   (org-element-property :path link))))
-		    (org-element-property :path link))))
-	    (message "Warning: org-element-map is not available. File links will not be attached.")
-	    '())))
-    (unless (featurep 'message)
-      (require 'message))
-    (cl-case org-mime-library
-      (mu4e
-       (mu4e~compose-mail to subject headers nil))
-      (t
-       (message-mail to subject headers nil)))
-    (message-goto-body)
-    (cl-labels ((bhook (body fmt)
-		       (let ((hook 'org-mime-pre-html-hook))
-			 (if (> (eval `(length ,hook)) 0)
-			     (with-temp-buffer
-			       (insert body)
-			       (goto-char (point-min))
-			       (eval `(run-hooks ',hook))
-			       (buffer-string))
-			   body))))
-      (let* ((org-link-file-path-type 'absolute)
-	     (org-export-preserve-breaks org-mime-preserve-breaks)
-	     (plain (org-mime--export-string body 'org))
-	     ;; this makes the html self-containing.
-	     (org-html-htmlize-output-type 'inline-css)
-	     ;; this is an older variable that does not exist in org 9
-	     (org-export-htmlize-output-type 'inline-css)
-	     (html-and-images
-	      (org-mime-replace-images
-	       (org-mime--export-string (bhook body 'html) 'html opts)
-	       file))
-	     (images (cdr html-and-images))
-	     (html (org-mime-apply-html-hook (car html-and-images))))
-	;; If there are files that were attached, we should remove the links,
-	;; and mark them as attachments. The links don't work in the html file.
-	(mapc (lambda (f)
-		(setq html (replace-regexp-in-string
-			    (format "<a href=\"%s\">%s</a>"
-				    (regexp-quote f) (regexp-quote f))
-			    (format "%s (attached)" (file-name-nondirectory f))
-			    html)))
-	      files)
-	(insert (org-mime-multipart plain html)
-		(mapconcat 'identity images "\n"))
-	;; Attach any residual files
-	(mapc (lambda (f)
-		(when org-mime-debug (message "attaching: %s" f))
-		(mml-attach-file f))
-	      files)))))
+;; (defun org-lms-mime-compose (body file &optional to subject headers opts addressee)
+;;   "Create mail BODY in FILE with TO, SUBJECT, HEADERS and OPTS."
+;;   (when org-mime-debug (message "org-mime-compose called => %s %s" file opts))
+;;   (setq body (format "Hello%s, \n\nAttached are the comments from your assignment.\n%s\nBest,\nMP.\n----------\n" (if addressee (concat " " addressee) "")  (replace-regexp-in-string "\\`\\(\\*\\)+.*$" "" body)))
+;;   (let* ((fmt 'html)
+;; 	 ;; we don't want to convert org file links to html
+;; 	 (org-html-link-org-files-as-html nil)
+;; 	 ;; These are file links in the file that are not images.
+;; 	 (files
+;; 	  (if (fboundp 'org-element-map)
+;; 	      (org-element-map (org-element-parse-buffer) 'link
+;; 		(lambda (link)
+;; 		  (when (and (string= (org-element-property :type link) "file")
+;; 			     (not (string-match
+;; 				   (cdr (assoc "file" org-html-inline-image-rules))
+;; 				   (org-element-property :path link))))
+;; 		    (org-element-property :path link))))
+;; 	    (message "Warning: org-element-map is not available. File links will not be attached.")
+;; 	    '())))
+;;     (unless (featurep 'message)
+;;       (require 'message))
+;;     (cl-case org-mime-library
+;;       (mu4e
+;;        (mu4e~compose-mail to subject headers nil))
+;;       (t
+;;        (message-mail to subject headers nil)))
+;;     (message-goto-body)
+;;     (cl-labels ((bhook (body fmt)
+;; 		       (let ((hook 'org-mime-pre-html-hook))
+;; 			 (if (> (eval `(length ,hook)) 0)
+;; 			     (with-temp-buffer
+;; 			       (insert body)
+;; 			       (goto-char (point-min))
+;; 			       (eval `(run-hooks ',hook))
+;; 			       (buffer-string))
+;; 			   body))))
+;;       (let* ((org-link-file-path-type 'absolute)
+;; 	     (org-export-preserve-breaks org-mime-preserve-breaks)
+;; 	     (plain (org-mime--export-string body 'org))
+;; 	     ;; this makes the html self-containing.
+;; 	     (org-html-htmlize-output-type 'inline-css)
+;; 	     ;; this is an older variable that does not exist in org 9
+;; 	     (org-export-htmlize-output-type 'inline-css)
+;; 	     (html-and-images
+;; 	      (org-mime-replace-images
+;; 	       (org-mime--export-string (bhook body 'html) 'html opts)
+;; 	       file))
+;; 	     (images (cdr html-and-images))
+;; 	     (html (org-mime-apply-html-hook (car html-and-images))))
+;; 	;; If there are files that were attached, we should remove the links,
+;; 	;; and mark them as attachments. The links don't work in the html file.
+;; 	(mapc (lambda (f)
+;; 		(setq html (replace-regexp-in-string
+;; 			    (format "<a href=\"%s\">%s</a>"
+;; 				    (regexp-quote f) (regexp-quote f))
+;; 			    (format "%s (attached)" (file-name-nondirectory f))
+;; 			    html)))
+;; 	      files)
+;; 	(insert (org-mime-multipart plain html)
+;; 		(mapconcat 'identity images "\n"))
+;; 	;; Attach any residual files
+;; 	(mapc (lambda (f)
+;; 		(when org-mime-debug (message "attaching: %s" f))
+;; 		(mml-attach-file f))
+;; 	      files)))))
 #+end_src
 
 #+RESULTS:
@@ -3646,7 +3660,7 @@ I think these are obsolete, but I'm not sure.
 (defun org-lms~open-attachment-or-repo () 
   (interactive)
   (let* ((attach-dir (org-attach-dir t))
-         (files (org-attach-file-list attach-dir)))
+         (files (org-lms-attach-file-list)))
     (if (> (length files) 0 )
         (org-attach-open)
       (org-lms~open-student-repo)
@@ -4261,10 +4275,20 @@ copy that subtree as slack text for posting to slack."
 #+begin_src emacs-lisp
 ;; Minor mode definition. I'm not really using it right now, but it
 ;; might be a worthwhile improvement.
-(devfar org-lms-keymap-prefix (kbd "C-c o")
+(defvar org-lms-keymap-prefix (kbd "C-c o")
         "`org-lms-mode` keymap prefix")
 
-
+(defun org-lms-get-and-open-attachment ()
+  "look for attachments; if they don't exist, try to fetch them, and
+if that succeeds, open them"
+  (interactive)
+  (unless (and (org-attach-dir)
+               (org-attach-file-list (org-attach-dir)))
+    (org-lms-get-canvas-attachments))
+  (if (and (org-attach-dir)
+           (org-attach-file-list (org-attach-dir)))
+      (org-attach-open)
+    (message "unable to retrieve attachments from canvas lms")))
 
 (define-minor-mode org-lms-mode
   "a mode to get my grading and other lms interacitons in order"
@@ -4277,7 +4301,7 @@ copy that subtree as slack text for posting to slack."
              (define-key map (kbd "C-c o p") 'org-lms-post-page)
              (define-key map (kbd "C-c o n") 'org-lms-headline-to-announcement)
              (define-key map (kbd "C-c o i") 'org-lms-module-item-from-headline)
-
+             (define-key map (kbd "C-c o o") 'org-lms-get-and-open-attachment)
              (define-key map (kbd "C-c o z") 'org-lms-munge-zoom-link)
              map )
   :lighter " LMS"
@@ -4294,7 +4318,7 @@ copy that subtree as slack text for posting to slack."
 #+end_src
 
 #+RESULTS:
-| keymap | (3 keymap (111 keymap (122 . org-lms-munge-zoom-link)) (48 keymap (105 . org-lms-module-item-from-headline) (110 . org-lms-headline-to-announcement) (112 . org-lms-post-page) (97 . org-lms-post-assignment)) (f12 . org-lms-wim-wim) (24 keymap (7 . org-lms-set-grade))) |
+| keymap | (3 keymap (111 keymap (122 . org-lms-munge-zoom-link) (105 . org-lms-module-item-from-headline) (110 . org-lms-headline-to-announcement) (112 . org-lms-post-page) (97 . org-lms-post-assignment)) (f12 . org-lms-wim-wim) (24 keymap (7 . org-lms-set-grade))) |
 
 * library closing
 
