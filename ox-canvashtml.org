@@ -54,12 +54,99 @@ make a ~ATTR_CANVASHTML: :fat t~ or something like that.
 * Derived backend for Canvas LMS Pages
 
 Canvas LMS accepts HTML text, but it quite frustratingly strips out ~link~ and ~style~ tags, so all css has to be inlined.  going to try now to add an inliner, let's see how it goes.
+
+
 ** Requirements
 #+begin_src emacs-lisp
 (require  'ox-html)
 #+end_src
 
-** define the minor mode
+** Add a link type for internal canvas links
+#+begin_src emacs-lisp
+;;; ol-canvas.el - Support for links to man pages in Org mode
+(require 'ol)
+
+(org-link-set-parameters "canvas"
+                         ;;:follow #'org-canvas-open
+                         :follow #'org-id-open
+                         :export #'org-canvas-export
+                         :store #'org-canvas-store-link)
+
+(defcustom org-canvas-command 'canvas
+  "The Emacs command to be used to display a man page."
+  :group 'org-link
+  :type '(choice (const man) (const woman)))
+
+(defun org-canvas-open (path _)
+  "Visit the canvas page on PATH.
+PATH should be a topic that can be thrown at the man command."
+  (browse-url path)
+  ;; (funcall org-canvas-command path)
+  )
+
+(defun org-canvas-get-url (id _)
+  (save-excursion
+    (org-id-open id _)
+    (or
+     (org-entry-get nil "CANVAS_HTML_URL")
+     (org-entry-get nil "ORG_LMS_PREVIEW_URL")
+     (org-entry-get nil "MODULE_ITEM_EXTERNAL_URL"))))
+
+(defun org-canvas-store-link ()
+  "Store a link to the current entry, using its ID .
+
+If before first heading store first title-keyword as description
+or filename if no title."
+  (interactive)
+  (when (and (buffer-file-name (buffer-base-buffer)) (derived-mode-p 'org-mode))
+    (let* ((link (concat "canvas:" (org-id-get-create)))
+	   (case-fold-search nil)
+	   (desc (save-excursion
+		   (org-back-to-heading-or-point-min t)
+                   (cond ((org-before-first-heading-p)
+                          (let ((keywords (org-collect-keywords '("TITLE"))))
+                            (if keywords
+                                (cadr (assoc "TITLE" keywords))
+                              (file-name-nondirectory
+			       (buffer-file-name (buffer-base-buffer))))))
+		         ((looking-at org-complex-heading-regexp)
+			  (if (match-end 4)
+			      (match-string 4)
+			    (match-string 0)))
+                         (t link)))))
+      (org-link-store-props :link link :description desc :type "canvas")
+      link)))
+
+
+
+(defun org-canvas-export (link description format &optional _)
+  "Export a canvas page link from Org files."
+  (let ((path (org-canvas-get-url link _))
+        (desc (or description link)))
+    (pcase format
+      (`html (if path
+                 (format "<a target=\"_blank\" href=\"%s\">%s</a>" path desc)
+               desc))
+      (`latex (if path
+                  (format "\\href{%s}{%s}" path desc)
+                des))
+      (`texinfo (if path
+                    (format "@uref{%s,%s}" path desc)
+                  desc))
+      (`ascii (if path
+                  (format "%s (%s)" desc path)
+                desc))
+      (t desc))))
+
+
+
+
+#+end_src
+
+#+RESULTS:
+: org-canvas-export
+
+** define the derived backend
 #+begin_src emacs-lisp
 (org-export-define-derived-backend 'canvas-html 'html
   :translate-alist '((template . canvas-html-template)
@@ -78,11 +165,6 @@ Canvas LMS accepts HTML text, but it quite frustratingly strips out ~link~ and ~
   )
 #+end_src
 
-#+RESULTS:
-: #s(org-export-backend canvas-html html ((template . canvas-html-template) (inner-template . org-canvas-html-inner-template) (section . org-canvas-html-section) (headline . org-canvas-html-headline)) nil nil nil (50 "Export to HTML" ((72 "As HTML buffer" org-canvas-html-export-as-html) (104 "As HTML file" org-canvas-html-export-to-html) (111 "As HTML file and open" (lambda (a s v b) (if a (org-canvas-html-export-to-html t s v b) (org-open-file (org-canvas-html-export-to-html nil s v b))))))))
-*** more tests
-
-dsfs
 ** Replace the section function
 
 allow disabling of section text container
@@ -324,14 +406,17 @@ holding export options."
 #+end_src
 
 #+RESULTS:
-: org-canvas-html-inner-template
-#+begin_src emacs-lisp
-(call-process "j
+
+#+begin_src emacs-lisp :exports none :tangle no
+
 #+end_src
 
 #+RESULTS:
 
 ** Add the export-to and export-as functions
+:PROPERTIES:
+:ID:       e53ca421-8bf0-4ceb-91aa-a9fca86a555a
+:END:
 #+begin_src emacs-lisp
 ;;; End-user functions
 
