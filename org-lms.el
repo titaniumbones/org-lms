@@ -26,17 +26,17 @@
 ;;(require 'ov) ;; for grade overlays
 
 (define-obsolete-function-alias 'org-lms-send-subtree-with-attachments
-    'org-lms~send-subtree-with-attachments "a pretty long time ago")
+    'org-lms--send-subtree-with-attachments "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-mail-all-undone 
     'org-lms-mail-all "a pretty long time ago")
 (define-obsolete-function-alias 'org-lms-parse-assignment 
     'org-lms-post-assignment "2021-06-20" "calling this`parse` was misleading")
 
 ;; variables
-  ;; most of these are used for canvas interactions...
+;; most of these are used for canvas interactions...
 
-  (defvar org-lms-courses nil
-    "Alist in which each car is a symbol, and each cdr is a plist.
+(defvar org-lms-courses nil
+  "Alist in which each car is a symbol, and each cdr is a plist.
 
   Value of this variable must be set beforeusing the library. The
   plist should include at least the following attributes in order
@@ -47,38 +47,44 @@
   - `:semester'
   ")
 
-  (defcustom org-lms-baseurl nil
-    "Baseurl for canvas API queries. 
+(defcustom org-lms-baseurl nil
+  "Baseurl for canvas API queries. 
     Should have the form \"https://canvas.instance.at.school/api/v1/\"."
-    :type '(string)
-    )
+  :type '(string)
+  )
 
-  (defcustom org-lms-token nil
-    "Secret oauth token for Canvas. DO NOT SHARE THIS INFO.
+(defcustom org-lms-public-baseurl nil
+  "Baseurl for canvas API queries. 
+    Should have the form \"https://canvas.instance.at.school/api/v1/\"."
+  :type '(string)
+  )
+
+(defcustom org-lms-token nil
+  "Secret oauth token for Canvas. DO NOT SHARE THIS INFO.
     Probably customize is a rotten place to put this!"
-    :type '(string))
+  :type '(string))
 
-  (defvar-local org-lms-course nil
-    "Locally-set variable representing the local course.")
+(defvar-local org-lms-course nil
+  "Locally-set variable representing the local course.")
 
-  (defvar-local org-lms-local-assignments nil
-    "List of assignments for the current course. 
+(defvar-local org-lms-local-assignments nil
+  "List of assignments for the current course. 
 
     Intended to be updated automatically somehow, but for now just
     being set in grading page")
 
-  (defvar-local org-lms-merged-assignments nil
-    "Buffer-local plist of students in this course, merging cnavas and local info. 
+(defvar-local org-lms-merged-assignments nil
+  "Buffer-local plist of students in this course, merging cnavas and local info. 
 
     Intended to be set automatically. Should always be buffer-local")
 
-  (defvar-local org-lms-local-students nil
-    "Buffer-local plist of students in this course, using local csv file. 
+(defvar-local org-lms-local-students nil
+  "Buffer-local plist of students in this course, using local csv file. 
 
     Intended to be set automatically. Should always be buffer-local")
 
-  (defvar-local org-lms-merged-students nil
-    "Buffer-local plist of students in this course, merging cnavas and local info. 
+(defvar-local org-lms-merged-students nil
+  "Buffer-local plist of students in this course, merging cnavas and local info. 
 
     Intended to be set automatically. Should always be buffer-local")
 (defcustom ol-make-headings-final-hook nil
@@ -89,6 +95,9 @@
   "https://dx.doi.org/"
   "Local DOI resolver for student bibliography links")
 
+;; in the syllabus, "citations" are actually full bibliography entries.
+;; therefore, don't wrap them in links that will create useless HTML
+;; and probably also don't create a full biblipgraphy. 
 (defcustom org-lms-citeproc-fmt-alist
   ;; oops, requires dash library!!
   (and (boundp 'citeproc-fmt--html-alist)
@@ -101,6 +110,9 @@
   in HTML tags; or nil, if CITEPROC-FMT--HTML-ALIST is not defined."
   :group 'org-export-re-reveal
   :type '(alist :key-type symbol :value-type function ))
+
+(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
+  "regexp of file names to ignore.  a bit clumsy but hey.")
 
 (defun org-lms-global-props (&optional property buffer)
   "Get the plists of global org properties of current buffer."
@@ -187,14 +199,15 @@
           (kill-line)
           (when value
             (insert (format "#+%s: %s" tag value))))
+      (goto-char (point-min))
       ;; add new filetag
       (if (looking-at "^$") 		;empty line
           ;; at beginning of line
           (when value
-            (insert (format "#+%s: %s" tag value)))
+            (insert (format "#+%s: %s\n" tag value)))
         ;; at end of some line, so add a new line
         (when value
-          (insert (format "\n#+%s: %s" tag value)))))))
+          (insert (format "#+%s: %s\n" tag value)))))))
 
 ;; Helper Functions
 
@@ -482,6 +495,12 @@ will be moved in this case too."
         (unless level
           (throw 'break nil))))))
 
+(defun org-lms-attach-file-list ()
+  "get the filtered attachments list" 
+  (seq-filter (lambda (a)
+                (not (string-match org-lms-attach-ignore a)))
+              (org-attach-file-list (org-attach-dir t))))
+
 ;; talking to canvas via API v1: https://canvas.instructure.com/doc/api/ 
 
 (defun org-lms-canvas-request (query &optional request-type request-params file)
@@ -638,8 +657,14 @@ will be moved in this case too."
          )
     (write-region (json-encode data-structure) nil "/home/matt/syl.json")
     ;;(setq response)
+    
     (message "Response: %s" response)
-    response
+    ( if response
+        (org-lms-set-keyword "SYLLABUS_URL" (format "%s/%s/assignments/syllabus"
+                                                    ;;org-lms-baseurl
+                                                    ;;fix this!
+                                                    "https://q.utoronto.ca/courses"
+                                                    courseid))) 
     ))
 
 (defun org-lms-post-gb-column (title &optional columnid position teachernotes courseid)
@@ -867,13 +892,8 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 
 (defun org-lms-post-new-file (filepath &optional endpoint folder courseid)
-  "Get comments from student headline and post to Canvas LMS.
-If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
-will be extracted from the current environment. Note the
-commented out `dolist' macro, which will upload attachments to
-canvas. THis process is potentially buggy and seems likely to
-lead to race conditions and duplicated uploads and comments. Still
-working on this."
+  "Upload FILEPATH to canvas storage. Default ENDPOINT is `/courses/COURSEID/files`
+but there are other possible endpoints; see the API for details. Optionally organize into FOLDER."
   (interactive)
   ;; main loop
   (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
@@ -885,8 +905,9 @@ working on this."
          (name (file-name-nondirectory filepath))
          (params `(("name" . ,name)))
          (formstring ""))
-    
-    (when folder (map-put params "parent_folder_path" folder ))
+    ;; note -- just updated to map-put! form map-put -- hopefully
+    ;; it's all ok now.  
+    (when folder (setq params (map-insert params "parent_folder_path" folder )))
     (setq fileinfo (org-lms-file-post-request
                      endpoint
                      params
@@ -914,6 +935,7 @@ working on this."
 (defun org-lms-upload-file-to-storage (filepath fileinfo)
   "using a canvas file upload response, upload a file to the file storage."
   (interactive)
+  (message "uploading file. fileinfo: %s" fileinfo)
   (let* ((upload-url (map-elt fileinfo :upload_url ))
          (params-plist (map-elt fileinfo :upload_params))
          (params-alist (org-lms-plist-to-alist params-plist))
@@ -1043,15 +1065,20 @@ working on this."
   (message "module params: %s" params)
   (let* ((canvasid (map-elt params "moduleid" nil 'equal))
          (org-html-checkbox-type 'unicode )
+         (course (org-lms-get-keyword "ORG_LMS_COURSEID"))
          (assignment-params  `(("module" . ,params)))
          (response
           (org-lms-canvas-request (format "courses/%s/modules%s"
-                                          (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                          course
                                           (if canvasid
                                               (format  "/%s" canvasid) ""))
                                   (if canvasid "PUT" "POST")
                                   assignment-params))
          (response-data (or response nil)))
+    (if response-data
+    (browse-url (format "%s/courses/%s/modules#%s"
+                        org-lms-public-baseurl course
+                        (plist-get response-data :id) )))
     response))
 
 (defun org-lms-module-delete (id)
@@ -1087,6 +1114,7 @@ working on this."
             (org-set-property "MODULE" (format "%s"(plist-get response-data :name)))
             (org-set-property "PUBLISHED" (format "%s"(plist-get response-data :published)))
             (org-set-property "POSITION" (format "%s"(plist-get response-data :position)))
+            
             )
         (message "did not receive module group response-data"))
       response)
@@ -1106,21 +1134,28 @@ working on this."
 
 
 (defun org-lms-set-module-item (item module &optional canvasid)
-  "create a module item from an item definition"
+  "create a module item from an item definition, then open modules page at item modules"
   (let* ((params `(("module_item" . ,item )))
+         (course (org-lms-get-keyword "ORG_LMS_COURSEID"))
          response)
     (message "MODULEPARAMS: %s" item)
     (message "MODULEJSON: %s" (json-encode item))
     
     (setq response
      (org-lms-canvas-request (format "courses/%s/modules/%s/items%s"
-                                     (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                     course
                                      module
                                      (if canvasid
                                          (format  "/%s" canvasid) ""))
        (if canvasid "PUT" "POST")
        params))
     
+    ;; this opens at the *module*. Would it be better to link directly to the 
+    ;; item itself at e.g. context_module_item_MODULEITEMID?
+    ;; in which case replace 'module' with
+    ;; (format "context_module_item_%s" (plist-get response-data :id)
+    (browse-url (format "%s/courses/%s/modules#%s" org-lms-public-baseurl course module ))
+
     (or  response (request-response-error-thrown response) "Something's wrong")
     ))
 
@@ -1148,8 +1183,7 @@ working on this."
          (name  (concat emoji  (nth 4 (org-heading-components))) )
          (position (org-entry-get nil "MODULE_POSITION"))
          (moduleid (or (org-entry-get nil "MODULE_ID" t)
-                       (org-lms-map-module-from-name (org-entry-get nil "MODULE" t))
-))
+                       (org-lms-map-module-from-name (org-entry-get nil "MODULE" t))))
          (moduleitemtype (or
                           (org-entry-get nil "MODULE_ITEM_TYPE" t)
                           (let ((assignmentp  (org-entry-get nil "CANVAS_SUBMISSION_URL"))
@@ -1186,8 +1220,11 @@ working on this."
                 (message "received module response-data")
                 (org-set-property "MODULE_ITEM_ID" (format "%s"(plist-get response-data :id)))
                 (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
-                (org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
-                (org-set-property "CONTENT_ID" (format "%s"(plist-get response-data :content_id)))
+
+                ;; actually this doesn't get sent back for some reason? huh
+                ;;(org-set-property "MODULE_ITEM_NEW_TAB" (format "%s"(plist-get response-data :new_tab)))
+                ;; ditto here
+                (org-set-property "CONTENT_ID" (format "%s"(or (plist-get response-data :content_id) canvasid "") ))
                 (org-set-property "MODULE_ITEM_PUBLISHED" (format "%s"(plist-get response-data :published)))
                 )
             (message "did not receive module item response-data"))
@@ -1265,6 +1302,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
             (org-up-heading-safe)
             (org-entry-get (point) "ASSIGNMENTID")
             ))
+         (org-lms-merged-students (or org-lms-merged-students (org-lms-get-students)))
          (studentid (or (org-entry-get (point) "STUDENTID") (org-entry-get (point) "ID")))
          (submission (org-lms-get-single-submission studentid assid))
          (student (org-lms-find-local-user studentid))
@@ -1272,8 +1310,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
-             (message "%s%s"(downcase (plist-get student :lastname))
-                      (downcase (plist-get student :firstname)) )
+             (message "%s%s" (plist-get student :lastname)
+                      (plist-get student :firstname) )
              (let* ((downloadurl (plist-get attachment :url))
                     (filename
                      (format "%s%s_%s%s_%s_%s"
@@ -1339,15 +1377,14 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                           "online_upload" "none")))
          ;;  (org-entry-get nil "DUE_AT"))
          (publish (org-entry-get nil "OL_PUBLISH"))
-         (group (org-entry-get nil "ASSIGNMENT_GROUP"))
-         (group (org-entry-get nil "ASSIGNMENT_GROUP"))
+         (group (org-entry-get nil "ASSIGNMENT_GROUP" t))
          (omit (org-entry-get nil "ASSIGNMENT_OMIT"))
          (position (org-entry-get nil "ASSIGNMENT_POSITION"))
          (reflection (org-entry-get nil "OL_HAS_REFLECTION"))
          (reflection-id (org-entry-get nil "OL_REFLECTION_ID"))
          (org-export-with-tags nil)
          (assignment-params `(("name" .  ,(nth 4 (org-heading-components)) )
-                              ("description" . ,(org-export-as 'html t nil t))
+                              ("description" . ,(org-export-as 'canvas-html t nil t))
                               ("due_at" . ,(o-l-date-to-timestamp
                                             (or duedate
                                                 (format-time-string "%Y-%m-%d"
@@ -1457,27 +1494,30 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
 (defun org-lms-assignment-group-from-headline ()
   "Extract assignment group data from HEADLINE.
   HEADLINE is an org-element object."
-  (let* ((canvasid (org-entry-get nil "MODULE_ID"))
+  (interactive)
+  (let* ((canvasid (org-entry-get nil "GROUP_ID"))
          (name  (nth 4 (org-heading-components)) )
-         (position (org-entry-get nil "MODULE_POSITION"))
-         (weight (org-entry-get nil "MODULE_WEIGHT"))
+         (position (org-entry-get nil "GROUP_POSITION"))
+         (weight (org-entry-get nil "GROUP_WEIGHT"))
          ;; rules...
+
          (params `((name . ,name)
-                   ))
+                   )))
          (when position (add-to-list 'params `("position" ,(string-to-number position))))
          (when weight (plist-put params `("group_weight" ,(string-to-number weight))))
-         (let* ((response (org-lms-set-assignment-group params))
-               (response-data (or response nil)))
-           
-           (if (plist-get response-data :id)
-               (progn
-                 (message "received assignment group response-data")
-                 (org-set-property "MODULE_ID" (format "%s"(plist-get response-data :id)))
-                 (org-set-property "MODULE_POSITION" (format "%s"(plist-get response-data :position)))
-                 (org-set-property "MODULE_WEIGHT" (format "%s"(plist-get response-data :group_weight)))
-                 )
-             (message "did not receive assignment group response-data"))
-           response))))
+
+    (let* ((response (org-lms-set-assignment-group params))
+           (response-data (or response nil)))
+      
+      (if (plist-get response-data :id)
+          (progn
+            (message "received assignment group response-data")
+            (org-set-property "GROUP_ID" (format "%s"(plist-get response-data :id)))
+            (org-set-property "GROUP_POSITION" (format "%s"(plist-get response-data :position)))
+            (org-set-property "GROUP_WEIGHT" (format "%s"(plist-get response-data :group_weight)))
+            )
+        (message "did not receive assignment group response-data"))
+      response)))
 
 (defun org-lms-set-assignment-group (params)
   "Create an asignment group from params"
@@ -1623,6 +1663,7 @@ will be extracted from the current environment, as the GRADE alwyas will be"
       ;; (message "Response: %s" comment-response )
       comment-response)))
 
+;; not that if you want to update a comment instead, it's necessary to use a different request mechanism
 
 (defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
   "Get comments from student headline and post to Canvas LMS.
@@ -1643,12 +1684,12 @@ working on this."
          (grade (org-entry-get (point) "GRADE"))
          (comments (let*((org-export-with-toc nil)
                          ;;(atext (org-export-as 'html t))
-                         (atitle (nth 4 (org-heading-components)))
+                         ;;(atitle (nth 4 (org-heading-components)))
                          (org-ascii-text-width 23058430000))
                      (org-export-as 'ascii t nil t)))
          (returnval '()))
     ;; loop over attachments
-    (dolist (a (org-attach-file-list (org-attach-dir t)))
+    (dolist (a  (org-lms-attach-file-list))
       (let* ((path (expand-file-name a (org-attach-dir t) ))
              (fileinfo (org-lms-canvas-request
                         (format "courses/%s/assignments/%s/submissions/%s/comments/files"
@@ -1679,6 +1720,7 @@ working on this."
                                          ;; EDIT 2018=11-07 -- untested switch from alist to plist
                                          ("file_ids" . ,returnval)
                                          ;; alas, doesn't seem to update the previous comment! drat
+                                         ;; it's a different API endpoint 
                                          ("id" . (or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
            (comment-response ;;(request-response-data)
             (org-lms-canvas-request
@@ -1840,19 +1882,26 @@ directly from Canvas LMS. UPDATE: seems to work well with
 Canvas LMS allows for export of student information; the
 resultant csv file has a certain shape, bu this may all be irrelevant now."
   (message "running org-lms-make-headings")
+  (unless students
+    (setq students (org-lms-get-students)))
   (save-excursion
     (goto-char (point-max))
     ;; (message "students=%s" students)
     ;; (mapcar (lambda (x)))
     (let* ((body a)
            ;; rewrite this part wit horg-process-props? 
-           ;; nmaybe not possible as written. 
-           (atitle (plist-get body :name ))
+           ;; nmaybe not possible as written.
+           (aname (plist-get body :name))
+           (org-id (plist-get body :org-id))
+           (atitle (format "[[id:%s][%s]]"
+                           org-id
+                           (plist-get body :name)))
            (number (plist-get body :assignment_number))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
+           
            (assignment-type (plist-get body :assignment-type))
            (email-response (plist-get body :email-response))
 	   (canvas-response (plist-get body :canvas-response))
@@ -1868,12 +1917,15 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
       (org-set-property "ASSIGNMENTID" assignmentid)
+      (org-set-property "ASSIGNMENT_NAME" aname)
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
       (org-set-property "BASECOMMIT" basecommit)
       (org-set-property "GRADING_TYPE" grading-type)
       ;;(org-set-property "NUMBER" number)
-      (org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
-      (org-set-property "OEG_LMS_CANVAS_RESPONSE" "t")
+      ;;(org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
+      ;;(org-set-property "ORG_LMS_CANVAS_RESPONSE" "t")
+      (org-set-property "ORG_LMS_EMAIL_COMMENTS" "t")
+      (org-set-property "ORG_LMS_CANVAS_COMMENTS" "t")
       (make-directory directory t)
       (goto-char (point-max))
       (let* (( afiles (if (file-exists-p directory)
@@ -1918,7 +1970,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                                       (if coursenum
                                           (format "[%s] " coursenum)
                                         "")
-                                      atitle nname lname ))
+                                      aname nname lname ))
                             ))
                          )
                     ;; (message "COURSENUM: %s" coursenum)
@@ -2141,11 +2193,11 @@ the structure of the the alist, and the means of attachment
   )
 
 ;; mail integration. Only tested with mu4e.
-(defun org-lms~send-subtree-with-attachments ()
+(defun org-lms--send-subtree-with-attachments ()
   "org-mime-subtree and HTMLize"
   (interactive)
   ;; (org-mark-subtree)
-  (let ((attachments (org-lms~attachment-list)))
+  (let ((attachments (org-lms-attach-file-list)))
     (save-excursion
       (org-lms-mime-org-subtree-htmlize attachments))
     ))
@@ -2215,7 +2267,7 @@ In that case, send all marked 'READY' or 'TODO'."
       (when post-to-lms (org-lms-put-single-submission-from-headline))
       (when also-mail  (save-excursion
                          ;;(org-lms-mime-org-subtree-htmlize )
-                         (org-lms~send-subtree-with-attachments)
+                         (org-lms--send-subtree-with-attachments)
                          (sleep-for 1)
                          ;; (message-send-and-exit)
                          ))
@@ -2292,161 +2344,6 @@ you have not received a grade for work that you have handed in,
     (dolist (a attachments) (message "Attachment: %s" a) (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
     (message-goto-to)
     ))
-
-;; more helpers
-(defun org-lms-mime-org-subtree-htmlize (&optional attachments)
-  "Create an email buffer of the current subtree.
-The buffer will contain both html and in org formats as mime
-alternatives.
-
-The following headline properties can determine the headers.\n* subtree heading
-   :PROPERTIES:
-   :MAIL_SUBJECT: mail title
-   :MAIL_TO: person1@gmail.com
-   :MAIL_CC: person2@gmail.com
-   :MAIL_BCC: person3@gmail.com
-   :END:
-
-The cursor is left in the TO field."
-  (interactive)
-  (save-excursion
-    ;; (funcall org-mime-up-subtree-heading)
-    (cl-flet ((mp (p) (org-entry-get nil p org-mime-use-property-inheritance)))
-      (let* ((file (buffer-file-name (current-buffer)))
-             (subject (or (mp "MAIL_SUBJECT") (nth 4 (org-heading-components))))
-             (to (mp "MAIL_TO"))
-             (cc (mp "MAIL_CC"))
-             (bcc (mp "MAIL_BCC"))
-             (addressee (or (mp "NICKNAME") (mp "FIRSTNAME") ) )
-             ;; Thanks to Matt Price for improving handling of cc & bcc headers
-             (other-headers (cond
-                             ((and cc bcc) `((cc . ,cc) (bcc . ,bcc)))
-                             (cc `((cc . ,cc)))
-                             (bcc `((bcc . ,bcc)))
-                             (t nil)))
-             (subtree-opts (when (fboundp 'org-export--get-subtree-options)
-			     (org-export--get-subtree-options)))
-	     (org-export-show-temporary-export-buffer nil)
-	     (org-major-version (string-to-number
-				 (car (split-string  (org-release) "\\."))))
-	     (org-buf  (save-restriction
-			   (org-narrow-to-subtree)
-			   (let ((org-export-preserve-breaks org-mime-preserve-breaks)
-                                 )
-			     (cond
-			      ((= 8 org-major-version)
-			       (org-org-export-as-org
-			        nil t nil
-			        (or org-mime-export-options subtree-opts)))
-			      ((= 9 org-major-version)
-			       (org-org-export-as-org
-			        nil t nil t
-			        (or org-mime-export-options subtree-opts)))))))
-	     (html-buf (save-restriction
-			 (org-narrow-to-subtree)
-			 (org-html-export-as-html
-			  nil t nil t
-			  (or org-mime-export-options subtree-opts))))
-	     ;; I wrap these bodies in export blocks because in org-mime-compose
-	     ;; they get exported again. This makes each block conditionally
-	     ;; exposed depending on the backend.
-	     (org-body (prog1
-			   (with-current-buffer org-buf
-			     ;; (format "#+BEGIN_EXPORT org\n%s\n#+END_EXPORT"
-				   ;;   (buffer-string))
-           (buffer-string))
-			 (kill-buffer org-buf)))
-	     (html-body (prog1
-			    (with-current-buffer html-buf
-			      (format "#+BEGIN_EXPORT html\n%s\n#+END_EXPORT"
-				      (buffer-string))
-            ;; (buffer-string)
-            )
-			  (kill-buffer html-buf)))
-	     ;; (body (concat org-body "\n" html-body))
-       (body org-body))
-	(save-restriction
-	  (org-narrow-to-subtree)
-	  (org-lms-mime-compose body file to subject other-headers
-			            (or org-mime-export-options subtree-opts)
-                                    addressee))
-        (if (eq org-mime-library 'mu4e)
-        (advice-add 'mu4e~switch-back-to-mu4e-buffer :after
-                    `(lambda ()
-                       (switch-to-buffer (get-buffer ,(buffer-name) ))
-                       (advice-remove 'mu4e~switch-back-to-mu4e-buffer "om-temp-advice"))
-                    '((name . "om-temp-advice"))))
-        (dolist (a attachments)  (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
-
-	(message-goto-to)
-        (message-send-and-exit)
-        ))))
-
-(defun org-lms-mime-compose (body file &optional to subject headers opts addressee)
-  "Create mail BODY in FILE with TO, SUBJECT, HEADERS and OPTS."
-  (when org-mime-debug (message "org-mime-compose called => %s %s" file opts))
-  (setq body (format "Hello%s, \n\nAttached are the comments from your assignment.\n%s\nBest,\nMP.\n----------\n" (if addressee (concat " " addressee) "")  (replace-regexp-in-string "\\`\\(\\*\\)+.*$" "" body)))
-  (let* ((fmt 'html)
-	 ;; we don't want to convert org file links to html
-	 (org-html-link-org-files-as-html nil)
-	 ;; These are file links in the file that are not images.
-	 (files
-	  (if (fboundp 'org-element-map)
-	      (org-element-map (org-element-parse-buffer) 'link
-		(lambda (link)
-		  (when (and (string= (org-element-property :type link) "file")
-			     (not (string-match
-				   (cdr (assoc "file" org-html-inline-image-rules))
-				   (org-element-property :path link))))
-		    (org-element-property :path link))))
-	    (message "Warning: org-element-map is not available. File links will not be attached.")
-	    '())))
-    (unless (featurep 'message)
-      (require 'message))
-    (cl-case org-mime-library
-      (mu4e
-       (mu4e~compose-mail to subject headers nil))
-      (t
-       (message-mail to subject headers nil)))
-    (message-goto-body)
-    (cl-labels ((bhook (body fmt)
-		       (let ((hook 'org-mime-pre-html-hook))
-			 (if (> (eval `(length ,hook)) 0)
-			     (with-temp-buffer
-			       (insert body)
-			       (goto-char (point-min))
-			       (eval `(run-hooks ',hook))
-			       (buffer-string))
-			   body))))
-      (let* ((org-link-file-path-type 'absolute)
-	     (org-export-preserve-breaks org-mime-preserve-breaks)
-	     (plain (org-mime--export-string body 'org))
-	     ;; this makes the html self-containing.
-	     (org-html-htmlize-output-type 'inline-css)
-	     ;; this is an older variable that does not exist in org 9
-	     (org-export-htmlize-output-type 'inline-css)
-	     (html-and-images
-	      (org-mime-replace-images
-	       (org-mime--export-string (bhook body 'html) 'html opts)
-	       file))
-	     (images (cdr html-and-images))
-	     (html (org-mime-apply-html-hook (car html-and-images))))
-	;; If there are files that were attached, we should remove the links,
-	;; and mark them as attachments. The links don't work in the html file.
-	(mapc (lambda (f)
-		(setq html (replace-regexp-in-string
-			    (format "<a href=\"%s\">%s</a>"
-				    (regexp-quote f) (regexp-quote f))
-			    (format "%s (attached)" (file-name-nondirectory f))
-			    html)))
-	      files)
-	(insert (org-mime-multipart plain html)
-		(mapconcat 'identity images "\n"))
-	;; Attach any residual files
-	(mapc (lambda (f)
-		(when org-mime-debug (message "attaching: %s" f))
-		(mml-attach-file f))
-	      files)))))
 
 
 
@@ -2749,7 +2646,7 @@ Simultaneously write results to results.csv in current directory."
 (defun org-lms~open-attachment-or-repo () 
   (interactive)
   (let* ((attach-dir (org-attach-dir t))
-         (files (org-attach-file-list attach-dir)))
+         (files (org-lms-attach-file-list)))
     (if (> (length files) 0 )
         (org-attach-open)
       (org-lms~open-student-repo)
@@ -2759,53 +2656,56 @@ Simultaneously write results to results.csv in current directory."
     "turn a buffer of assignment objects into a plist with relevant info enclosed."
 
     (let ((old-buffer (current-buffer)))
-      (with-temp-buffer 
-        (if file (insert-file-contents (expand-file-name file))
-          (insert-buffer-substring-no-properties old-buffer))
-        ;; (insert-file-contents file)
-        (org-mode)
-        (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
-               (results '())
-               (org-use-tag-inheritance nil)
-               )
-         (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
-          (setq results 
-                (org-map-entries
-                 (lambda ()
-                   (let* ((rubric )
-                          (name (nth 4 (org-heading-components)))
-                          (a-symbol (intern (or (org-entry-get nil  "ORG_LMS_ANAME") 
-                                                (replace-regexp-in-string "[ \n\t]" "" name)))))
-                     (setq rubric  (car (org-map-entries
-                                         (lambda ()
-                                           (let ((e (org-element-at-point )))
-                                             ;; in case at some point we would rather have thewhole element (scary)
-                                             ;; (org-element-at-point)
-                                             (buffer-substring-no-properties
-                                              (org-element-property :contents-begin e)
-                                              (-  (org-element-property :contents-end e) 1))
-                                             ))
-                                         "rubric" 'tree))  )
-                     ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
-                     `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
-                                               :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
-                                               :name ,(nth 4 (org-heading-components)  ) 
-                                               :submission_type ,(or (org-entry-get nil "SUBMISSION_TYPE") "online_upload") 
-                                               :published ,(org-entry-get nil "OL_PUBLISH")
-                                               :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
-                                               :basecommit ,(org-entry-get nil "BASECOMMIT")
-                                               :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
-                                               :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
-                                               :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
-                                               :grade_type "letter_grade" ;; oops fix this!
-                                               :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
-                                               :directory ,(or (org-entry-get nil "OL_DIRECTORY")
-                                                               (downcase
-                                                                (replace-regexp-in-string "[\s]" "-" name )))
-                                               :rubric ,rubric)))
-                                               ) "assignment"))
-          ;;(message "RESULT IS: %s" results)
-          results))) )
+      (save-window-excursion
+        (with-temp-buffer 
+          (if file (find-file file) ;; (insert-file-contents (expand-file-name file))
+            old-buffer;; (insert-buffer-substring-no-properties old-buffer)
+            )
+          ;; (insert-file-contents file)
+          (org-mode)
+          (let* ((id (org-lms-get-keyword "ORG_LMS_COURSEID"))
+                 (results '())
+                 (org-use-tag-inheritance nil)
+                 )
+            (message "BUFFER STRING SHOULD BE: %s" (buffer-string))
+            (setq results 
+                  (org-map-entries
+                   (lambda ()
+                     (let* ((rubric )
+                            (name (nth 4 (org-heading-components)))
+                            (a-symbol (intern (or (org-entry-get nil  "ORG_LMS_ANAME") 
+                                                  (replace-regexp-in-string "[ \n\t]" "" name)))))
+                       (setq rubric  (car (org-map-entries
+                                           (lambda ()
+                                             (let ((e (org-element-at-point )))
+                                               ;; in case at some point we would rather have thewhole element (scary)
+                                               ;; (org-element-at-point)
+                                               (buffer-substring-no-properties
+                                                (org-element-property :contents-begin e)
+                                                (-  (org-element-property :contents-end e) 1))
+                                               ))
+                                           "rubric" 'tree))  )
+                       ;; hopefully nothing broeke here w/ additions <2018-11-16 Fri>
+                       `(,a-symbol .  (:courseid ,id :canvasid ,(org-entry-get nil "CANVASID")
+                                                 :due-at ,(org-entry-get nil "DUE_AT") :html_url ,(org-entry-get nil "CANVAS_HTML_URL")
+                                                 :name ,(nth 4 (org-heading-components)  ) 
+                                                 :submission_type ,(or (org-entry-get nil "SUBMISSION_TYPE") "online_upload") 
+                                                 :published ,(org-entry-get nil "OL_PUBLISH")
+                                                 :submission_url ,(org-entry-get nil "CANVAS_SUBMISSION_URL")
+                                                 :basecommit ,(org-entry-get nil "BASECOMMIT")
+                                                 :org_lms_email_comments ,(org-entry-get nil "ORG_LMS_MAIL_COMMENTS")
+                                                 :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
+                                                 :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
+                                                 :grade_type "letter_grade" ;; oops fix this!
+                                                 :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
+                                                 :org-id ,(org-id-get-create)
+                                                 :directory ,(or (org-entry-get nil "OL_DIRECTORY")
+                                                                 (downcase
+                                                                  (replace-regexp-in-string "[\s]" "-" name )))
+                                                 :rubric ,rubric)))
+                     ) "assignment"))
+            ;;(message "RESULT IS: %s" results)
+            results)))) )
 
   (defun org-lms-save-assignment-map (&optional file)
     "Map assignments and save el object to FILE, \"assignments.el\" by default."
@@ -3117,21 +3017,30 @@ approach)."
               (when do-export
                 (let ((org-re-reveal-single-file t)
                       (exported-file
-                       (org-re-reveal-export-to-html async subtree visible-only nil nil)))
+                       (org-re-reveal-export-to-html async subtree visible-only nil
+                                                     '(:org-re-reveal-single-file t :re-reveal-single-file t :reveal-single-file t))))
                   (if exported-file
                       (let ((file-info)
                             (file-location)
+                            (file-view-in-canvas)
                             (file-folder (or (org-entry-get (point) "ORG_LMS_FILE_FOLDER")
                                              "Lectures")))
                         (setq file-info
                               (json-read-from-string (org-lms-post-new-file exported-file nil file-folder ))
-                              file-location (alist-get   'preview_url file-info))
+                              file-location (format "%s%s" org-lms-public-baseurl (alist-get   'preview_url file-info))
+                              file-actual-preview (and file-location
+                                                       (replace-regexp-in-string
+                                                        "\\(/.*/\\)\\(file_preview\\?\\)\\(.*\\)"
+                                                        "\\1"
+                                                        file-location)))
                         (message "PREVIEW: %s" file-location)
                         (when file-location
                           (org-entry-put (point) "CANVASID"
                                         (format "%s" (alist-get 'id file-info)))
+                          (org-entry-put (point) "ORG_LMS_PREVIEW_URL"
+                                         file-actual-preview)
                           (org-entry-put (point) "ORG_LMS_FILE_URL"
-                                         (concat "https://q.utoronto.ca" file-location)))
+                                         file-location))
                         file-info
                         )))
                 
@@ -3273,7 +3182,21 @@ copy that subtree as slack text for posting to slack."
 
 ;; Minor mode definition. I'm not really using it right now, but it
 ;; might be a worthwhile improvement.
- 
+(defvar org-lms-keymap-prefix (kbd "C-c o")
+        "`org-lms-mode` keymap prefix")
+
+(defun org-lms-get-and-open-attachment ()
+  "look for attachments; if they don't exist, try to fetch them, and
+if that succeeds, open them"
+  (interactive)
+  (unless (and (org-attach-dir)
+               (org-attach-file-list (org-attach-dir)))
+    (org-lms-get-canvas-attachments))
+  (if (and (org-attach-dir)
+           (org-attach-file-list (org-attach-dir)))
+      (org-attach-open)
+    (message "unable to retrieve attachments from canvas lms")))
+
 (define-minor-mode org-lms-mode
   "a mode to get my grading and other lms interacitons in order"
   :init-value nil
@@ -3281,11 +3204,11 @@ copy that subtree as slack text for posting to slack."
   :keymap  (let ((map (make-sparse-keymap))) 
              (define-key map (kbd "C-c C-x C-g") 'org-lms-set-grade )
              (define-key map (kbd "C-c <f12>") 'org-lms-wim-wim)
-             (define-key map (kbd "C-c 0 a") 'org-lms-post-assignment)
-             (define-key map (kbd "C-c 0 p") 'org-lms-post-page)
-             (define-key map (kbd "C-c 0 n") 'org-lms-headline-to-announcement)
-             (define-key map (kbd "C-c 0 i") 'org-lms-module-item-from-headline)
-
+             (define-key map (kbd "C-c o a") 'org-lms-post-assignment)
+             (define-key map (kbd "C-c o p") 'org-lms-post-page)
+             (define-key map (kbd "C-c o n") 'org-lms-headline-to-announcement)
+             (define-key map (kbd "C-c o i") 'org-lms-module-item-from-headline)
+             (define-key map (kbd "C-c o o") 'org-lms-get-and-open-attachment)
              (define-key map (kbd "C-c o z") 'org-lms-munge-zoom-link)
              map )
   :lighter " LMS"
