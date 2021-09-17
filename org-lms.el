@@ -114,6 +114,21 @@
 (defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
   "regexp of file names to ignore.  a bit clumsy but hey.")
 
+(defvar org-lms-grading-table
+  '(("A+" . 92)
+    ("A" . 87)
+    ("A-" . 83)
+    ("B+" . 78)
+    ("B" . 75)
+    ("B-" . 72)
+    ("C+" . 68)
+    ("C" . 65)
+    ("C-" . 62)
+    ("D+" . 58)
+    ("D" . 55)
+    ("D-" . 52))
+  "Quick lookup table for marks so that they get properly translated to canvas. Should it be a hash table? Who cares?")
+
 (defun org-lms-global-props (&optional property buffer)
   "Get the plists of global org properties of current buffer."
   (unless property (setq property "PROPERTY"))
@@ -495,11 +510,31 @@ will be moved in this case too."
         (unless level
           (throw 'break nil))))))
 
+(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
+  "regexp of file names to ignore.  a bit clumsy but hey.")
+
+
 (defun org-lms-attach-file-list ()
   "get the filtered attachments list" 
   (seq-filter (lambda (a)
                 (not (string-match org-lms-attach-ignore a)))
               (org-attach-file-list (org-attach-dir t))))
+
+(defun org-lms-calculate-grade (initial)
+  "Infer canvas-style grade from numerical, percentage, or letter grade."
+  (let ((weight (or
+                 (org-entry-get (point) "ASSIGNMENT_WEIGHT" t)
+                 "0.1"))
+        (trimmed (s-trim initial))
+        (matched (or
+                  (map-elt org-lms-grading-table initial nil 'equal)
+                  (and (string= (s-right 1 trimmed) "%")
+                       (s-numeric (s-left -1 trimmed))
+                       (string-to-number (s-left -1 trimmed)))
+                  (string-to-number trimmed)
+                  0)))
+    (string-to-number (format "%0.2f" 
+                              (* matched (string-to-number weight))))))
 
 ;; talking to canvas via API v1: https://canvas.instructure.com/doc/api/ 
 
@@ -905,8 +940,9 @@ but there are other possible endpoints; see the API for details. Optionally orga
          (name (file-name-nondirectory filepath))
          (params `(("name" . ,name)))
          (formstring ""))
-    ;; note -- just updated to map-put! form map-put -- hopefully
-    ;; it's all ok now.  
+    ;; note -- just updated to map-put! from map-put, but that  didn't seem to
+    ;; work
+    ;; it's all ok now that I'm using map-insert instead  
     (when folder (setq params (map-insert params "parent_folder_path" folder )))
     (setq fileinfo (org-lms-file-post-request
                      endpoint
@@ -1594,28 +1630,29 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (atext (org-export-as 'canvas-html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
-         )
+         (section (org-entry-get (point) "OL_SECTION_ID" t))
+         (params `(("title" . ,atitle)
+                  ("message" . ,atext)
+                  ("is_published" . t)
+                  ("is_announcement" . t))))
+    (when section
+      (add-to-list 'params `("specific_sections" . ,(list section))  ))
     ;; (message "BUILDMETA DEFN")
     ;; (prin1 (symbol-function  'org-html--build-meta-info))
     ;; (message "%s" atext)
+
     (if oldid
         (progn
           (message "already added!")
           (setq response ;;(request-response-data) 
                 (org-lms-canvas-request
                  (format  "courses/%s/discussion_topics/%s" courseid oldid) "PUT"
-                 `(("title" . ,atitle)
-                   ("message" . ,atext)
-                   ("is_published" . t)
-                   ("is_announcement" . t)))))
+                 params)))
 
       (setq response ;;(request-response-data)
             (org-lms-canvas-request
              (format  "courses/%s/discussion_topics" courseid) "POST"
-             `(("title" . ,atitle)
-               ("message" . ,atext)
-               ("is_published" . t)
-               ("is_announcement" . t)))))
+             params)))
     (cl-loop for (k v) on response
              do
              (message "%s %S" k v))
@@ -1626,6 +1663,28 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
     (if (plist-get response :url) 
         (browse-url (plist-get response :url)))
     response))
+
+(defun org-lms-get-sections (&optional courseid)
+"Retrieve list of course sections" 
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/sections" courseid) "GET"))
+
+(defun org-lms-get-single-section (sectionid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (let ((params '(("include" . ("items")))))
+    (org-lms-canvas-request (format "courses/%s/sections/%s" courseid sectionid) "GET" params)))
+
+(defun org-lms-map-section-from-name (name)
+  (interactive)
+  (let* ((sections (org-lms-get-sections))
+         (match (or (--first (string= (plist-get it :name) name) sections )
+                    (org-lms-set-section `((name . ,name))))))
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
 
 (defun org-lms-get-grading-standards (&optional courseid)
     "Retrieve Canvas grading standards for course with id COUSEID"
@@ -1647,7 +1706,7 @@ will be extracted from the current environment, as the GRADE alwyas will be"
          (returnval '()))
     ;; loop over attachments
     
-    (let* ((grade-params `(("submission" . (("posted_grade" . ,grade)))))
+    (let* ((grade-params `(("submission" . (("posted_grade" . ,(org-lms-calculate-grade grade))))))
            (comment-response ;;(request-response-data)
             (org-lms-canvas-request
              (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
@@ -1715,13 +1774,14 @@ working on this."
                         ;; this needs to be fixed up still -- only saves last
                         (org-entry-put (point) "ORG_LMS_ATTACHMENT_URL"
                                        file_id))))))
-    (let* ((grade-params `(("submission" . (("posted_grade" . ,grade)))
+    (let* ((grade-params `(("submission" . (("posted_grade" . ,(org-lms-calculate-grade grade))))
                            ("comment" . (("text_comment" . ,comments)
                                          ;; EDIT 2018=11-07 -- untested switch from alist to plist
                                          ("file_ids" . ,returnval)
                                          ;; alas, doesn't seem to update the previous comment! drat
-                                         ;; it's a different API endpoint 
-                                         ("id" . (or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
+                                         ;; it's a different API endpoint
+                                         ;; this is a todo item
+                                         ("id" . ,(or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
            (comment-response ;;(request-response-data)
             (org-lms-canvas-request
              (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
@@ -1780,9 +1840,10 @@ variables must be set or errors will result."
   :type 'function)
 
 (defun org-lms-get-local-students (&optional file)
-  ;; (unless file
-  ;;   (setq file "./students.json"))
-  (apply org-lms-get-student-function (list file)))
+  (unless file
+    (setq file "./students.json"))
+  (if (file-exists-p file) 
+      (apply org-lms-get-student-function (list file))))
 
 (defun org-lms-assignments-table (&optional assignments students)
   "Return a 2-dimensional list suitable whose contents are org-mode table cells.
@@ -1901,7 +1962,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (directory (plist-get body :directory ))
            (weight (plist-get body :assignment-weight ))
            (grade-type (plist-get body :grade-type ))
-           
+           (assignment-weight (plist-get body :assignment-weight))
            (assignment-type (plist-get body :assignment-type))
            (email-response (plist-get body :email-response))
 	   (canvas-response (plist-get body :canvas-response))
@@ -1916,6 +1977,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (template (plist-get body :rubric)))
       ;; (message "car assignment successful: %s" template)
       (insert (format "\n* %s :ASSIGNMENT:" atitle))
+      (org-set-property "ASSIGNMENT_WEIGHT" assignment-weight)
       (org-set-property "ASSIGNMENTID" assignmentid)
       (org-set-property "ASSIGNMENT_NAME" aname)
       (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
@@ -2199,8 +2261,10 @@ the structure of the the alist, and the means of attachment
   ;; (org-mark-subtree)
   (let ((attachments (org-lms-attach-file-list)))
     (save-excursion
-      (org-lms-mime-org-subtree-htmlize attachments))
-    ))
+      
+      (org-lms-mime-org-subtree-htmlize attachments)
+      ;; (org-mime-org-subtree-htmlize attachments)
+      )))
 
 ;; defunkt
 (defun org-lms-send-subtree-with-attachments ()
@@ -2344,6 +2408,8 @@ you have not received a grade for work that you have handed in,
     (dolist (a attachments) (message "Attachment: %s" a) (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
     (message-goto-to)
     ))
+
+
 
 
 
