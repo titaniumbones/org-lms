@@ -2488,9 +2488,10 @@ variables must be set or errors will result."
   :type 'function)
 
 (defun org-lms-get-local-students (&optional file)
-  ;; (unless file
-  ;;   (setq file "./students.json"))
-  (apply org-lms-get-student-function (list file)))
+  (unless file
+    (setq file "./students.json"))
+  (if (file-exists-p file) 
+      (apply org-lms-get-student-function (list file))))
 #+end_src
 
 #+RESULTS:
