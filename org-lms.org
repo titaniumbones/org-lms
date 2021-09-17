@@ -2209,28 +2209,29 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
          (atext (org-export-as 'canvas-html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
-         )
+         (section (org-entry-get (point) "OL_SECTION_ID" t))
+         (params `(("title" . ,atitle)
+                  ("message" . ,atext)
+                  ("is_published" . t)
+                  ("is_announcement" . t))))
+    (when section
+      (add-to-list 'params `("specific_sections" . ,(list section))  ))
     ;; (message "BUILDMETA DEFN")
     ;; (prin1 (symbol-function  'org-html--build-meta-info))
     ;; (message "%s" atext)
+
     (if oldid
         (progn
           (message "already added!")
           (setq response ;;(request-response-data) 
                 (org-lms-canvas-request
                  (format  "courses/%s/discussion_topics/%s" courseid oldid) "PUT"
-                 `(("title" . ,atitle)
-                   ("message" . ,atext)
-                   ("is_published" . t)
-                   ("is_announcement" . t)))))
+                 params)))
 
       (setq response ;;(request-response-data)
             (org-lms-canvas-request
              (format  "courses/%s/discussion_topics" courseid) "POST"
-             `(("title" . ,atitle)
-               ("message" . ,atext)
-               ("is_published" . t)
-               ("is_announcement" . t)))))
+             params)))
     (cl-loop for (k v) on response
              do
              (message "%s %S" k v))
@@ -2268,8 +2269,38 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
 
 to#+RESULTS:
 : {"assignment[description]":"<p>\nThis kind of amazing-sounding talk is happenin...","assignment[submission_types]":"none","assignment[grading_type]":"letter_grade","descrpition":"","key1":"value1","":""}
+** Sections
+
+Now that I'm a TA I actually need access to sections. 
+
+#+begin_src emacs-lisp
+(defun org-lms-get-sections (&optional courseid)
+"Retrieve list of course sections" 
+  (unless courseid
+    (setq courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+
+  (org-lms-canvas-request (format "courses/%s/sections" courseid) "GET"))
+
+(defun org-lms-get-single-section (sectionid &optional courseid)
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     ))
+  (let ((params '(("include" . ("items")))))
+    (org-lms-canvas-request (format "courses/%s/sections/%s" courseid sectionid) "GET" params)))
+
+(defun org-lms-map-section-from-name (name)
+  (interactive)
+  (let* ((sections (org-lms-get-sections))
+         (match (or (--first (string= (plist-get it :name) name) sections )
+                    (org-lms-set-section `((name . ,name))))))
+    (plist-get match :id) ;;(plist-get it :id)
+    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ))
+
+#+end_src
 ** Grading Standards
-Unfortunately, at Canadian schools we need to set the grading standard for every single assignment :frowning:  TThis should be another keyword I guess :-(. However... once again I don't seem to have permission to set the grading standards fro mthe API :-(; and I can't evne seme to *get* them, which is frustrating.    
+Unfortunately, at Canadian schools we need to set the grading standard for every single assignment :frowning:  TThis should be another keyword I guess :-(. However... once again I don't seem to have permission to set the grading standards fro mthe API :-(; and I can't evne seme to *get* them, which is frustrating.
+
+Might be easier really to just use the new defvar ~org-lms-grading-table~ instead of futzing with all this. 
 *** Getter -- get-grading-standards
 #+begin_src emacs-lisp
 (defun org-lms-get-grading-standards (&optional courseid)
