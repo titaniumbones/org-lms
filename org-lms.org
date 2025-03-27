@@ -1,5 +1,5 @@
 #+TODO: ACTION(a) STARTED(s) WAITING(w) NEEDSHELP(n) MISSING(m) | DONE(d) WONTDO(o)
-#+PROPERTY: header-args    :tangle org-lms.el
+#+PROPERTY: header-args    :tangle org-lms.el scalar drawer :comments link
 #+ORG_LMS_COURSE: wildwater
 I'm moving this package to a literate programming format to make it easier to maintain.
 
@@ -11,33 +11,39 @@ Source blocks are tangled using org-babel.
 - The [[https://canvas.instructure.com/doc/api/file.graphql.html][GraphQL API]] is much less well-documented, though it also comes with a live interaction tool; at U of T it's [[https://q.utoronto.ca/graphiql][at this URL]]. 
 - Add some docs about request, and maybe dash? 
 * Package intro
-
+:PROPERTIES:
+:ID:       7ee1088c-2bf1-4ee4-b701-c37bfce5197f
+:END:
 #+begin_src emacs-lisp
-  ;;; org-lms -- Summary
-  ;;;
-  ;;; Commentary:
-  ;;; Library to facilitate marking assignments and interacting
-  ;;; with the Canvas LMS (https://canvas.instructure.com/) via its
-  ;;; JSON API (https://canvas.instructure.com/doc/api/).
-  ;;;
-  ;;; Functionality is still rough and design is idiosyncratic. I hope to
-  ;;; one day design a more robusti nterface but... who know? 
+;;; org-lms -- Summary
+;;;
+;;; Commentary:
+;;; Library to facilitate marking assignments and interacting
+;;; with the Canvas LMS (https://canvas.instructure.com/) via its
+;;; JSON API (https://canvas.instructure.com/doc/api/).
+;;;
+;;; Functionality is still rough and design is idiosyncratic. I hope to
+;;; one day design a more robusti nterface but... who know? 
 
-  ;;; Code:
+;;; Code:
 
 
 #+end_src
+#+RESULTS:
 
 * COMMENT What does this package contain? 
-
+huh, I don't seem to have defined this function -- I think it's supposed to give me a link to the location of each defun.
 #+begin_src emacs-lisp :results list :tangle no
 (matches-in-buffer "(\\\(defun .*\\\)")
-
 #+end_src
+[[file:./org-lms.org::55]]
 
 #+RESULTS:
 * Dependencies
-#+begin_src emacs-lisp
+:PROPERTIES:
+:ID:       35d81f3c-d0d5-4eda-b603-cf5524c3144d
+:END:
+#+begin_src emacs-lisp :results value scalar drawer
 ;; require the dependencies
 (require 'org) ;; the source of all good!
 (require 'org-attach) ;; for attaching files to emails
@@ -55,10 +61,12 @@ Source blocks are tangled using org-babel.
 
 #+end_src
 
-#+RESULTS:
-: ox-canvashtml
+#+RESULTS:!
 
 * Define obsolete functions
+:PROPERTIES:
+:ID:       301ef65a-b3df-47df-9c07-fd1ee41db174
+:END:
 THere's some stuff I should get rid of. Trying to track it down.  
 
 #+begin_src emacs-lisp
@@ -75,10 +83,13 @@ THere's some stuff I should get rid of. Trying to track it down.
 : org-lms-parse-assignment
 
 * STARTED Variable definitions
+:PROPERTIES:
+:ID:       35bdba27-0d0d-4fe2-bad7-ddd0341ce4a5
+:END:
 The underlying data structure has changed a bit :-) as I start to understand what information needs to be stored in non-textual data structures and what doesn't. A lot of this has not been documented yet!
   
 - need to give a better default value to org-lms-courses
-
+** basic variables that most users will need to set
 #+begin_src emacs-lisp
 ;; variables
 ;; most of these are used for canvas interactions...
@@ -122,7 +133,7 @@ The underlying data structure has changed a bit :-) as I start to understand wha
     being set in grading page")
 
 (defvar-local org-lms-merged-assignments nil
-  "Buffer-local plist of students in this course, merging cnavas and local info. 
+  "Buffer-local plist of assignments in this course, merging cnavas and local info. 
 
     Intended to be set automatically. Should always be buffer-local")
 
@@ -159,7 +170,7 @@ The underlying data structure has changed a bit :-) as I start to understand wha
   :group 'org-export-re-reveal
   :type '(alist :key-type symbol :value-type function ))
 
-(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
+(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|^\\.~lock\\.\\|\\.zip$" 
   "regexp of file names to ignore.  a bit clumsy but hey.")
 
 (defvar org-lms-grading-table
@@ -181,8 +192,25 @@ The underlying data structure has changed a bit :-) as I start to understand wha
 
 #+RESULTS:
 : org-lms-grading-table
+** Variables used internally to keep code (sort of) clean
+#+begin_src emacs-lisp
+
+#+end_src
+*** testing some stuff
+:PROPERTIES:
+:numeric:  123456
+:null: nil
+:listy: hello there
+:END:
+#+begin_src emacs-lisp :results code :tangle no
+(org-entry-get (point) "listy" )
+#+end_src
+
 
 * NEEDSHELP Set up Testing
+:PROPERTIES:
+:ID:       b8d3adf8-c7a7-4c56-97ac-3c29d6b0d6a4
+:END:
 Thisi s a complete joke; needs to be entirely rethought. 
 
 Unit tests wil lbe defined throughout and just tangled to a different place! First we have to set up the environment. You'll need to set some of these values up yourself!
@@ -204,6 +232,9 @@ sooo.. write this fing function?
 (if plaplapla))
 #+end_src
 ** ACTION Read global values of org file
+:PROPERTIES:
+:ID:       fc60274a-cb96-4c47-87ea-1214265d940d
+:END:
 Stolen from [[https://emacs.stackexchange.com/questions/21713/how-to-get-property-values-from-org-file-headers/21715#21715][stackexchange]] via [[https://github.com/zzamboni/dot-emacs/blob/master/init.org#publishing-to-leanpub][Diego Zamboni]], thee functions allow Emacs to see values of props set in the header. 
 
 I need to figure out a setter -- these are just getters.  Something like :
@@ -231,6 +262,7 @@ I need to figure out a setter -- these are just getters.  Something like :
 ** ACTION Reading keywords in org files
 :PROPERTIES:
 :ORG_LMS_COURSE: calmwater
+:ID:       eef51540-ecf6-4214-87e2-a1abceed138f
 :END:
 
 From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre "define" a new keyword without the elabotrate  apparatus of an org exporter. 
@@ -328,7 +360,11 @@ From a discussion w/ john kitchin, Nicolas Goaziou, ando thers, how to as itwre 
           (insert (format "#+%s: %s\n" tag value)))))))
 #+end_src
 
+
 ** ACTION CSV Parsers
+:PROPERTIES:
+:ID:       b36188ef-c224-4045-8ad0-876a259263f5
+:END:
 There are several of these here. The code is largely redundant and should be combined into one or two
 #+begin_src emacs-lisp
   ;; Helper Functions
@@ -457,6 +493,9 @@ There are several of these here. The code is largely redundant and should be com
 
 no tests yet!
 ** Miscellaneous Helper functions
+:PROPERTIES:
+:ID:       697c0909-3d56-4f9c-9dff-35ab6ec4537f
+:END:
 - navigate org trees w/ ~org-lms-get-parent-headline
 - execute plist-get but return empty string (~""~) )instead of ~nil~ when element is absent/nil.  
 
@@ -508,7 +547,13 @@ Neither of these is heavily-used and the latter can be safely replaced by ~(form
 
 #+end_src
 
+#+RESULTS:
+: org-lms-plist-to-alist
+
 ** JSON helpers and wrappers
+:PROPERTIES:
+:ID:       1ee86384-12e7-4e37-8581-138a90c2477c
+:END:
 Intended to make it easier to read and write json according to the library's standards.
 - ol-jsonwrapper :: macro to set ~json.el~ vars temporarily around a ~json-read~ call
 - ol-write-json-plists :: either there's a bug or I'm not understanding something; without thissetting lists of plists were being interpreted wrong by json-encode.
@@ -569,6 +614,9 @@ default values are:
 : ol-write-json-alists
 
 ** Read-lines: Belongs up with the utility functions
+:PROPERTIES:
+:ID:       b0ecaf98-7f73-4dcf-aa51-47bf7bf926a3
+:END:
 
 #+begin_src emacs-lisp
 ;; stolen from xah, http://ergoemacs.org/emacs/elisp_read_file_content.html
@@ -581,7 +629,13 @@ default values are:
 
 #+end_src
 
+#+RESULTS:
+: org-lms~read-lines
+
 ** Parse and set properties
+:PROPERTIES:
+:ID:       61406e02-e6f7-4078-b513-ea059380ad6e
+:END:
 Much of the code in this library reads and sets properties at the headline level.  These helpers should increase readability and maintainability. We use ~let-alist~ to set headline-level variables accessed with ~org-lms-process-props~, and set those properties using a dictionary-like map of Canvas API response property names to org-lms headline properties.  
 
 #+NAME:lms-process
@@ -598,6 +652,7 @@ Much of the code in this library reads and sets properties at the headline level
                    nil
                  value ))))
 
+;; i don't think this is used? b it's cool 
 (defun org-lms-propertize-response-data (response-data)
    "write a variable value to a headline property. MUNGED-VAR is a dot-variable set by `let-alist`, 
 which see for more details"
@@ -622,15 +677,23 @@ which see for more details"
               )
             
    ))
+
+(defun org-lms-generic-set-properties (data isgroup)
+  "sets prperties for all groups "
+                                
+  )
 #+end_src
 
 #+RESULTS: lms-process
-: org-lms-propertize-response-data
+: org-lms-generic-set-properties
 
 #+RESULTS:
 : org-lms-set-prop
 
 ** Deal with timestamps
+:PROPERTIES:
+:ID:       fa4803ed-368e-41bf-a1bc-81c710bbd11d
+:END:
 #+begin_src emacs-lisp
 (require 'ts)
 (defun o-l-date-to-timestamp (date)
@@ -644,7 +707,23 @@ usually of the form `2019-09-26`, but optionally including a full time."
 #+RESULTS:
 : o-l-date-to-timestamp
 
+What about daylight savings time? 
+
+I'm confused because it seems like this actually works when I test it on its own.  Hmm, will have ti figure out how to fix it.  
+#+begin_src emacs-lisp :results raw :tangle no
+(require 'cal-dst)
+(calendar-current-time-zone)
+(o-l-date-to-timestamp "2021-08-31")
+ (ts-format "%Y-%m-%dT%H:%M:%S%:z" (ts-apply :hour 23 :minute 59 :second 59 (ts-parse "2021-11-31")))
+
+(ts-format "%Y-%m-%dT%H:%M:%S%:z" (ts-parse-fill 'end "2021-08-31" ))
+(ts-format "%Y-%m-%dT%H:%M:%S%:z" (ts-parse "2021-11-06T03:59:59Z"))
+#+end_src
+
 ** ACTION Generic get-valid-subtree function.
+:PROPERTIES:
+:ID:       88ca9ba2-ce33-4832-ba3f-c6649eb57fe3
+:END:
 
 This function, which is [[https://github.com/kaushalmodi/ox-hugo/blob/b5672ea8925eaff93c4e17982b35acec302ba5e7/ox-hugo.el#L3617][taken directly from ox-hugo]] and is effectively (c) Kaushal Modi under GPL-3.0, *moves point* to the parent subtree and should always be wrapped in a save-excursion.  Most of the export functions above should also now get wrapper functions for wim-scope, and end users could be expected to mostly use those (rather than the existing functions). 
 
@@ -680,10 +759,11 @@ will be moved in this case too."
 : org-lms--get-valid-subtree
 
 ** Filter attachments
+:PROPERTIES:
+:ID:       0aeb4b07-1715-4965-8cd8-7eec9a44a089
+:END:
 I have a bunch of  attachment-gathering functions that all need to be changed; might as well do it in one place
 #+begin_src emacs-lisp
-(defvar org-lms-attach-ignore "^\\.pdf-view-restore$\\|addyouroethertexthere" 
-  "regexp of file names to ignore.  a bit clumsy but hey.")
 
 
 (defun org-lms-attach-file-list ()
@@ -693,29 +773,73 @@ I have a bunch of  attachment-gathering functions that all need to be changed; m
               (org-attach-file-list (org-attach-dir t))))
 #+end_src
 
+#+RESULTS:
+: org-lms-attach-file-list
+
 ** Letter Grade to numerical value
+:PROPERTIES:
+:ID:       ee55fc83-c2a8-4a81-a101-9d26958849c9
+:END:
 This function, which assumes it is called  *in an active tree*, generates a numerical grade from a letter grade, by looking up its percentage value in ~org-lms-grading-table~ and miltiplying it by the ~ASSIGNMENT_WEIGHT~ property. Should maybe also take a numerical grade and multiply it by the assignment weight... not sure how best to manage that.
 
 #+begin_src emacs-lisp
 (defun org-lms-calculate-grade (initial)
   "Infer canvas-style grade from numerical, percentage, or letter grade."
-  (let ((weight (or
+  (let* ((weight (or
                  (org-entry-get (point) "ASSIGNMENT_WEIGHT" t)
                  "0.1"))
         (trimmed (s-trim initial))
         (matched (or
+                  (and (stringp trimmed)  (string=  trimmed "pass") "pass")
                   (map-elt org-lms-grading-table initial nil 'equal)
                   (and (string= (s-right 1 trimmed) "%")
                        (s-numeric (s-left -1 trimmed))
                        (string-to-number (s-left -1 trimmed)))
                   (string-to-number trimmed)
                   0)))
-    (string-to-number (format "%0.2f" 
-                              (* matched (string-to-number weight))))))
+    (if  (and (stringp matched) (string= matched "pass"))
+        matched
+      (string-to-number (format "%0.2f" 
+                                (* matched (string-to-number weight)))))))
 #+end_src
 
 #+RESULTS:
 : org-lms-calculate-grade
+
+** ACTION Expand templates in titles
+:PROPERTIES:
+:ID:       7abe1892-61e8-4761-ad2e-7957bad79cdd
+:END:
+I am not parsing titles very well.  This is a TODO. But for now, a terrible hack.
+
+#+begin_src emacs-lisp
+(defun org-lms-quick-template-expand (unparsed)
+(if (string-match "\\(^.*\\){{{\\([-A-Za-z0-9_]+\\)}}}\\(.*\\)$"  
+                  unparsed)
+    (let* ((key (downcase (match-string 2 unparsed)))
+           (prefix (match-string-no-properties 1 unparsed))
+           (suffix (match-string-no-properties 3 unparsed))
+           (value (match-string-no-properties 0 unparsed))
+           ;; (args (pcase (match-string-no-properties 3)
+	   ;;         (`nil nil)
+	   ;;         (a (org-macro-extract-arguments
+	   ;;     	(replace-regexp-in-string
+	   ;;     	 "[ \t\r\n]+" " " (org-trim a))))))
+           (m (list 'macro (list :key key
+		                 :value value
+		                 :args nil
+		                 :begin 0
+		                 :end 10
+		                 ;;:post-blank post-blank
+                                 ))))
+      (concat prefix 
+              (org-macro-expand m org-macro-templates)
+              suffix))
+  unparsed))
+#+end_src
+
+#+RESULTS:
+: org-lms-quick-template-expand
 
 * Talking to Canvas - Fundamentals
 Everything in here should be generically useful, and segregated from my unique workflow. That means, among other things, that there should be a specific relationship to an API endpoint. 
@@ -758,6 +882,7 @@ No Plans Yet
 ** Basic "request" function
 :PROPERTIES:
 :GRADE:    1
+:ID:       19613987-3e4c-441d-b869-545165a85d35
 :END:
 These are basically wrappers around ~request.el~ that allow some of the requests to be simplified. I have written 2 functions, one for passing requests via header arguments, and another for passing them via json. THese should be combined & I should use a switch to allow users to use one interface rather than theo ther (though probably we should always go through the JSON interface!
 )
@@ -829,6 +954,9 @@ These are basically wrappers around ~request.el~ that allow some of the requests
 In order to rewrite the basic requests from REST to GraphQL, we'll need a basic graphql function.
 ** STARTED Courses
 *** Getters
+:PROPERTIES:
+:ID:       4b40f180-8ca4-4efc-a0d6-def2c784e158
+:END:
 - org-lms-get-courses :: getter for all courses
 - org-lms-get-single-courses :: getter for single course with known id
 - org-lms-infer-course :: transformer for single coures 
@@ -895,6 +1023,9 @@ In order to rewrite the basic requests from REST to GraphQL, we'll need a basic 
 : org-lms-infer-course
 *** No Setters! not in normal permission scope
 *** tests
+:PROPERTIES:
+:ID:       47a8c6ae-d625-4f14-ae51-cb6d7758dac9
+:END:
 Implemented:
 - org-lms-get-courses
 - org-lms-get-courseids
@@ -956,7 +1087,13 @@ The syllabus is posted as an attribute of the course element. See [[https://canv
 *** ACTION Getter 
 Not Implemented 
 *** Setter
+:PROPERTIES:
+:ID:       7a7e095e-108d-4b96-90bf-9b6cdc7c36ab
+:END:
+consider adding a defvar to set whether or not syllabus should be defaulted
+Actually I think I've already done that?
 
+so not sure what this comment means exacatly :-( <2021-09-03 Fri>
 #+begin_src emacs-lisp
 (defun org-lms-post-syllabus (&optional courseid subtreep)
   "Post  syllabus to course"
@@ -1001,7 +1138,7 @@ Not Implemented
          (response (org-lms-canvas-request
                     (format  "courses/%s" courseid) "PUT" data-structure ))
          )
-    (write-region (json-encode data-structure) nil "/home/matt/syl.json")
+    (write-region (json-encode data-structure) nil "~/syl.json")
     ;;(setq response)
     
     (message "Response: %s" response)
@@ -1024,6 +1161,7 @@ This will have to be a bit more clever -- need to add some context and "with tem
 ** Custom Gradebook Columns
 :PROPERTIES:
 :GRADE:    1
+:ID:       f7ef997d-32d2-48e4-a2f0-8f30bc817dfc
 :END:
 Exploring this as a way to store nicknames and github IDs.  Doesn't seem any easier than whay I already have, except that if I end up in the canvas interface I'll be able to see my data.
 
@@ -1076,25 +1214,40 @@ Exploring this as a way to store nicknames and github IDs.  Doesn't seem any eas
 
 No Setters here! We don't add or remove students from the class via the API.  
 *** Getters
+:PROPERTIES:
+:ID:       262d0e63-3273-4e76-b140-7d47a1da598f
+:END:
 #+begin_src emacs-lisp
 
-(defun org-lms-get-students (&optional courseid)
+
+(defun org-lms-get-students (&optional courseid sections)
     "Retrieve Canvas student data for course with id COUSEID"
     (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
 ;; (courseid (plist-get course :id))
            (result
             (org-lms-canvas-request (format "courses/%s/users" courseid) "GET"
                                     '(("enrollment_type" . ("student"))
-                                      ("include" . ("email"))
+                                      ("include" . ("email" "enrollments"))
                                       ("per_page" . 500 )))))
-      ;;(message "RESULTS")
+      (message "RESULTS: number of students: %s" (length result) )
       ;;(with-temp-file "students-canvas.json" (insert result))
+      (when sections
+        (let ((counter 0))
+          (setq result (-filter
+                        (lambda (student)
+                          (setq counter (1+ counter))
+                          (let* ((enrollments (plist-get student :enrollments))
+                                 (student-sections
+                                  (--map (plist-get it :course_section_id) enrollments)))
+                            (-intersection sections student-sections)))
+                        result)))
+        (message "RESULTS: filtered students: %s" (length result)))
       (cl-loop for student in-ref result
-            do
-            (if (string-match "," (plist-get student :sortable_name))
-                (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
-                  (plist-put student :lastname (car namelist) )
-                  (plist-put student :firstname (cadr namelist)))))
+               do
+               (if (string-match "," (plist-get student :sortable_name))
+                   (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
+                     (plist-put student :lastname (car namelist) )
+                     (plist-put student :firstname (cadr namelist)))))
       result))
 
   (defun org-lms-get-all-users (&optional courseid)
@@ -1115,7 +1268,13 @@ No Setters here! We don't add or remove students from the class via the API.
       result))
 #+end_src
 
+#+RESULTS:
+: org-lms-find-local-user
+
 *** Transformer -- merging student lists
+:PROPERTIES:
+:ID:       ace4e656-3fd4-43a6-9909-f11e1064aeb5
+:END:
 We set the local student list, though we can't/shouldn't set the upstream student list from here, it's too dangerous. 
 #+begin_src emacs-lisp
 ;; fix broken symbol not keyword assignment!!!
@@ -1161,6 +1320,9 @@ We set the local student list, though we can't/shouldn't set the upstream studen
 [[https://canvas.instructure.com/doc/api/pages.html][Canvas pages object documentation]]
 
 *** Getter -- get all pages
+:PROPERTIES:
+:ID:       932c02c2-51f0-4a44-be41-f258fd7ef3a6
+:END:
 
 #+begin_src emacs-lisp
 (defun org-lms-get-all-pages () 
@@ -1184,6 +1346,9 @@ We set the local student list, though we can't/shouldn't set the upstream studen
 : org-lms-collect-page-links
 
 *** Setter -- create page
+:PROPERTIES:
+:ID:       b235e31d-1543-46a2-9616-11fbae7c832d
+:END:
 Rewritten <2019-10-01 Tue> to use let-alist.  Function to create and update pages, which might start to reduce reliance on external websites.  
 
 #+begin_src emacs-lisp 
@@ -1257,6 +1422,9 @@ Some of this is rather more complex because of the way folders are conceptualize
 - [ ] org-lms-set-file
 - [ ] org-lms-set-file-from-attachment ? 
 *** Getters
+:PROPERTIES:
+:ID:       6b7b5c99-6ac3-4cbc-b80c-53396f83897c
+:END:
 
 Start with folders, which are simple and very similar to modules in that they ave simple content items. Files, however, [[https://canvas.instructure.com/doc/api/file.file_uploads.html#method.file_uploads.post][are much more complex]], because they are stored off site (mostly AWS) and therefore require a multi-stage process. This was previously implemented in org-lms-get-submissions, now generalizing in order to keep code DRYer.
 #+begin_src emacs-lisp
@@ -1336,6 +1504,7 @@ but there are other possible endpoints; see the API for details. Optionally orga
                      endpoint
                      params
                      filepath))
+    (message "%s" fileinfo)
     (if fileinfo
         (org-lms-upload-file-to-storage filepath fileinfo))
     ;; (if fileinfo
@@ -1426,6 +1595,9 @@ but there are other possible endpoints; see the API for details. Optionally orga
 : org-lms-get-single-module-item
 
 *** ACTION Setters
+:PROPERTIES:
+:ID:       2bf5e6d8-514b-43be-a6c4-793af091df71
+:END:
 
 Files are complicated!
 
@@ -1465,7 +1637,6 @@ Files are complicated!
 #+RESULTS:
 : org-lms-set-file
 
-
 ** STARTED Modules
 :PROPERTIES:
 :DUE_AT:   "hello" "what about this"
@@ -1484,6 +1655,9 @@ We don't plan to support all the module options for now
 
 The main function here is to 
 *** Getters
+:PROPERTIES:
+:ID:       3b4db1eb-924d-429a-b1f7-09c50a3093a4
+:END:
 #+begin_src emacs-lisp
 (defun org-lms-get-modules (&optional courseid)
   (unless courseid
@@ -1517,7 +1691,13 @@ The main function here is to
   (org-lms-canvas-request (format "courses/%s/modules/%s/items/%s" courseid moduleid itemid) "GET" '(("include" . "content_details" ))))
 #+end_src
 
+#+RESULTS:
+: org-lms-get-single-module-item
+
 *** ACTION Setters
+:PROPERTIES:
+:ID:       fe38a73f-3169-4eb2-a640-d2181f25b82d
+:END:
 
 I don't believe these are working! Need to get it done so that can be added as a hook to the end of other setters. 
 
@@ -1738,6 +1918,9 @@ Assignments first.
 -  ::
 *** Getters
 **** Assignments 
+:PROPERTIES:
+:ID:       0c7c6bdf-935c-4889-9d40-23eecf1de176
+:END:
 #+begin_src emacs-lisp
 (defun org-lms-get-assignments (&optional courseid)
   (unless courseid
@@ -1788,43 +1971,54 @@ Assignments first.
 #+RESULTS:
 : org-lms-merge-assignment-values
 **** Submissions
+:PROPERTIES:
+:ID:       e32286ba-b4ea-46a1-9f8a-31fd946499dc
+:END:
 Submissions
 - org-lms-get-submissions: 
 #+begin_src emacs-lisp
   (defun org-lms-get-submissions (&optional courseid)
     "get all submisisons in a COURSE (rarely used)."
     (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
-    (org-lms-canvas-request (format "courses/%s/students/submissions" courseid) "GET"))
+    (org-lms-canvas-request (format "courses/%s/students/submissions" courseid) "GET" `(("per_page" . 100))))
 
   (defun org-lms-get-assignment-submissions ( assignmentid &optional courseid)
     "Get all submisisons belonging to ASSIGNMENTID in optional COURSE."
   
     (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
     (org-lms-canvas-request
-     (format "courses/%s/assignments/%s/submissions/" courseid assignmentid ) "GET"))
+     (format "courses/%s/assignments/%s/submissions/" courseid assignmentid ) "GET" `(("per_page" . 100))))
 
-  (defun org-lms-get-single-submission (studentid assignmentid &optional courseid)
+  (defun org-lms-get-single-submission (studentid assignmentid &optional courseid quizp)
     "Retrieve a single sugmission from canvas.
-  STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the course."
+  STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the course. If QUIZP is non-nil, the assignment is a quiz"
     (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
     (org-lms-canvas-request
-     (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid) "GET"))
+     (format "courses/%s/%s/%s/submissions/%s" courseid 
+             (if  quizp "quizzes" "assignments")  assignmentid studentid)
+     "GET"))
 #+end_src
+
+#+RESULTS:
+: org-lms-get-single-submission
+
 **** Attachments
+:PROPERTIES:
+:ID:       706131cf-a7db-449e-bd01-53005c3ae3ec
+:END:
 Attachments. These functions are a little complicated because attachments are stored on AWS and there's a 3-step process for getting them. The PUTTER is a little easier. 
 #+begin_src emacs-lisp
-(defun org-lms-get-canvas-attachments ()
+(defun org-lms-get-canvas-attachments (&optional quizp)
   (interactive) 
   (let* ((assid
           (save-excursion 
             (org-up-heading-safe)
-            (org-entry-get (point) "ASSIGNMENTID")
-            ))
+            (org-entry-get (point) "ASSIGNMENTID")))
+         (quizp (save-excursion (org-up-heading-safe) (org-entry-get (point) "IS_QUIZ")))
          (org-lms-merged-students (or org-lms-merged-students (org-lms-get-students)))
          (studentid (or (org-entry-get (point) "STUDENTID") (org-entry-get (point) "ID")))
-         (submission (org-lms-get-single-submission studentid assid))
-         (student (org-lms-find-local-user studentid))
-         )
+         (submission (org-lms-get-single-submission studentid assid quizp))
+         (student (org-lms-find-local-user studentid)))
          (message "Submission: %s" submission)
     (cl-loop for attachment in (plist-get submission :attachments)
              do
@@ -1871,6 +2065,9 @@ Attachments. These functions are a little complicated because attachments are st
 #+RESULTS:
 : org-lms-get-canvas-attachments
 **** Assignment Groups
+:PROPERTIES:
+:ID:       e335d78a-0f2c-46d9-b185-307876bffb13
+:END:
 Just getting started with this. The idea is mostly to enable adding assignments to assignment groups.  The UI for this is a bit tricky to automate I think. Need to store these assignmetn groups locally osmehow I think. 
 #+begin_src emacs-lisp
 (defun org-lms-get-assignment-groups (&optional courseid)
@@ -1885,12 +2082,18 @@ Just getting started with this. The idea is mostly to enable adding assignments 
   (org-lms-canvas-request (format "courses/%s/assignment_groups/%s" courseid groupid) "GET"))
 #+end_src
 
+#+RESULTS:
+: org-lms-get-single-assignment-group
+
 *** ACTION Setters -- Creating Assignments
 +*rename -parse-assignment to -post-assignment*+ DONE  
 
 Functions to create announcements and assignments. Actually the crucial assignment code is still languishing in ~grading-template.org~. That's one of the reasons I made this org file - -to try to avoid that kind of junk!
 
 **** Assignments
+:PROPERTIES:
+:ID:       1949f612-1cf7-4c2f-892b-51ebff669a42
+:END:
 #+begin_src emacs-lisp 
 (defun org-lms-post-assignment ()
   "Extract assignment data from HEADLINE.
@@ -1961,9 +2164,10 @@ Functions to create announcements and assignments. Actually the crucial assignme
     (if (plist-get response-data :id)
         (progn
           (message "received assignment response-data")
-          (org-set-property "DUE_AT"  (format "%s" (substring
-                                                    (plist-get response-data :due_at)
-                                                    0 10)))
+          (org-set-property "DUE_AT"
+                            (ts-format
+                             "%Y-%m-%d" ;; wrong time zone so ignore for now "%Y-%m-%dT%H:%M:%S%:z"
+                             (ts-parse (plist-get response-data :due_at)))                            )
           (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
           (org-set-property "OL_PUBLISH" (format "%s"(plist-get response-data :published)))
           (org-set-property "ORG_LMS_CATEGORY" "Assignment")
@@ -2035,6 +2239,10 @@ Adding these functions to update all assignments for the new year.  But actually
 : org-lms-assignment-update-all
 
 **** Assignment Groups
+:PROPERTIES:
+:ID:       cc4f25aa-ebdd-44a5-9273-b86d5cc8c69e
+:END:
+The old version breaks when group_weight is already in place. so, needs to be added to the library proper. 
 #+begin_src emacs-lisp
 (defun org-lms-assignment-group-from-headline ()
   "Extract assignment group data from HEADLINE.
@@ -2046,10 +2254,10 @@ Adding these functions to update all assignments for the new year.  But actually
          (weight (org-entry-get nil "GROUP_WEIGHT"))
          ;; rules...
 
-         (params `((name . ,name)
-                   )))
-         (when position (add-to-list 'params `("position" ,(string-to-number position))))
-         (when weight (plist-put params `("group_weight" ,(string-to-number weight))))
+         (params `((name . ,name))))
+    (when canvasid (add-to-list 'params `("CANVASID" . ,canvasid)))
+    (when position (add-to-list 'params `("position" . ,(string-to-number position))))
+    (when weight (add-to-list  'params `("group_weight" . ,(string-to-number weight))))
 
     (let* ((response (org-lms-set-assignment-group params))
            (response-data (or response nil)))
@@ -2068,17 +2276,17 @@ Adding these functions to update all assignments for the new year.  But actually
   "Create an asignment group from params"
   (interactive)
 
-  (let* ((canvasid (plist-get params  "CANVASID"))
+  (let* ((canvasid (or  (plist-get params  "CANVASID")
+                        (alist-get "CANVASID" params  nil nil #'equal)))
          (org-html-checkbox-type 'unicode )  ;; canvas stirps checkbox inputs
-         (pointspossible (if (org-entry-get nil "ASSIGNMENT_WEIGHT") (* 100 (string-to-number (org-entry-get nil "ASSIGNMENT_WEIGHT")))))
+         
          )
     ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
     ;;(prin1 canvasid)
     (let* ((org-export-with-tags nil)
            (assignment-params  params 
                                )
-           
-
+  
            (response
             (org-lms-canvas-request (format "courses/%s/assignment_groups%s"
                                             (org-lms-get-keyword "ORG_LMS_COURSEID")
@@ -2104,13 +2312,15 @@ also a utility for adding a group if needed
                     (org-lms-set-assignment-group `((name . ,name)))))
          )
     (plist-get match :id) ;;(plist-get it :id)
-    ;;(org-lms-set-assignment-group `((name . ,name))))
+    ;;(org-lms-set-assignment-group `((name . ,name)))
     ))
 
 
 ;;(org-lms-set-assignment-group `((name . "Tests")))
 #+end_src
 
+#+RESULTS:
+: org-lms-map-assignment-group-from-name
 
 ** ACTION Calendar Events
 Right now I have no way to generate calendar events & therefore put stuff into the "upcoming events' stream in Canvas.  [[https://canvas.instructure.com/doc/api/calendar_events.html][The API for Calendar Events is described here]]. It won't be easy for me to accommodate this mode of organization, unfortunately.  Probably won't happen for a while.
@@ -2168,30 +2378,39 @@ ok, let's start with a very simple basic function modled on modules
          (response-data (or response nil)))
     response))
 #+end_src
+
+#+RESULTS:
+: org-lms-set-timetable
+
 ** ACTION Announcements
 *** ACTION Setters -- headlineto announcement
+:PROPERTIES:
+:ID:       c4349dc3-9a57-4a84-9c26-379548162c8e
+:END:
 todo: docstrings!!; also, need to switch to CANVASID from ORG_LMS_ANNOUNCEMENT_ID for consistency, in order to use ~org-lms-propertize-thingie~. 
 
 Also, looks like it isn't reading heading properties before posting!! Needs to be rewritten on model of other setters.
 #+begin_src emacs-lisp
-  ;; huh is this deprecated?
-  ;; doesn't seem to be used at all 
-(defun org-lms-post-announcement (payload &optional courseid)
+;; huh is this deprecated?
+;; doesn't seem to be used at all 
+(defun org-lms-post-announcement (payload &optional courseid apipath)
   "Create new announcement using PAYLOAD a data in course COURSEID."
-    (setq courseid (or courseid
-                       (org-lms-get-keyword "ORG_LMS_COURSEID")
-                       (plist-get org-lms-course)))
-    (org-lms-canvas-request
-     (format "courses/%s/discussion_topics" courseid) "POST" payload))
+  (setq courseid (or courseid
+                     (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     (plist-get org-lms-course))
+        apipath (or apipath "courses"))
+  (org-lms-canvas-request
+   (format "%s/%s/discussion_topics" apipath courseid) "POST" payload))
 
 ;; announcements
 
-(defun org-lms-headline-to-announcement (&optional courseid file)
+(defun org-lms-headline-to-announcement (&optional courseid file apipath)
   ""
   (interactive)
   (setq courseid (or courseid
-                       (org-lms-get-keyword "ORG_LMS_COURSEID")
-                       (plist-get org-lms-course)))
+                     (org-lms-get-keyword "ORG_LMS_COURSEID")
+                     (plist-get org-lms-course))
+        apipath (or apipath "courses"))
   ;; (cl-flet ((org-html--build-meta-info
   ;;            (lambda (&rest args) ""))))
   (let* ((org-export-with-toc nil)
@@ -2202,7 +2421,8 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
          (org-html-head-include-scripts nil)
          (org-html-head-include-default-style nil)
          ;;(atext (org-export-as 'html t))
-         (atitle (nth 4 (org-heading-components)))
+         (atitle (org-lms-quick-template-expand
+                  (nth 4 (org-heading-components))))
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
          ;;(courseid (plist-get course :id))
@@ -2211,11 +2431,11 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
          (section (org-entry-get (point) "OL_SECTION_ID" t))
          (params `(("title" . ,atitle)
-                  ("message" . ,atext)
-                  ("is_published" . t)
-                  ("is_announcement" . t))))
-    (when section
-      (add-to-list 'params `("specific_sections" . ,(list section))  ))
+                   ("message" . ,atext)
+                   ("is_published" . (not (org-entry-get (point) "ORG_LMS_WITHHOLD")))
+                   ("is_announcement" . t))))
+    (when (and section (not (string-equal apipath "groups")))
+      (add-to-list 'params `("specific_sections" . ,(s-split " " section))  ))
     ;; (message "BUILDMETA DEFN")
     ;; (prin1 (symbol-function  'org-html--build-meta-info))
     ;; (message "%s" atext)
@@ -2225,12 +2445,12 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
           (message "already added!")
           (setq response ;;(request-response-data) 
                 (org-lms-canvas-request
-                 (format  "courses/%s/discussion_topics/%s" courseid oldid) "PUT"
+                 (format  "%s/%s/discussion_topics/%s" apipath courseid oldid) "PUT"
                  params)))
 
       (setq response ;;(request-response-data)
             (org-lms-canvas-request
-             (format  "courses/%s/discussion_topics" courseid) "POST"
+             (format  "%s/%s/discussion_topics" apipath courseid) "POST"
              params)))
     (cl-loop for (k v) on response
              do
@@ -2270,6 +2490,9 @@ Also, looks like it isn't reading heading properties before posting!! Needs to b
 to#+RESULTS:
 : {"assignment[description]":"<p>\nThis kind of amazing-sounding talk is happenin...","assignment[submission_types]":"none","assignment[grading_type]":"letter_grade","descrpition":"","key1":"value1","":""}
 ** Sections
+:PROPERTIES:
+:ID:       7ed96296-aff0-4175-be4f-8066a8b85553
+:END:
 
 Now that I'm a TA I actually need access to sections. 
 
@@ -2284,24 +2507,53 @@ Now that I'm a TA I actually need access to sections.
 (defun org-lms-get-single-section (sectionid &optional courseid)
   (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")
                      ))
-  (let ((params '(("include" . ("items")))))
+  (let ((params '(("include" . ( "students" "total_students" "enrollments" "email")))))
     (org-lms-canvas-request (format "courses/%s/sections/%s" courseid sectionid) "GET" params)))
+
+
 
 (defun org-lms-map-section-from-name (name)
   (interactive)
   (let* ((sections (org-lms-get-sections))
          (match (or (--first (string= (plist-get it :name) name) sections )
-                    (org-lms-set-section `((name . ,name))))))
+                    ;; (org-lms-set-section `((name . ,name)))
+                    )))
     (plist-get match :id) ;;(plist-get it :id)
     ;;(org-lms-set-assignment-group `((name . ,name))))
     ))
 
+(defun org-lms-get-section-students (sectionid &optional courseid)
+  "get all students in section; if sectionid is a string, first map from section list"
+  (interactive)
+  (let* ((section (or (and (or  (numberp sectionid) (s-numeric sectionid))  sectionid) (org-lms-map-section-from-name sectionid)))
+        (students (plist-get  (org-lms-get-single-section section courseid) :students)))
+    ;; (--sort (plist-get it :sortable_name)
+    ;;         (plist-get  (org-lms-get-single-section section courseid) :students))
+    (cl-loop for student in-ref students
+            do
+            (if (string-match "," (plist-get student :sortable_name))
+                (let ((namelist  (split-string (plist-get student :sortable_name) ", ")))
+                  (plist-put student :lastname (car namelist) )
+                  (plist-put student :firstname (cadr namelist)))))
+    (cl-sort students
+             'string-lessp :key (lambda (student) (plist-get student :sortable_name)))))
+
+(defun org-lms-get-multiple-section-students (sectionslist &optional courseid)
+  "collect and merge student lists from sections"
+  (--mapcat (org-lms-get-section-students it) sectionslist))
 #+end_src
+
+#+RESULTS:
+: org-lms-get-multiple-section-students
+
 ** Grading Standards
 Unfortunately, at Canadian schools we need to set the grading standard for every single assignment :frowning:  TThis should be another keyword I guess :-(. However... once again I don't seem to have permission to set the grading standards fro mthe API :-(; and I can't evne seme to *get* them, which is frustrating.
 
 Might be easier really to just use the new defvar ~org-lms-grading-table~ instead of futzing with all this. 
 *** Getter -- get-grading-standards
+:PROPERTIES:
+:ID:       9a4f370c-be3a-4ffe-892a-5c3cadd3ee0c
+:END:
 #+begin_src emacs-lisp
 (defun org-lms-get-grading-standards (&optional courseid)
     "Retrieve Canvas grading standards for course with id COUSEID"
@@ -2315,242 +2567,162 @@ Might be easier really to just use the new defvar ~org-lms-grading-table~ instea
 : org-lms-get-grading-standards
 ** MISSING Forum Posts
 [[https://canvas.instructure.com/doc/api/discussion_topics.html][API docs are here]]. U of Toronto [[https://q.utoronto.ca/doc/api/live#!/][live API is here]]. 
+** STARTED Groups 
+I'm just geting started with groups, now that I'm a TA. Here instead of posting to a course, we post to a group; I looks like I can make 
+- announcements
+- pages
+- discussions
+
+all in the group.  I'm not really sure how notifications work here, nor how easy it is for students to find these.
+The main thing we do here is post with group id instead of canvas id.  Seems really simple actually.  
+
+The only tricky part is posting the same announcement/file to multiple sections. To do that I need new org properties
+
+Something else that is a bit tricky actually: rightn ow I simply update the request functions to ocnditionally go to ~.../courses...~ or ~../groups/..~. This is kind of fun. But I might have some logicing to do with theproperty settings which will be a little bit annoying, actually.  
+
+This would have to be done in discussions, announcements, and pages, so maybe it would make sense to write a tiny function that the three of them can call with the request object as a parameter; set the functions hter.e
+
+In general, simplifying that property setitng code makes a loto f sense.  The function ~org-lms-propertize-response-data~ already exists, so it might beworth fixing that up a bit and at lest throwing it in for these request types.
+
+That said, adidng the new one might be a bit hard I guess.  I'll have to work it out.  See [[id:61406e02-e6f7-4078-b513-ea059380ad6e][Parse and set properties]] for starts.  
+
+Anyway. Not a huge deal just yet.  
+
+*** Making and getting groupsets (group categories)
+:PROPERTIES:
+:ID:       c48e4c77-5bf5-43db-b57a-8bab326d1189
+:END:
+called groupsets in the UI, group categories in the API docs.  Easy to get
+
+#+begin_src emacs-lisp
+(defun org-lms-get-group-categories (&optional courseid)
+  "we will need these in order to create and get groups, actually"
+  (interactive)
+  (setq courseid (or courseid
+                       (org-lms-get-keyword "ORG_LMS_COURSEID")
+                       (plist-get org-lms-course)))
+  (let* ((response nil))
+    (setq response ;;(request-response-data) 
+          (org-lms-canvas-request
+           (format  "%s/%s/group_categories" "courses" courseid ) "GET"))
+    response))
+
+(defun org-lms-group-category-from-name (name) 
+  (let* ((categories (org-lms-get-group-categories))
+         (matching
+          (seq-filter
+              (lambda (group)
+                (string= name 
+                         (plist-get group :name)))
+              categories)))
+    (if matching 
+        (plist-get (car matching) :id)
+        ;;(plist-get matching :id)
+      (message "whoops"))))
+
+#+end_src
+
+#+RESULTS:
+: org-lms-group-category-from-name
+  
+*** Making and getting groups
+:PROPERTIES:
+:ID:       33f40618-2770-4fcd-9c36-721013f9acef
+:END:
+#+begin_src emacs-lisp
+(defun org-lms-get-groups-in-category (category &optional courseid)
+  
+  (let ((request)
+        (courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))) 
+    (setq request (org-lms-canvas-request
+                   (format  "group_categories/%s/groups"  category ) "GET"))
+    request))
+(cl-defun org-lms-set-group-in-category (name category &key students id description)
+  (let ((method (if id "PUT" "POST"))
+        (params `((name . ,name)))
+        (request))
+    (if students (add-to-list 'params  `(members . ,students)))
+    (if description (add-to-list 'params  `(description . ,description)))
+    (setq request (org-lms-canvas-request
+                   (if id 
+                       (format "groups/%s" id)
+                     (format "group_categories/%s/groups" category))
+                   method
+                   params))
+    request))
+#+end_src
+
+#+RESULTS:
+: org-lms-set-group-in-category
+
+*** Group Announcements
+:PROPERTIES:
+:ID:       365cbbb5-121d-424d-a9b8-6e2c2bab854c
+:END:
+#+begin_src emacs-lisp
+(defun org-lms-headline-to-group-announcement ()
+  (interactive)
+  (let ((groupid (org-entry-get (point)  "GROUP_ID" t)))
+    (org-lms-headline-to-announcement groupid nil "groups")))
+#+end_src
+
+#+RESULTS:
+: org-lms-headline-to-group-announcement
+
+* Some miscellaneous section functions
+:PROPERTIES:
+:ID:       2c13487e-7082-418f-828f-e8ab1feea411
+:END:
+#+NAME his108-sections
+#+begin_src emacs-lisp
+(defun org-lms-get-multiple-section-ids (sectionRE)
+  (seq-map
+   (lambda (section) (plist-get section :id))
+   (seq-filter
+    (lambda (section)
+      (string-match
+       sectionRE
+       (plist-get section :name)))
+    (org-lms-get-sections ))))
+;; (org-lms-get-multiple-section-ids "0301\\|0401\\|0501\\|0601")
+#+end_src
+
+#+RESULTS:
+: org-lms-get-multiple-section-ids
+
+
+#+NAME: his108-students
+#+begin_src emacs-lisp :results  output
+(defun org-lms-students-from-multiple-sections (sectionRE)
+(seq-mapcat
+ (lambda (sectionid)
+   (plist-get  (org-lms-get-single-section sectionid) :students))
+ (seq-map
+  (lambda (section) (plist-get section :id))
+  (seq-filter
+   (lambda (section)
+     (string-match
+      sectionRE
+    (plist-get section :name)))
+ (org-lms-get-sections )))))
+;; (seq-map (lambda (s) (plist-get s :id))
+
+;;  )
+#+end_src
+
+#+RESULTS: his108-students
+
+
 * MWP-specific workflow
 Needs to be segregated and maybe re-namespaced, and potentially made more generally useful. 
 
 ** Marking and Returning Submissions
 Sorta belongs with submissions above, but am trying to separate out stuff that is specific to my workflow (as opposed to just part of the Canvas API).
-*** Setters - post submissions from headlines
-
-TODO <2021-08-10 Tue>: add submission comment updating -- need to use the [[https://canvas.instructure.com/doc/api/submissions.html#SubmissionComment][submissioncomments]] endpoint. 
-
-CF [[https://github.com/titaniumbones/org-lms/issues/42][github issue]]
-
-#+begin_src emacs-lisp
-
-
-(defun org-lms-put-single-grade-from-headline (&optional studentid assignmentid courseid)
-  "Get grade only (!) from student headline and post to Canvas LMS.
-If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
-will be extracted from the current environment, as the GRADE alwyas will be"
-  (interactive)
-  ;; main loop
-  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
-         (assignmentid (or assignmentid (save-excursion (org-up-heading-safe) (org-entry-get (point) "ASSIGNMENTID"))))
-         (studentid (or studentid (org-entry-get (point) "STUDENTID")))
-         (grade (org-entry-get (point) "GRADE"))
-         (returnval '()))
-    ;; loop over attachments
-    
-    (let* ((grade-params `(("submission" . (("posted_grade" . ,(org-lms-calculate-grade grade))))))
-           (comment-response ;;(request-response-data)
-            (org-lms-canvas-request
-             (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
-             "PUT" grade-params)))
-      (org-entry-put nil "ORG_LMS_SPEEDGRADER_URL"
-                     (format
-                      "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
-                      courseid assignmentid studentid))
-      
-      (message "%s" (plist-get  (car (plist-get comment-response
-                                                :submission_comments)) :id))
-      (message "NO PROBLEMS HERE")
-      ;; (message "Response: %s" comment-response )
-      comment-response)))
-
-;; not that if you want to update a comment instead, it's necessary to use a different request mechanism
-
-(defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
-  "Get comments from student headline and post to Canvas LMS.
-If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
-will be extracted from the current environment. Note the
-commented out `dolist' macro, which will upload attachments to
-canvas. THis process is potentially buggy and seems likely to
-lead to race conditions and duplicated uploads and comments. Still
-working on this."
-  (interactive)
-  ;;(setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
-  (unless assignmentid
-    (setq assignmentid (save-excursion (org-up-heading-safe)
-                                       (org-entry-get (point) "ASSIGNMENTID"))))
-  (unless studentid (setq studentid (org-entry-get (point)  "STUDENTID")))
-  ;; main loop
-  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
-         (grade (org-entry-get (point) "GRADE"))
-         (comments (let*((org-export-with-toc nil)
-                         ;;(atext (org-export-as 'html t))
-                         ;;(atitle (nth 4 (org-heading-components)))
-                         (org-ascii-text-width 23058430000))
-                     (org-export-as 'ascii t nil t)))
-         (returnval '()))
-    ;; loop over attachments
-    (dolist (a  (org-lms-attach-file-list))
-      (let* ((path (expand-file-name a (org-attach-dir t) ))
-             (fileinfo (org-lms-canvas-request
-                        (format "courses/%s/assignments/%s/submissions/%s/comments/files"
-                                courseid assignmentid studentid)
-                        "POST" `(("name" . ,a)) ) ;; (request-response-data )
-                       )
-             (al (org-lms-plist-to-alist (plist-get fileinfo :upload_params)))
-             (formstring ""))
-        (cl-loop for prop in al
-                 do
-                 (setq formstring (concat formstring "-F '" (symbol-name (car prop))
-                                          "=" (format "%s" (cdr prop)) "' ")))
-        (setq formstring (concat formstring " -F 'file=@" path "' 2> /dev/null"))
-        (let* ((thiscommand  (concat "curl '"
-                                     (plist-get fileinfo :upload_url)
-                                     "' " formstring))
-               (curlres  (shell-command-to-string thiscommand))
-               (file_id (if (> (length curlres) 0 ) (format "%s" (plist-get (ol-jsonwrapper json-read-from-string curlres) :id )))))
-          (message "CURLRES: %s" curlres)
-          
-          (if file_id (progn
-                        (setq returnval (add-to-list 'returnval file_id))
-                        ;; this needs to be fixed up still -- only saves last
-                        (org-entry-put (point) "ORG_LMS_ATTACHMENT_URL"
-                                       file_id))))))
-    (let* ((grade-params `(("submission" . (("posted_grade" . ,(org-lms-calculate-grade grade))))
-                           ("comment" . (("text_comment" . ,comments)
-                                         ;; EDIT 2018=11-07 -- untested switch from alist to plist
-                                         ("file_ids" . ,returnval)
-                                         ;; alas, doesn't seem to update the previous comment! drat
-                                         ;; it's a different API endpoint
-                                         ;; this is a todo item
-                                         ("id" . ,(or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
-           (comment-response ;;(request-response-data)
-            (org-lms-canvas-request
-             (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
-             "PUT" grade-params)))
-      (org-entry-put nil "ORG_LMS_SPEEDGRADER_URL"
-                     (format
-                      "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
-                      courseid assignmentid studentid))
-      (org-entry-put nil "OL_COMMENT_ID"
-                     (format "%s"
-                             (plist-get  (car (plist-get comment-response
-                                                         :submission_comments)) :id))  )
-      (message "%s" (plist-get  (car (plist-get comment-response
-                                                :submission_comments)) :id))
-      (message "NO PROBLEMS HERE")
-      ;; (message "Response: %s" comment-response )
-      comment-response)))
-#+end_src
-
-#+RESULTS:
-: org-lms-put-single-submission-from-headline
-
-*** ACTION Set up local environment
-Need to assess usefulness of all this. 
-
-org-lms-setup especially is useful here; and "get-local-students" parses ~students.csv~ (kinda on its way to being deprecated eventually). 
-
-*TODO*: Need to switch to JSON format for students!!
-
-#+begin_src emacs-lisp
-;;deprectaed!!!!!!
-(defun org-lms-setup ()
-  "Merge  defs and students lists, and create table for later use.
-
-`org-lms-course', `org-lms-local-assignments' and other org-lms
-variables must be set or errors wil lresult."
-  (setq org-lms-merged-students (org-lms-merge-student-lists))
-  (setq org-lms-merged-assignments (org-lms-merge-assignment-values))
-  (org-lms-assignments-table org-lms-merged-assignments)
-  )
-
-(defun org-lms-setup-grading (&optional courseid assignmentsfile)
-  "Parse assignments buffer and students lists, and create table for later use.
-
-`org-lms-course', `org-lms-local-assignments' and other org-lms
-variables must be set or errors will result."
-  (setq org-lms-merged-students (org-lms-merge-student-lists))
-  ;;(setq org-lms-merged-assignments (org-lms-merge-assignment-values))
-  (setq assignments (org-lms-map-assignments (org-lms-get-keyword "ORG_LMS_ASSIGNMENTS")))
-  (setq org-lms-merged-assignments assignments)
-  (org-lms-assignments-table assignments)
-  )
-(defun org-lms-get-local-csv-students (&optional csv)
-  (unless csv
-    (setq csv "./students.csv"))
-  (org-lms~parse-plist-symbol-csv-file csv)
-  )
-
-(defun org-lms-get-local-json-students (&optional jfile)
-  (unless jfile
-    (setq jfile "./students-local.json"))
-  (ol-jsonwrapper json-read-file jfile))
-
-
-
-(defcustom org-lms-get-student-function 'org-lms-get-local-json-students
-  "function to use to get students"
-  :type 'function)
-
-(defun org-lms-get-local-students (&optional file)
-  (unless file
-    (setq file "./students.json"))
-  (if (file-exists-p file) 
-      (apply org-lms-get-student-function (list file))))
-#+end_src
-
-#+RESULTS:
-: org-lms-get-local-students
-
-*** Assignments Table
-This function prints out a helpful table with links to various locations (e.g., LMS URLs for assignments & submissions) and elisp functions (e.g., grading headline generation).
-#+begin_src emacs-lisp
-  (defun org-lms-assignments-table (&optional assignments students)
-    "Return a 2-dimensional list suitable whose contents are org-mode table cells.
-
-  Intnded to be used in a simpe src block with :results header `value raw table'. 
-  Resultant links allow quick access to the canvas web interface as well as the make-headings commands."
-    (unless assignments
-      (setq assignments org-lms-merged-assignments))
-    (unless students
-      (setq students org-lms-merged-students))
-    ;;(message "MERGED ASSIGNMENTS")
-    ;;(prin1 assignments)
-    (let* ((cid (org-lms-get-keyword "ORG_LMS_COURSEID"))
-           (make-headlines-string "")
-           (table-header '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline))
-           )
-      (append '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline)
-              (cl-loop for i in assignments
-                       collect `( ,(format "%s"
-                                           (if (plist-get (cdr i) :html_url)
-                                               (concat "[[" (org-lms-safe-pget (cdr i) :html_url) "][" (org-lms-safe-pget (cdr i) :name) "]]")
-                                             (org-lms-safe-pget (cdr i) :name)) ) 
-                                  ,(format "%s"
-                                           (if (plist-get (cdr i) :submissions_download_url)
-                                               (concat "[[" (org-lms-safe-pget (cdr i) :submissions_download_url) "][Download Submissions]]")
-                                             " ")
-                                           )
-                                  ,(format
-                                    "%s"
-                                    (if (plist-get (cdr i) :canvasid)
-                                        (concat  "[[elisp:(org-lms-canvas-inspect \"courses/"
-                                                 (format "%s" cid)
-                                                 "/assignments/"
-                                                 (format "%s" (org-lms-safe-pget (cdr i) :canvasid))
-                                                 "\")][Inspect Original JSON]]")
-                                      " "))
-                                  ;; "Inspect Original JSON"
-                                  ,(format "[[%s][%s]]"
-                                           (concat "elisp:(org-lms-make-headings (alist-get '"
-                                                   (symbol-name (car i))
-                                                   " org-lms-merged-assignments) org-lms-merged-students)"
-                                                   ) 
-                                           "Make Headlines"))))
-
-      ))
-
-#+end_src
-#+RESULTS:
-: org-lms-assignments-table
-
 *** Making headings
 **** Principal headline-making functions
+:PROPERTIES:
+:ID:       e30cc637-2aed-4ed0-95ec-eb58adf313bb
+:END:
 ~org-lms-make-headings~ used to be the main thing we did here. Now ther's a bunch more. 
 
 #+begin_src emacs-lisp
@@ -2595,7 +2767,7 @@ and that the current headline is the name of a student. Speeds up file choice."
 ;; this feels a bit fragile
 ;;(define-key 'org-attach-map (kbd "s p") #'projectile-pt)
 
-(defun org-lms-make-headings (a students)
+(defun org-lms-make-headings (a students &optional ignore-attachments)
   "Create a set of headlines for grading.
 
 A is a plist describing the assignment. STUDENTS is now assumed
@@ -2621,6 +2793,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
            (atitle (format "[[id:%s][%s]]"
                            org-id
                            (plist-get body :name)))
+           (quizp (plist-get body :is-quiz))
            (number (plist-get body :assignment_number))
            (assignmentid (or (format "%s" (plist-get body :canvasid)) ""))
            (directory (plist-get body :directory ))
@@ -2644,9 +2817,10 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
       (org-set-property "ASSIGNMENT_WEIGHT" assignment-weight)
       (org-set-property "ASSIGNMENTID" assignmentid)
       (org-set-property "ASSIGNMENT_NAME" aname)
-      (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory)
+      (and directory (org-set-property "ORG_LMS_ASSIGNMENT_DIRECTORY" directory))
       (org-set-property "BASECOMMIT" basecommit)
       (org-set-property "GRADING_TYPE" grading-type)
+      (org-set-property "IS_QUIZ" (format "%s" quizp))
       ;;(org-set-property "NUMBER" number)
       ;;(org-set-property "ORG_LMS_EMAIL_RESPONSE" "t")
       ;;(org-set-property "ORG_LMS_CANVAS_RESPONSE" "t")
@@ -2669,7 +2843,7 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                          (lname (plist-get stu :lastname))
                          (nname (or  (unless (equal  (plist-get stu :nickname) nil)
                                        (plist-get stu :nickname)) fname))
-                         (email (plist-get stu :email))
+                         (email (or (plist-get stu :email) ""))
                          (coursenum (if  (and  (boundp 'org-lms-course) (listp org-lms-course))
                                         (plist-get org-lms-course :coursenum)
                                       nil))
@@ -2686,6 +2860,8 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                             ("GITHUB" . ,github)
                             ("ORG_LMS_REPO_BASENAME" . ,repo-basename)
                             ("STUDENTID" . ,id)
+                            ("GRADE_URL" . ,(concat org-lms-public-baseurl "courses/" courseid
+                                                    "/gradebook/speed_grader?assignment_id=" assignmentid  "&student_id=" id))
                             ("COURSEID" . ,courseid)
                             ("BASECOMMIT" . ,basecommit) ;; it would be better to keep this in the parent
                             ("ORG_LMS_ASSIGNMENT_DIRECTORY" . ,directory)
@@ -2757,14 +2933,20 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
                               ))
                         ))
                      ;; if assignment is handed in on canvas, getstudent work as attachments     
-                     ((equal assignment-type "canvas")
+                     ((and (equal assignment-type "canvas") (not ignore-attachments))
                       ;; (message "SUBTYPE IS CANVAS")
-                      (org-lms-get-canvas-attachments))
+                      (ignore-errors
+                        (with-local-quit
+                          (org-lms-get-canvas-attachments))))
                      
                      ;; otherwise, look for existing files with approximately matching names in the appropriate directory.  
                      (t
-                      (let* ((fullnamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
-                             (nicknamefiles (remove-if-not (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
+                      (let* ((fullnamefiles
+                              (remove-if-not
+                               (lambda (f) (string-match (concat "\\\(" fname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles))
+                             (nicknamefiles
+                              (remove-if-not
+                               (lambda (f) (string-match (concat "\\\(" nname "\\\)\\\([^[:alnum:]]\\\)*" lname) f)) afiles)))
                         ;;(message "fullnamefiles is: %s" fullnamefiles)
                         (if afiles
                             (cond
@@ -2813,6 +2995,9 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
 : org-lms-make-headings
 
 **** ACTION OBSOLETE github-specific function
+:PROPERTIES:
+:ID:       4ab1601c-5c2d-4a07-8cf0-c3f6300a6861
+:END:
 
 #+begin_src emacs-lisp
 ;; org make headings, but for github assignments
@@ -2901,6 +3086,9 @@ the structure of the the alist, and the means of attachment
                             ))students) ) ) assignments)))
 
 #+end_src
+
+#+RESULTS:
+: org-lms-make-headings-from-github
 
 **** Ad-hoc function to make some assignment sub-headings
 #+begin_src emacs-lisp :tangle no
@@ -3006,11 +3194,13 @@ resultant csv file has a certain shape, bu this may all be irrelevant now."
 #+RESULTS:
 : org-lms-make-participation-headings-here
 
-
 **** Integration with Mail systems
 I like to mail my marks back to my students.  These are the functions that manage that.  
 
 ***** Attachments 
+:PROPERTIES:
+:ID:       afef95a2-cd5a-4d95-b00b-8569b86570e1
+:END:
 
 Make sure to get all the attachments.  I think that org-mime now takes care of this so it might be a good idea to refactor.
 
@@ -3037,7 +3227,13 @@ I don't think I use this anymore?
 
 #+end_src
 
+#+RESULTS:
+: org-lms~attachment-list
+
 ***** ACTION Sending Subtrees
+:PROPERTIES:
+:ID:       3f3c6a00-bfae-4929-bd01-78057df8a183
+:END:
 Huh, interesting. I have two versions of this code and no idea which of them is actually used where!! +In fact, it kind of looks like neither is being used.  Source of much confusion!!+
 
 *UPDATE <2018-11-08 Thu>:* ~org-mime-lms-send-subtree-with-attachments~ is an obsolete function which has been replaced by ~org-lms-mime-org-subtree-htmlize~.  I'm too chicken to delete it right now but should do so soon.
@@ -3063,48 +3259,22 @@ Huh, interesting. I have two versions of this code and no idea which of them is 
   ;; (org-mark-subtree)
   (let ((attachments (org-lms-attach-file-list)))
     (save-excursion
-      (org-lms-mime-org-subtree-htmlize attachments))
-    ))
+      
+      (org-lms-mime-org-subtree-htmlize attachments)
+      ;; (org-mime-org-subtree-htmlize attachments)
+      )))
 
 ;; defunkt
-(defun org-lms-send-subtree-with-attachments ()
-  "org-mime-subtree and HTMLize"
-  (interactive)
-  (org-mark-subtree)
-  (let ((attachments (mwp-org-attachment-list))
-        (subject  (mwp-org-get-parent-headline)))
-    ;;(insert "Hello " (nth 4 org-heading-components) ",\n")
-    (org-mime-subtree)
-    (insert "\nBest,\nMP.\n")
-    (message-goto-body)
-    (insert "Hello,\n\nAttached are the comments from your assignment.\n\n")
-    (insert "At this point I have marked all the papers I know about. If 
-you have not received a grade for work that you have handed in,
- please contact me immediately and we can resolve the situation!.\n\n")
-    ;; (message "subject is" )
-    ;; (message subject)
-    ;;(message-to)
-    (org-mime-htmlize)
-    ;; this comes from gnorb
-    ;; I will reintroduce it if I want to reinstate questions.
-    ;; (map-y-or-n-p
-    ;;  ;; (lambda (a) (format "Attach %s to outgoing message? "
-    ;;  ;;                    (file-name-nondirectory a)))
-    ;; (lambda (a)
-    ;;   (mml-attach-file a (mm-default-file-encoding a)
-    ;;                    nil "attachment"))
-    ;; attachments
-    ;; '("file" "files" "attach"))
-    ;; (message "Attachments: %s" attachments)
-    (dolist (a attachments) (message "Attachment: %s" a) (mml-attach-file a (mm-default-file-encoding a) nil "attachment"))
-    (message-goto-to)
-    ))
+
 #+end_src
 
 #+RESULTS:
-: org-lms-send-subtree-with-attachments
+: org-lms--send-subtree-with-attachments
 
 ***** ACTION Mail and Post Multiple Trees
+:PROPERTIES:
+:ID:       c6e6821f-fffa-4560-9590-e51bdc4c8d2d
+:END:
 
 Once again, I've written multiple functions to do two very similar tasks. Need to refactor!!!
 
@@ -3231,6 +3401,9 @@ you have not received a grade for work that you have handed in,
 
 
 ***** WONTDO Even more Mail -- org-mime rewrite functions. 
+:PROPERTIES:
+:ID:       f2dea58a-9eb6-4062-bb9b-ac60a681c426
+:END:
  *OBSOLETE*
 +Actually *this* is the real real work...+ 
 
@@ -3238,13 +3411,14 @@ you have not received a grade for work that you have handed in,
 +i needed to modify stuff in the middle of the org-mime process, so I modified these fns lightly.+
 
 I thought i had gotten rid of this but...
-#+begin_src emacs-lisp :tangle no
+#+begin_src emacs-lisp
 ;; ;; more helpers
 (defun org-lms-mime-org-subtree-htmlize (&optional attachments)
   "Create an email buffer of the current subtree.
 The buffer will contain both html and in org formats as mime
 alternatives.
 
+Need to remove link from header
 The following headline properties can determine the headers.\n* subtree heading
    :PROPERTIES:
    :MAIL_SUBJECT: mail title
@@ -3258,7 +3432,8 @@ The cursor is left in the TO field."
   (save-excursion
     ;; (funcall org-mime-up-subtree-heading)
     (cl-flet ((mp (p) (org-entry-get nil p org-mime-use-property-inheritance)))
-      (let* ((file (buffer-file-name (current-buffer)))
+      (let* ((org-export-with-broken-links t)
+             (file (buffer-file-name (current-buffer)))
              (subject (or (mp "MAIL_SUBJECT")
                           (replace-regexp-in-string "\\[\\[.*?\\]\\[\\(.*?\\)\\]\\]"
                                                    "\\1"
@@ -3403,14 +3578,19 @@ The cursor is left in the TO field."
 
 #+begin_src emacs-lisp
 
-
 #+end_src 
 
 ***** Set Grades and Overlays
+:PROPERTIES:
+:ID:       219b5b27-1998-4d80-a54c-0b40ed3bdd61
+:END:
 These are for showing grades in the org buffer
 
 #+begin_src emacs-lisp
-;; still imperfect, but good enough for me.  
+(require 'ov)
+(defvar-local org-lms-grade-overlays '()
+  "array of currently existing grading overlays")
+;; still imperfect, but good enough for me.
 (defun org-lms-overlay-headings ()
   "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
   (interactive)
@@ -3436,61 +3616,63 @@ These are for showing grades in the org buffer
 (defun org-lms-overlay-current-heading ()
   "Show grades at end of headlines that have a 'GRADE' property. If file keyword 'OL_USE_CHITS' is non-nil, also add a 'CHItS:' overlay."
   (interactive)
-  (require 'ov)
+  (save-excursion
+    (let ((grade (org-entry-get (point) "GRADE")))
+      (when grade
+        (org-back-to-heading)
+        (let* ((gradestring (format  "GRADE: %s%s" grade
+                                     ;; causing a hangup with parsing sometimes
+                                     ;; (if (org-lms-get-keyword "OL_USE_CHITS")  (format " %s" (org-entry-get (point) "CHITS")) "")
+                                     ""
+                                     ))
+               (end (line-end-position))
+               (character (buffer-substring (- end 1) end))
+               (gradeov (ov-in 'name "grading" (line-beginning-position) end)))
+          (if gradeov
+              (setq gradeov (car gradeov))
+            (setq gradeov (ov (- end 1) end 'name "grading" 'grading "true")))
+          (ov-set gradeov 'display (concat character " " gradestring))
+          
+          ;; (setq thisov (make-overlay (- end 1)
+          ;;                            (+ 0 end)))
 
-  (let ((chits (org-lms-get-keyword "OL_USE_CHITS")))
-    (save-excursion
-      (org-back-to-heading)
-      
-      (when (org-entry-get (point) "GRADE")
-        (ov-clear (- (line-end-position) 1)
-                  (+ 0 (line-end-position)))
-        (setq ov (make-overlay (- (line-end-position) 1)
-                               (+ 0 (line-end-position))))
-        (setq character (buffer-substring (- (line-end-position) 1) (line-end-position)))
-        (overlay-put
-         ov 'display
-         (format  "%s  GRADE: %s %s" character (org-entry-get (point) "GRADE")
-                  (if chits (org-entry-get (point) "CHITS") "")))
-        (overlay-put ov 'name "grading")
-        (message "%s" (overlay-get ov "name")))))
-  )
+          ;; (overlay-put
+          ;;  thisov 'display
+          ;;  )
+          ;; (overlay-put thisov 'name "grading")
+          ;; (overlay-put thisov 'grading "true")
+          (message "%s" (ov-val gradeov 'name)))))))
 
 (defun org-lms-clear-overlays ()
   "if the overlays become annoying at any point"
   (interactive)
   (ov-clear))
 
-;; (defun org-lms-set-grade (grade)
-;;   "set grade property at point and regenerate overlays"
-;;   (interactive "sGrade:")
-;;   (org-set-property "GRADE" grade)
-;;   (org-lms-clear-overlays)
-;;   (org-lms-overlay-headings) )
-
-(defvar ol-grade-regex  "- \\*?Grade:?\\*?\\( ::\\)? ?\\(.+\\)"
+(defvar ol-grade-regex  "- \\*?Grade:?\\*?\\( ::\\)? ?\\([^[:space:]]+\\) *"
   "regular expression matching grade lines." )
 
 (defun org-lms-set-grade ()
-  "set grade property for all headings on basis of \"- Grade :: \" line.
+  "set grade property for current heading on basis of \"- Grade :: \" line.
 
   Use with caution."
   (interactive)
-  (save-restriction 
+  (save-restriction
     (org-narrow-to-subtree)
-  (save-excursion
-    (org-back-to-heading)
-    (while (re-search-forward ol-grade-regex nil t )
-      (let ((mark (or (match-string 2) 0)))
-
-        (if (string= mark "Pass")
-            (setq mark "pass"))
-        (org-set-property "GRADE" mark)
-        (org-todo "READY"))
-      )))
-  (org-lms-overlay-headings) 
-  (org-next-visible-heading 1)
-  )
+    (save-excursion
+      (org-back-to-heading)
+      (while (re-search-forward ol-grade-regex nil t )
+        (let ((mark (or (match-string 2) 0)))
+          (message "mark is: %s" mark)
+          (if (string= mark "Pass")
+              (setq mark "pass"))
+          (org-set-property "GRADE" mark)
+          (org-todo "READY"))
+        (org-lms-overlay-current-heading))
+      (org-back-to-heading)
+      (org-cycle)))
+  (progn  (org-next-visible-heading 1)
+        (org-show-entry)
+        (org-hide-drawer-all)))
 
 (defun org-lms-set-all-grades ()
   "set grade property for all headings on basis of \"- Grade :: \" line.
@@ -3506,7 +3688,7 @@ These are for showing grades in the org buffer
       ;;   (org-set-property)
       ;;   (org-element-at-point))
       ))
-  (org-lms-overlay-headings) 
+  (org-lms-overlay-headings)
 
   )
 
@@ -3522,25 +3704,27 @@ These are for showing grades in the org buffer
         (if (or (string-match "pass" (downcase grade)) (string-match "1" grade ))
             (progn (message grade)
                    (org-set-property "GRADE" "pass"))
-          )) 
-      
+          ))
+
       ;;(org-set-property "GRADE" (match-string 1))
       ;; (save-excursion
       ;;   (org-back-to-heading)
       ;;   (org-set-property)
       ;;   (org-element-at-point))
       ))
-  (org-lms-overlay-headings) 
-  ;;(org-lms-overlay-headings) 
+  (org-lms-overlay-headings)
+  ;;(org-lms-overlay-headings)
 
   )
-
 #+end_src
 
 #+RESULTS:
 : org-lms-set-all-grades-boolean
 
 ****** More grading, for pass/fail 
+:PROPERTIES:
+:ID:       ef7a0df9-79ac-40d1-947f-0855ee3caa98
+:END:
 These fuctions hould be up with the other grading stuff
 
 #+begin_src emacs-lisp
@@ -3565,7 +3749,13 @@ These fuctions hould be up with the other grading stuff
 
 #+end_src
 
+#+RESULTS:
+: org-lms-chit
+
 ****** Grade Report Tables
+:PROPERTIES:
+:ID:       36e810a0-239e-4914-8d8c-6d9eff452162
+:END:
 Generates a tables of marks for export to csv or direct manipulation within org. I don't find this that useful yet, needs some work. 
 #+begin_src emacs-lisp
 (defun org-lms-generate-tables ()
@@ -3584,14 +3774,17 @@ Simultaneously write results to results.csv in current directory."
     (let ((org-use-tag-inheritance nil))
       (org-map-entries
        (lambda ()
-         (add-to-list 'assignments (nth 4 (org-heading-components)) t))
+         (add-to-list 'assignments
+                      (org-id-get-create)
+                      ;;(nth 4 (org-heading-components))
+                      t))
        "ASSIGNMENT"))
     
     ;;loop over entries
     ;; this should be improved, returning a plist to be looped over
     (dolist (assignment assignments)
       (save-excursion
-        (org-open-link-from-string (format "[[%s]]" assignment)) ;; jump to assignment
+        (org-open-link-from-string (format "[[id:%s]]" assignment)) ;; jump to assignment
         (org-map-entries        ;; map over entries
          (lambda ()
            (let* ((heading (nth 4 (org-heading-components)))
@@ -3607,7 +3800,7 @@ Simultaneously write results to results.csv in current directory."
                          ;; this needs to be figured out. I want this in p/f booleans but not for 0 grades in non-booleans
                          ((string= g "0") (setq g "Fail"))
                          )
-                        (add-to-list 'grades `(,assignment . ,g))
+                        (add-to-list 'grades `(,heading . ,g))
                         
                         ;; (if chits
                         ;;     (add-to-list 'grades `(,(concat assignment " Chits") . ,(org-entry-get (point) "CHITS"))))
@@ -3620,7 +3813,9 @@ Simultaneously write results to results.csv in current directory."
     (message "Students = %s" students)
     
     (let* ((columns (cl-loop for a in assignments
-                                         collect a
+                             collect (save-excursion
+                                       (org-open-link-from-string (format "[[id:%s]]" a))
+                                       (org-entry-get (point) "ASSIGNMENT_NAME" ))
                                          ;; if chits
                                          ;; collect (concat a " Chits")
                                          ))
@@ -3720,6 +3915,9 @@ Simultaneously write results to results.csv in current directory."
 : org-lms-generate-tables
 
 ****** ACTION Github-related helper functions
+:PROPERTIES:
+:ID:       25d74ef0-9450-413b-a36b-8aae3c41a4a2
+:END:
 I think these are obsolete, but I'm not sure. 
 #+begin_src emacs-lisp
 ;; helper functions for github repos
@@ -3738,14 +3936,273 @@ I think these are obsolete, but I'm not sure.
 
 #+end_src
 
+#+RESULTS:
+: org-lms~open-attachment-or-repo
+
+*** Setters - post submissions from headlines
+:PROPERTIES:
+:ID:       68ff4811-70b0-48aa-9799-c8f7a12cf10e
+:END:
+
+TODO <2021-08-10 Tue>: add submission comment updating -- need to use the [[https://canvas.instructure.com/doc/api/submissions.html#SubmissionComment][submissioncomments]] endpoint. 
+
+CF [[https://github.com/titaniumbones/org-lms/issues/42][github issue]]
+
+#+begin_src emacs-lisp
+
+
+(defun org-lms-put-single-grade-from-headline (&optional studentid assignmentid courseid)
+  "Get grade only (!) from student headline and post to Canvas LMS.
+If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
+will be extracted from the current environment, as the GRADE alwyas will be"
+  (interactive)
+  ;; main loop
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (assignmentid (or assignmentid (save-excursion (org-up-heading-safe) (org-entry-get (point) "ASSIGNMENTID"))))
+         (studentid (or studentid (org-entry-get (point) "STUDENTID")))
+         (grade (org-entry-get (point) "GRADE"))
+         (returnval '()))
+    ;; loop over attachments
+    
+    (let* ((grade-params `(("submission" . (("posted_grade" . ,(org-lms-calculate-grade grade))))))
+           (comment-response ;;(request-response-data)
+            (org-lms-canvas-request
+             (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
+             "PUT" grade-params)))
+      (org-entry-put nil "ORG_LMS_SPEEDGRADER_URL"
+                     (format
+                      "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
+                      courseid assignmentid studentid))
+      
+      (message "%s" (plist-get  (car (plist-get comment-response
+                                                :submission_comments)) :id))
+      (message "NO PROBLEMS HERE")
+      ;; (message "Response: %s" comment-response )
+      comment-response)))
+
+;; not that if you want to update a comment instead, it's necessary to use a different request mechanism
+
+(defun org-lms-put-single-submission-from-headline (&optional studentid assignmentid courseid)
+  "Get comments from student headline and post to Canvas LMS.
+If STUDENTID, ASSIGNMENTID and COURSEID are omitted, their values
+will be extracted from the current environment. Note the
+commented out `dolist' macro, which will upload attachments to
+canvas. THis process is potentially buggy and seems likely to
+lead to race conditions and duplicated uploads and comments. Still
+working on this."
+  (interactive)
+  ;;(setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID") (plist-get org-lms-course)))
+  (unless assignmentid
+    (setq assignmentid (save-excursion (org-up-heading-safe)
+                                       (org-entry-get (point) "ASSIGNMENTID"))))
+  (unless studentid (setq studentid (org-entry-get (point)  "STUDENTID")))
+  ;; main loop
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (grade (org-entry-get (point) "GRADE"))
+         (comments (let*((org-export-with-toc nil)
+                         ;;(atext (org-export-as 'html t))
+                         ;;(atitle (nth 4 (org-heading-components)))
+                         (org-ascii-text-width 23058430000))
+                     (org-export-as 'ascii t nil t)))
+         (returnval '()))
+    ;; loop over attachments
+    (dolist (a  (org-lms-attach-file-list))
+      (let* ((path (expand-file-name a (org-attach-dir t) )))
+        (unless (file-directory-p path)
+          (let* ((fileinfo (org-lms-canvas-request
+                            (format "courses/%s/assignments/%s/submissions/%s/comments/files"
+                                    courseid assignmentid studentid)
+                            "POST" `(("name" . ,a)) ) ;; (request-response-data )
+                           )
+                 (al (org-lms-plist-to-alist (plist-get fileinfo :upload_params)))
+                 (formstring ""))
+            (cl-loop for prop in al
+                     do
+                     (setq formstring (concat formstring "-F '" (symbol-name (car prop))
+                                              "=" (format "%s" (cdr prop)) "' ")))
+            (setq formstring (concat formstring " -F 'file=@" path "' 2> /dev/null"))
+            (let* ((thiscommand  (concat "curl '"
+                                         (plist-get fileinfo :upload_url)
+                                         "' " formstring))
+                   (curlres  (shell-command-to-string thiscommand))
+                   (file_id (if (> (length curlres) 0 ) (format "%s" (plist-get (ol-jsonwrapper json-read-from-string curlres) :id )))))
+              (message "CURLRES: %s" curlres)
+              
+              (if file_id (progn
+                            (setq returnval (add-to-list 'returnval file_id))
+                            ;; this needs to be fixed up still -- only saves last
+                            (org-entry-put (point) "ORG_LMS_ATTACHMENT_URL"
+                                           file_id))))))))
+    (let* ((grade-params `(("submission" . (("posted_grade" . ,(org-lms-calculate-grade grade))))
+                           ("comment" . (("text_comment" . ,comments)
+                                         ;; EDIT 2018=11-07 -- untested switch from alist to plist
+                                         ("file_ids" . ,returnval)
+                                         ;; alas, doesn't seem to update the previous comment! drat
+                                         ;; it's a different API endpoint
+                                         ;; this is a todo item
+                                         ("id" . ,(or (org-entry-get nil "OL_COMMENT_ID" ) nil))))))
+           (comment-response ;;(request-response-data)
+            (org-lms-canvas-request
+             (format "courses/%s/assignments/%s/submissions/%s" courseid assignmentid studentid)
+             "PUT" grade-params)))
+      (org-entry-put nil "ORG_LMS_SPEEDGRADER_URL"
+                     (format
+                      "[[https://q.utoronto.ca/courses/%s/gradebook/speed_grader?assignment_id=%s#{\"student_id\":%s}]]"
+                      courseid assignmentid studentid))
+      (org-entry-put nil "OL_COMMENT_ID"
+                     (format "%s"
+                             (plist-get  (car (plist-get comment-response
+                                                         :submission_comments)) :id))  )
+      (message "%s" (plist-get  (car (plist-get comment-response
+                                                :submission_comments)) :id))
+      (message "NO PROBLEMS HERE")
+      ;; (message "Response: %s" comment-response )
+      comment-response)))
+#+end_src
+
+#+RESULTS:
+: org-lms-put-single-submission-from-headline
+
+*** ACTION Set up local environment
+:PROPERTIES:
+:ID:       ad5a5801-6aff-4926-a1e6-7dedfd2c212a
+:END:
+Need to assess usefulness of all this. 
+
+org-lms-setup especially is useful here; and "get-local-students" parses ~students.csv~ (kinda on its way to being deprecated eventually). 
+
+*TODO*: Need to switch to JSON format for students!!
+
+#+begin_src emacs-lisp
+;;deprectaed!!!!!!
+(defun org-lms-setup ()
+  "Merge  defs and students lists, and create table for later use.
+
+`org-lms-course', `org-lms-local-assignments' and other org-lms
+variables must be set or errors wil lresult."
+  (setq org-lms-merged-students (org-lms-merge-student-lists))
+  (setq org-lms-merged-assignments (org-lms-merge-assignment-values))
+  (org-lms-assignments-table org-lms-merged-assignments)
+  )
+
+(defun org-lms-setup-grading (&optional courseid assignmentsfile)
+  "Parse assignments buffer and students lists, and create table for later use.
+
+`org-lms-course', `org-lms-local-assignments' and other org-lms
+variables must be set or errors will result."
+  (setq org-lms-merged-students (org-lms-merge-student-lists))
+  ;;(setq org-lms-merged-assignments (org-lms-merge-assignment-values))
+  (setq assignments (org-lms-map-assignments (org-lms-get-keyword "ORG_LMS_ASSIGNMENTS")))
+  (setq org-lms-merged-assignments assignments)
+  (org-lms-assignments-table assignments))
+
+(defun org-lms-setup-ta-grading (sectionslist &optional courseid assignmentsfile)
+  "Parse assignments buffer & student lists, and create table for later use.
+Restrict student list to your tutorials."
+  (setq org-lms-merged-students
+        (org-lms-merge-student-lists
+         nil ;;
+         (org-lms-get-multiple-section-students sectionslist courseid)
+         ;;(org-lms-get-students courseid sectionslist)
+         ))
+  (setq assignments (org-lms-map-assignments (org-lms-get-keyword "ORG_LMS_ASSIGNMENTS")))
+  (setq org-lms-merged-assignments assignments)
+  (org-lms-assignments-table assignments))
+
+(defun org-lms-get-local-csv-students (&optional csv)
+  (unless csv
+    (setq csv "./students.csv"))
+  (org-lms~parse-plist-symbol-csv-file csv)
+  )
+
+(defun org-lms-get-local-json-students (&optional jfile)
+  (unless jfile
+    (setq jfile "./students-local.json"))
+  (ol-jsonwrapper json-read-file jfile))
+
+
+
+(defcustom org-lms-get-student-function 'org-lms-get-local-json-students
+  "function to use to get students"
+  :type 'function)
+
+(defun org-lms-get-local-students (&optional file)
+  (unless file
+    (setq file "./students-local.json"))
+  (if (file-exists-p file) 
+
+      (apply org-lms-get-student-function (list file))))
+#+end_src
+
+#+RESULTS:
+: org-lms-get-local-students
+
+*** Assignments Table
+:PROPERTIES:
+:ID:       0e170fbd-9bfb-4dd2-9426-ff69b6d7ce5c
+:END:
+This function prints out a helpful table with links to various locations (e.g., LMS URLs for assignments & submissions) and elisp functions (e.g., grading headline generation).
+#+begin_src emacs-lisp
+  (defun org-lms-assignments-table (&optional assignments students)
+    "Return a 2-dimensional list suitable whose contents are org-mode table cells.
+
+  Intnded to be used in a simpe src block with :results header `value raw table'. 
+  Resultant links allow quick access to the canvas web interface as well as the make-headings commands."
+    (unless assignments
+      (setq assignments org-lms-merged-assignments))
+    (unless students
+      (setq students org-lms-merged-students))
+    ;;(message "MERGED ASSIGNMENTS")
+    ;;(prin1 assignments)
+    (let* ((cid (org-lms-get-keyword "ORG_LMS_COURSEID"))
+           (make-headlines-string "")
+           (table-header '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline))
+           )
+      (append '(("Name (upload here)" "Download URL" Inspect "Make Headers") hline)
+              (cl-loop for i in assignments
+                       collect `( ,(format "%s"
+                                           (if (plist-get (cdr i) :html_url)
+                                               (concat "[[" (org-lms-safe-pget (cdr i) :html_url) "][" (org-lms-safe-pget (cdr i) :name) "]]")
+                                             (org-lms-safe-pget (cdr i) :name)) ) 
+                                  ,(format "%s"
+                                           (if (plist-get (cdr i) :submissions_download_url)
+                                               (concat "[[" (org-lms-safe-pget (cdr i) :submissions_download_url) "][Download Submissions]]")
+                                             " ")
+                                           )
+                                  ,(format
+                                    "%s"
+                                    (if (plist-get (cdr i) :canvasid)
+                                        (concat  "[[elisp:(org-lms-canvas-inspect \"courses/"
+                                                 (format "%s" cid)
+                                                 "/assignments/"
+                                                 (format "%s" (org-lms-safe-pget (cdr i) :canvasid))
+                                                 "\")][Inspect Original JSON]]")
+                                      " "))
+                                  ;; "Inspect Original JSON"
+                                  ,(format "[[%s][%s]]"
+                                           (concat "elisp:(org-lms-make-headings (alist-get '"
+                                                   (symbol-name (car i))
+                                                   " org-lms-merged-assignments) org-lms-merged-students)"
+                                                   ) 
+                                           "Make Headlines"))))
+
+      ))
+
+#+end_src
+#+RESULTS:
+: org-lms-assignments-table
+
 ** Reading and Writing Assignment Variables from files
 
 *** ACTION Transformer -- map org file to json
+:PROPERTIES:
+:ID:       bc1eb18a-3557-4183-8c50-0af1943e4e0c
+:END:
 Storing assignments as an intermediate lisp object allows me to avoid parsing an org buffer or making a json call before doing things like making headlines.
 
 Needs to be ocnverted to org-ql! <2019-10-01 Tue>
 
-#+begin_src emacs-lisp :results code
+#+begin_src emacs-lisp 
   (defun org-lms-map-assignments (&optional file )
     "turn a buffer of assignment objects into a plist with relevant info enclosed."
 
@@ -3791,6 +4248,7 @@ Needs to be ocnverted to org-ql! <2019-10-01 Tue>
                                                  :org_lms_canvas_comments ,(org-entry-get nil "ORG_LMS_CANVAS_COMMENTS")
                                                  :assignment_number ,(org-entry-get nil "ORG_LMS_NUMBER")
                                                  :grade_type "letter_grade" ;; oops fix this!
+                                                 :assignment_weight ,(org-entry-get nil "ASSIGNMENT_WEIGHT")
                                                  :assignment-type ,(org-entry-get nil "ASSIGNMENT_TYPE")
                                                  :org-id ,(org-id-get-create)
                                                  :directory ,(or (org-entry-get nil "OL_DIRECTORY")
@@ -3821,7 +4279,14 @@ Needs to be ocnverted to org-ql! <2019-10-01 Tue>
 
 #+end_src
 
+#+RESULTS:
+: org-lms-read-assignment-map
+
+
 *** ACTION Creator -- making assignments 
+:PROPERTIES:
+:ID:       b30b9da6-0ee4-48b3-b4f2-789ab7e61723
+:END:
 I need a simple function to add new assignments when I'm working, with all the properties set up at least partially.
 
 #+begin_src emacs-lisp
@@ -3897,7 +4362,173 @@ I need a simple function to add new assignments when I'm working, with all the p
 #+RESULTS:
 : org-lms-assignment-add-headline-create
 
+*** New Approach -- generate org trees using org-ml
+
+Org-ml gives a dash-like experience creating org trees.  We can take the plist resulting from ~org-lms-get-assignments~ and turn it into a tree with all of the properties etc that we want in an assignments.org file 
+
+cf issue #44 in the repo. 
+
+**** First, let's define a ~let=plist~ macro that should make our lives easier 
+
+TODO: move to helpers above
+
+#+begin_src emacs-lisp
+;; let-plist definition taken fro
+;; https://github.com/alphapapa/emacs-package-dev-handbook/issues/7#issuecomment-475969263
+(defvar let-plist--symbol-prefix "$")
+
+(defun let-plist--remove-prefix (symbol)
+  "Return SYMBOL, without an initial prefix.
+Which prefix in particular is `let-plist--symbol-prefix'."
+  (let ((name (symbol-name symbol))
+        (regexp (eval `(rx bos ,let-plist--symbol-prefix) t)))
+    (if (string-match regexp name)
+        (intern (replace-match "" nil nil name))
+      symbol)))
+
+(defun let-plist--list-to-sexp (list var)
+  "Turn symbols LIST into recursive calls to `plist-get' on VAR."
+  `(plist-get ,(if (cdr list)
+                   (let-plist--list-to-sexp (cdr list) var)
+                 var)
+              ',(car list)))
+
+(defun let-plist--access-sexp (symbol variable)
+  "Return a sexp used to access SYMBOL inside VARIABLE."
+  (let* ((clean (let-plist--remove-prefix symbol))
+         (name (symbol-name clean))
+         (regexp (eval `(rx bol ,let-plist--symbol-prefix) t)))
+    (if (string-match regexp name)
+        clean
+      (let-plist--list-to-sexp
+       (mapcar #'intern (thread-last (eval `(rx ,let-plist--symbol-prefix) t)
+                          (split-string name)
+                          (nreverse)))
+       variable))))
+
+(defun let-plist--deep-var-search (data)
+  "Return alist of symbols inside DATA that start with
+`let-plist--symbol-prefix'. Perform a deep search and return an alist where each
+car is the symbol, and each cdr is the same symbol without the
+`let-plist--symbol-prefix'."
+  (cond
+   ((symbolp data)
+    (let ((name (symbol-name data))
+          (regexp (eval `(rx bol ,let-plist--symbol-prefix) t)))
+      (when (string-match regexp name)
+        ;; Return the cons cell inside a list, so it can be appended
+        ;; with other results in the clause below.
+        (list (cons data (intern (replace-match "" nil nil name)))))))
+   ((not (consp data)) nil)
+   ((eq (car data) 'let-alist)
+    ;; For nested ‘let-alist’ forms, ignore symbols appearing in the
+    ;; inner body because they don’t refer to the alist currently
+    ;; being processed.  See Bug#24641.
+    (let-plist--deep-var-search (cadr data)))
+   (t (append (let-plist--deep-var-search (car data))
+              (let-plist--deep-var-search (cdr data))))))
+
+(defmacro let-plist (plist &rest body)
+  (declare (indent 1))
+  (let ((plist-var (gensym)))
+    `(let ((,plist-var ,plist))
+       (let ,(cl-loop for (dotvar . var) in (delete-dups (let-plist--deep-var-search body))
+                      collect `(,dotvar ,(let-plist--access-sexp dotvar plist-var)))
+         ,@body))))
+
+
+;; alternative implementation, with some broken parts
+#+end_src
+
+#+RESULTS:
+: let-plist
+
+**** making sure org-ml methods work miht my data structures.
+
+It turns out to be abit clumsy -- will have to check for numberic values and convert to strings, which is cumbersome.  
+#+begin_src emacs-lisp :tangle no
+
+;; (org-ml-build-property-drawer! '(canvas otherthing))
+
+
+;; (--map (org-ml-build-node-property (car it) (cadr it))
+;;        '(("canvasid" "12345") ("due_at" "date")))
+
+(defun o-l-format-prop (assignment keyword)
+  (format "%s" (plist-get assignment keyword))
+  )
+
+
+;;(o-l-format-prop '(:id 12345) :id)
+(defun org-lms-assignment-plist-to-headline (assignment)
+  "take the results of `org-lms-get-assignments` and convert to an org-ml headline node.
+
+I would like to use let-plisth ere but it's a shitshow. "
+  (let* ((let-plist--symbol-prefix "$")
+         (a assignment)
+         (allprops `(("CANVASID" ,(o-l-format-prop a :id))
+                     ("ASSIGNMENT_TYPE" "canvas")
+                     ("DUE_AT" ,(o-l-format-prop a :due_at))
+                     ("points_posisble" ,(o-l-format-prop a :points_possible))
+                     ("CANVAS_HTML_URL" ,(o-l-format-prop a :html_url))
+                     ("CANVAS_SUBMISSION_URL" ,(o-l-format-prop a :submissions_download_url)))))
+
+    (->>  (org-ml-build-headline! :title-text (plist-get assignment :name)
+                                  :tags '("assignment")
+                                  :section-children
+                                  (list (apply 'org-ml-build-property-drawer 
+                                               (--map (org-ml-build-node-property (car it) (cadr it)) allprops)))))))
+
+(defun org-lms-html-to-org-string (html)
+  "take the html from the description prop and convert to html syntax"
+  (let* ((quoted (shell-quote-argument html)))
+    (shell-command-to-string
+     (format "echo %s | pandoc -f html -t json | pandoc --wrap=none -f json -t org  | sed 's/�/ /g'" quoted))))
+
+
+(defun org-lms-insert-remote-assignments (&optional pom)
+  "retrieve remote assignments, parse, and then insert as headlines  at point.
+Intended to be run manually from inside the Assingments.org buffer"
+  (interactive)
+  (let* ((old-point (point))
+         (pom (or pom (point)))
+         (all (org-lms-get-assignments))
+         (parsedcons (-map  (lambda (a)
+                              (cons (org-lms-assignment-plist-to-headline a)
+                                    (org-lms-html-to-org-string (plist-get a :description))))
+                            all)))
+    (-each parsedcons (lambda (p)
+                        (org-ml-insert pom (car p))
+                        (org-end-of-subtree)
+                        (insert (concat "\n" (cdr p)))
+                        (setq pom (point))
+                        (org-ml-fold (org-ml-parse-headline-at (point)))
+                        ))
+    (goto-char old-point)))
+
+;; (let-plist
+;;     assignment
+
+;;   (message "%s" assignment)
+;;   (message "%s %s %s" $:due_at $:id $:id)
+;;   ;; (org-ml-build-node-property (upcase "due_at")
+;;   ;;                             (format "%s" (symbol-value (intern (concat "$:" "due_at"))))
+;;   ;;                             )
+;;   (--map    
+;;     (org-ml-build-node-property (upcase it)
+;;                                 (format "%s" (symbol-value (intern (concat "$:" it)))))
+;;     '( "id" "due_at" "unlock_at" "points_possible" )))
+#+end_src
+
+#+RESULTS:
+: org-lms-insert-remote-assignments
+
+**** 
+
 ** exporting lectures to reveal presentations and uploading to Quercus in a Lecture Folder
+:PROPERTIES:
+:ID:       04f61002-bb5a-4957-a5c9-ac76e695272d
+:END:
 Thisi s copied from ox-huveal, which in turn is copied from ox-hugo.  Disabling async b/c that would likely fuck things up since I need the file for the transfer.  Would be nice to have a non-blocking way to do this.
 
 Also need to remove the ox-hugo dependencies.  
@@ -3977,7 +4608,9 @@ approach)."
   (interactive "P")
   (let ((f-or-b-name (if (buffer-file-name)
                          (file-name-nondirectory (buffer-file-name))
-                       (buffer-name))))
+                       (buffer-name)))
+        (org-re-reveal-single-file t)
+        (org-reveal-single-file t))
     (save-window-excursion
       (save-restriction
         (widen)
@@ -4161,6 +4794,9 @@ approach)."
 
 * Troubleshooting Utilities
 ** ACTION Debugging
+:PROPERTIES:
+:ID:       10b2a3be-befa-4177-8e8b-aec0fdc39ee6
+:END:
 Need Docstrings!
 Utility function to get direct access to request object via restclient. Helps when running into problems w/ emacs-request
 #+begin_src emacs-lisp
@@ -4170,11 +4806,17 @@ Utility function to get direct access to request object via restclient. Helps wh
 
 #+end_src
 
+#+RESULTS:
+: org-lms-inspect-object
+
 #+begin_src emacs-lisp
 
 #+end_src
 
 ** MAYBE Canvas-inspect
+:PROPERTIES:
+:ID:       3da03ed8-6024-46ad-b495-c1587d1105b9
+:END:
 
 Maybe deprecate/eliminate this? 
 
@@ -4237,8 +4879,14 @@ maybe key-type needs to be keyword though! Still a work in progress.
       (user-error "Please set a value for for `org-lms-token' in order to complete API calls"))))
 #+end_src
 
+#+RESULTS:
+: org-lms-canvas-inspect
+
 
 ** Paste zoom recording links
+:PROPERTIES:
+:ID:       1ca2c2c9-b8fd-45b1-b980-a4febafb4dc4
+:END:
 Lately I have to paste these links a lot. It gets tedious. Here's a solution.
 
 #+begin_src emacs-lisp
@@ -4249,16 +4897,20 @@ Lately I have to paste these links a lot. It gets tedious. Here's a solution.
         (s (or (and (use-region-p)
                     (buffer-substring-no-properties (region-beginning) (region-end)))
                (current-kill 0 t))))
-    (insert   (replace-regexp-in-string "^.*?\\(https://.*?\\) \\(Passcode: \\)\\(.*?\\) ?$"
-                                        (concat "
-- [[\\1][Recording from " today ":]] \\2 *\\3*") s))))
-
+    (insert   (replace-regexp-in-string "^.*?\\(https://.*?\\)\\s-+(?\\(Passcode: \\)\\(.*?\\))? ?$" ;; "^.*?\\(https://.*?\\)\\s-+\\((?Passcode: \\)\\(.*?\\)) ?$" 
+                                        (concat "- [[\\1][Recording from " today ":]] (\\2 *\\3*)") s))))
 
 #+end_src
 
 #+RESULTS:
 : org-lms-munge-zoom-link
 
+
+- [[https://utoronto.zoom.us/rec/share/p2xKunMq22GSXUPF5k8_h9fYiiSg8VIpHmR6rNcYgWf1YtFkPP1aEQmKzDsa5HAN.tZdsg6P1Aa2UahXd][Recording from January 27:]] (Passcode:  *vqCR%aSJD0*
+#+RESULTS:
+: org-lms-munge-zoom-link
+https://utoronto.zoom.us/rec/share/FugfmRckCuWQEgDNW-wp-Z_gdRXUy1r5uPSjxjW-iN13B4Us55g10tFMp61C9gzG.BnzQJaaGmalkKSuF
+Access Passcode: !^a.w58YT&
 * Minor-mode (work in progress!)
 It would be nice to define a minor mode that set the coure up properly, but there's a bit of a ways to go before I do that .
 
@@ -4268,7 +4920,25 @@ This is now working; place these functions next to their topically-appropriate s
  
 Copying the excellent "do what I mean" scope from [[https://github.com/kaushalmodi/ox-hugo/][ox-hugo]] as ~org-lms-0get-valid-subtree~, which checks parent headers for the ~EXPORT_FILE_NAME~ property before setting the subtree scope of export.
 
-** Completely ad-hoc function designed exclusively for my own purposes
+** [#A] Completely ad-hoc function designed exclusively for my own purposes
+:PROPERTIES:
+:ID:       e763392a-50a8-4a22-b6c2-80a0aa768dcb
+:END:
+#+begin_src emacs-lisp
+(defun org-lms-visit-gradebook ()
+  "visit the online gradebook location"
+  (interactive)
+  (let* ((id (org-entry-get (point) "STUDENTID") )
+         (assignment (org-entry-get (point) "ASSIGNMENTID" t ))
+         (course (org-entry-get (point) "COURSEID" t))
+         (url (concat org-lms-public-baseurl "courses/" course
+                      "/gradebook/speed_grader?assignment_id=" assignment "&student_id=" id)))
+    (browse-url url)))
+#+end_src
+
+#+RESULTS:
+: org-lms-visit-gradebook
+
 
 #+begin_src emacs-lisp
 
@@ -4340,6 +5010,9 @@ copy that subtree as slack text for posting to slack."
 : org-lms-wim-wim
 
 ** Preliminary mode defn
+:PROPERTIES:
+:ID:       e2a24b2f-0676-48dd-ba63-abff4f315b2f
+:END:
 - define a key map prefix (C-c C-x ?)
 - add hook to ctrl-c ctrl-c; if in thism ode, and in announcements, announcement-wim; if in lectures, lslides-wim; if in grades... etc.  
 #+begin_src emacs-lisp
@@ -4387,12 +5060,18 @@ if that succeeds, open them"
 
 #+end_src
 
-#+RESULTS:
-| keymap | (3 keymap (111 keymap (122 . org-lms-munge-zoom-link) (105 . org-lms-module-item-from-headline) (110 . org-lms-headline-to-announcement) (112 . org-lms-post-page) (97 . org-lms-post-assignment)) (f12 . org-lms-wim-wim) (24 keymap (7 . org-lms-set-grade))) |
-
 * library closing
+:PROPERTIES:
+:ID:       18d6b493-50f9-447f-b296-7b3f4dcae131
+:END:
 
 #+begin_src emacs-lisp
+
+
 (provide 'org-lms)
 ;;; org-lms ends here
+
 #+end_src
+
+#+RESULTS:
+: org-lms
