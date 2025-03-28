@@ -1,0 +1,100 @@
+$brand-color: rgb(0, 42, 92);
+$border-color: adjust-color($brand-color,$lightness:10%, $alpha:-0.2);
+
+.mygrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.mygrid>h1, .mygrid>h2 {
+    grid-column: 1/-1;
+    margin-left: auto;
+    margin-right: auto;
+} 
+
+.box {
+    // column-count: 2;
+}
+.outline-text-2 {
+    // column-count: 2;
+}
+.box-contents outline-text-2,  {
+    // column-count: 2;
+}
+
+.colflow {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    /* This is better for small screens, once min() is better supported */
+    /* grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); */
+    grid-gap: 1rem;
+    /* This is the standardized property now, but has slightly less support */
+    /* gap: 1rem */
+}
+
+
+// make tables suck less
+table {
+    font-size: 1.2em;
+    border-spacing: 0 0;
+    border-collapse: separate;
+    border: 1px solid grey;
+    thead {
+        background-color: $brand-color;
+        color: white;
+    } 
+    /* zebra striping */
+
+    tbody tr:nth-child(odd) {
+        background-color: adjust-color($brand-color,$lightness:75%, $hue:10);
+        
+    }
+        tbody tr:nth-child(even) {
+        background-color: adjust-color($brand-color,$lightness:55%, $hue:0);
+    }
+    
+    tbody tr td {
+        padding-left: 1em;
+        padding-right: 1em
+    }
+    a {
+        color: adjust-color(rgb(0, 0, 238), $hue:30)
+    }
+}
+
+// sections
+// section.outline-2 h2 {
+//     //border-top: 2px solid $border-color;
+//     margin-top: 1em;
+// }
+// section.outline-2  {
+//     border-top: 2px solid $border-color;
+//     // margin: 1em;
+// }
+#outline-container-course-schedule .outline-3 {
+    border-radius: 10px;
+    border: adjust-color(black, $lightness: 20%, $alpha:-0.25) 2px solid;
+    padding-left: 1em;
+    margin-bottom: 10px;
+    .outline-4 {
+        border: grey solid 1px;
+        border-radius: 10px;
+        padding: 1em;
+        margin-right: 1em;
+        margin-bottom: 1em;
+    }
+}
+
+// #outline-container-course-schedule.dh-block-parent .outline-3 
+// fat sections
+// actually changes thisto my own class maybe, like e.g. "fat" 
+.content-box {
+    // background-color: var(--ic-brand-primary-lightened-10);
+    background-color: var(--ic-brand-primary);
+    color: #ffffff;
+} 
+
+section.outline-2 h2.content-box {
+    margin-top:0.25em;
+    margin-bottom: 0.25em;
+}

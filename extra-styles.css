@@ -1,0 +1,83 @@
+.mygrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.mygrid > h1, .mygrid > h2 {
+  grid-column: 1/-1;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.box {
+  column-count: 2;
+}
+
+.outline-text-2 {
+  column-count: 2;
+}
+
+.box-contents outline-text-2 {
+  column-count: 2;
+}
+
+.colflow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  /* This is better for small screens, once min() is better supported */
+  /* grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); */
+  grid-gap: 1rem;
+  /* This is the standardized property now, but has slightly less support */
+  /* gap: 1rem */
+}
+
+table {
+  font-size: 1.2em;
+  border-spacing: 0 0;
+  border-collapse: separate;
+  border: 1px solid grey;
+  /* zebra striping */
+}
+table thead {
+  background-color: #002a5c;
+  color: white;
+}
+table tbody tr:nth-child(odd) {
+  background-color: #dce6ff;
+}
+table tbody tr:nth-child(even) {
+  background-color: #76b4ff;
+}
+table tbody tr td {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+table a {
+  color: #7700ee;
+}
+
+#outline-container-course-schedule .outline-3 {
+  border-radius: 10px;
+  border: rgba(51, 51, 51, 0.75) 2px solid;
+  padding-left: 1em;
+  margin-bottom: 10px;
+}
+#outline-container-course-schedule .outline-3 .outline-4 {
+  border: grey solid 1px;
+  border-radius: 10px;
+  padding: 1em;
+  margin-right: 1em;
+  margin-bottom: 1em;
+}
+
+.content-box {
+  background-color: var(--ic-brand-primary);
+  color: #ffffff;
+}
+
+section.outline-2 h2.content-box {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/*# sourceMappingURL=extra-styles.css.map */
