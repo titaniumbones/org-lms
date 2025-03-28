@@ -1,5 +1,5 @@
 #+TODO: ACTION(a) STARTED(s) WAITING(w) NEEDSHELP(n) MISSING(m) | DONE(d) WONTDO(o)
-#+PROPERTY: header-args    :tangle org-lms.el scalar drawer :comments link
+#+PROPERTY: header-args    scalar drawer :comments link  :tangle org-lms.el
 #+ORG_LMS_COURSE: wildwater
 I'm moving this package to a literate programming format to make it easier to maintain.
 
