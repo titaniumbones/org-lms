@@ -3895,6 +3895,85 @@ if that succeeds, open them"
       
       response)))
 
+;; Quiz Question Group Management Functions
+(defun org-lms-get-quiz-question-groups (quizid &optional courseid)
+  "Retrieve all question groups for quiz QUIZID in course COURSEID."
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request (format "courses/%s/quizzes/%s/groups" courseid quizid) "GET"))
+
+(defun org-lms-get-single-quiz-question-group (groupid quizid &optional courseid)
+  "Retrieve single question group GROUPID from quiz QUIZID in course COURSEID."
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request (format "courses/%s/quizzes/%s/groups/%s" courseid quizid groupid) "GET"))
+
+(defun org-lms-post-quiz-question-group ()
+  "Create or update a quiz question group and all its child questions."
+  (interactive)
+  (let* ((courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))
+         (quizid (org-entry-get nil "QUIZ_ID" t))
+         (groupid (org-entry-get nil "QUESTION_GROUP_ID"))
+         (group-name (nth 4 (org-heading-components)))
+         (pick-count (or (org-entry-get nil "PICK_COUNT") "1"))
+         (question-points (or (org-entry-get nil "QUESTION_POINTS") "1"))
+         (position (org-entry-get nil "GROUP_POSITION"))
+         
+         (group-params `(("name" . ,group-name)
+                        ("pick_count" . ,(string-to-number pick-count))
+                        ("question_points" . ,(string-to-number question-points)))))
+
+    ;; Add optional parameters if they exist
+    (when position
+      (add-to-list 'group-params `("position" . ,(string-to-number position))))
+
+    ;; Create the group first
+    (let* ((final-params `(("quiz_groups" . (,group-params))))
+           (response (org-lms-canvas-request
+                     (format "courses/%s/quizzes/%s/groups%s"
+                            courseid quizid
+                            (if groupid (format "/%s" groupid) ""))
+                     (if groupid "PUT" "POST")
+                     final-params))
+           (question-responses '())
+           (question-count 0))
+      
+      (message "Group response: %s" response)
+      ;; Canvas API returns groups wrapped in quiz_groups array
+      (let ((quiz-groups (plist-get response :quiz_groups)))
+        (when quiz-groups
+          (let ((group-data (if (listp quiz-groups) (car quiz-groups) quiz-groups)))
+            (when (plist-get group-data :id)
+              (org-set-property "QUESTION_GROUP_ID" (format "%s" (plist-get group-data :id)))
+              (message "Set QUESTION_GROUP_ID to: %s" (plist-get group-data :id))
+              (when (plist-get group-data :quiz_id)
+                (org-set-property "QUIZ_ID" (format "%s" (plist-get group-data :quiz_id))))
+              
+              ;; Now process child questions within this group
+              (message "Processing child questions for group...")
+              (org-map-entries
+               (lambda ()
+                 (when (org-entry-get nil "QUESTION_TYPE")
+                   (setq question-count (1+ question-count))
+                   (let ((existing-question-id (org-entry-get nil "QUESTION_ID")))
+                     (if existing-question-id
+                         (message "Updating existing question %d to join group..." question-count)
+                       (message "Creating new question %d in group..." question-count))
+                     (let ((question-response (org-lms-post-quiz-question)))
+                       (if (plist-get question-response :id)
+                           (progn
+                             (push question-response question-responses)
+                             (message "Question %d %s successfully" 
+                                     question-count 
+                                     (if existing-question-id "updated" "created")))
+                         (message "Failed to %s question %d" 
+                                 (if existing-question-id "update" "create") 
+                                 question-count))))))
+               nil 'tree)))))
+      
+      ;; Return comprehensive response
+      `(:group ,response 
+        :questions ,(reverse question-responses)
+        :question-count ,question-count))))
+
 ;; Quiz Question Management Functions
 (defun org-lms-get-quiz-questions (quizid &optional courseid)
   "Retrieve all questions for quiz QUIZID in course COURSEID."
@@ -3938,6 +4017,11 @@ if that succeeds, open them"
       (let ((answers (org-lms-extract-quiz-answers)))
         (when answers
           (add-to-list 'question-params `("answers" . ,answers)))))
+
+    ;; Check if this question belongs to a question group
+    (let ((groupid (org-entry-get nil "QUESTION_GROUP_ID" t)))
+      (when groupid
+        (add-to-list 'question-params `("quiz_group_id" . ,(string-to-number groupid)))))
 
     (let* ((final-params `(("question" . ,question-params)))
            (response (org-lms-canvas-request
@@ -3996,46 +4080,67 @@ Looks for answer choices in the format:
             (org-export-as 'canvas-html nil nil t)))))))
 
 (defun org-lms-export-question-text ()
-  "Export question text excluding answer choices (checkbox lists).
-If the question text is effectively empty, prepend the question title."
+  "Export question text excluding answer choices (checkbox lists)."
   (save-restriction
     (org-narrow-to-subtree)
     (save-excursion
       (org-back-to-heading)
-      (let* ((title (nth 4 (org-heading-components)))
-             (start (progn 
-                      (forward-line 1)
-                      (while (looking-at "^[ \t]*:")
-                        (forward-line 1))
-                      (point)))
-             (end (save-excursion
-                    (if (outline-next-heading)
-                        (point)
-                      (point-max))))
-             (content (buffer-substring-no-properties start end)))
-        (with-temp-buffer
-          (insert content)
-          (org-mode)
-          ;; Remove checkbox list items (answer choices)
-          (goto-char (point-min))
-          (while (re-search-forward "^[ \t]*- \\[[ x]\\] .*$" nil t)
-            (replace-match ""))
-          ;; Clean up extra newlines
-          (goto-char (point-min))
-          (while (re-search-forward "\n\n\n+" nil t)
-            (replace-match "\n\n"))
-          ;; Check if content is effectively empty after cleanup
-          (let ((cleaned-content (string-trim (buffer-string))))
-            (when (or (string-empty-p cleaned-content)
-                      (string-match-p "^\\s-*$" cleaned-content))
-              ;; Content is empty, prepend the title
-              (goto-char (point-min))
-              (insert title "\n\n")))
-          (org-export-as 'canvas-html nil nil t))))))
+      (let ((start (progn 
+                     (forward-line 1)
+                     (while (looking-at "^[ \t]*:")
+                       (forward-line 1))
+                     (point)))
+            (end (save-excursion
+                   (if (outline-next-heading)
+                       (point)
+                     (point-max)))))
+        (let ((content (buffer-substring-no-properties start end)))
+          (with-temp-buffer
+            (insert content)
+            (org-mode)
+            ;; Remove checkbox list items (answer choices)
+            (goto-char (point-min))
+            (while (re-search-forward "^[ \t]*- \\[[ x]\\] .*$" nil t)
+              (replace-match ""))
+            ;; Clean up extra newlines
+            (goto-char (point-min))
+            (while (re-search-forward "\n\n\n+" nil t)
+              (replace-match "\n\n"))
+            (org-export-as 'canvas-html nil nil t)))))))
+
+;; Quiz debugging utilities
+(defun org-lms-debug-quiz-structure ()
+  "Debug the current quiz structure showing groups and questions."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading)
+    (message "=== Quiz Structure Debug ===")
+    (message "Quiz: %s" (nth 4 (org-heading-components)))
+    (message "Quiz ID: %s" (org-entry-get nil "QUIZ_ID"))
+    
+    (org-map-entries 
+     (lambda ()
+       (let ((level (org-outline-level))
+             (heading (nth 4 (org-heading-components)))
+             (pick-count (org-entry-get nil "PICK_COUNT"))
+             (question-type (org-entry-get nil "QUESTION_TYPE"))
+             (group-id (org-entry-get nil "QUESTION_GROUP_ID"))
+             (question-id (org-entry-get nil "QUESTION_ID")))
+         (cond
+          (pick-count
+           (message "  GROUP (level %d): %s" level heading)
+           (message "    PICK_COUNT: %s" pick-count)
+           (message "    GROUP_ID: %s" group-id))
+          (question-type
+           (message "    QUESTION (level %d): %s" level heading)
+           (message "      QUESTION_TYPE: %s" question-type)
+           (message "      QUESTION_ID: %s" question-id)
+           (message "      INHERITED_GROUP_ID: %s" (org-entry-get nil "QUESTION_GROUP_ID" t))))))
+     nil 'tree)))
 
 ;; Quiz utilities
 (defun org-lms-post-quiz-with-questions ()
-  "Post the current quiz and all its questions to Canvas."
+  "Post the current quiz, question groups, and all questions to Canvas."
   (interactive)
   (save-excursion
     (org-back-to-heading)
@@ -4043,27 +4148,52 @@ If the question text is effectively empty, prepend the question title."
     ;; First create the quiz
     (let ((quiz-response (org-lms-post-quiz))
           (question-count 0)
-          (question-responses '()))
+          (group-count 0)
+          (question-responses '())
+          (group-responses '()))
       (if (plist-get quiz-response :id)
           (progn
-            (message "Quiz created successfully. Creating questions...")
-            ;; Now create questions from subheadings
+            (message "Quiz created successfully. Processing structure...")
+            
+            ;; Process groups and direct questions (no nesting needed)
             (org-map-entries 
              (lambda ()
-               (when (org-entry-get nil "QUESTION_TYPE")
+               (cond
+                ;; Handle question groups (they process their own children)
+                ((org-entry-get nil "PICK_COUNT")
+                 (setq group-count (1+ group-count))
+                 (message "Creating question group %d..." group-count)
+                 (let ((group-response (org-lms-post-quiz-question-group)))
+                   (if (plist-get group-response :group)
+                       (progn
+                         (push group-response group-responses)
+                         ;; Add child question count to total
+                         (setq question-count (+ question-count (plist-get group-response :question-count)))
+                         (setq question-responses (append question-responses (plist-get group-response :questions)))
+                         (message "Question group %d created successfully with %d questions" 
+                                 group-count (plist-get group-response :question-count)))
+                     (message "Failed to create question group %d" group-count))))
+                
+                ;; Handle direct questions (not in groups) - only level 2 headings
+                ((and (org-entry-get nil "QUESTION_TYPE")
+                      (not (org-entry-get nil "PICK_COUNT" t))
+                      (= (org-outline-level) 2))
                  (setq question-count (1+ question-count))
-                 (message "Creating question %d..." question-count)
+                 (message "Creating direct question %d..." question-count)
                  (let ((question-response (org-lms-post-quiz-question)))
                    (if (plist-get question-response :id)
                        (progn
                          (push question-response question-responses)
                          (message "Question %d created successfully" question-count))
-                     (message "Failed to create question %d" question-count)))))
+                     (message "Failed to create question %d" question-count))))))
              nil 'tree)
-            (message "Quiz creation complete: %d questions added" question-count)
+            
+            (message "Quiz creation complete: %d groups, %d questions added" group-count question-count)
             ;; Return summary
             `(:quiz ,quiz-response 
+              :groups ,(reverse group-responses)
               :questions ,(reverse question-responses)
+              :group-count ,group-count
               :question-count ,question-count))
         (message "Failed to create quiz")
         nil))))
@@ -4090,8 +4220,8 @@ If the question text is effectively empty, prepend the question title."
     (org-entry-put nil "OL_PUBLISH" "nil")
     (insert "\nThis is the quiz description. You can include instructions here.\n\n")
     
-    ;; Add sample questions
-    (insert "** Sample Multiple Choice Question\n")
+    ;; Add sample direct question
+    (insert "** Direct Question (not in group)\n")
     (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
     (org-entry-put nil "QUESTION_POINTS" "2")
     (org-entry-put nil "CORRECT_COMMENTS" "Excellent! That's the correct answer.")
@@ -4102,14 +4232,33 @@ If the question text is effectively empty, prepend the question title."
     (insert "- [ ] 5\n")
     (insert "- [ ] 6\n\n")
     
-    (insert "** Another Sample Question\n")
-    (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
+    ;; Add sample question group
+    (insert "** Math Problems (Question Group)\n")
+    (org-entry-put nil "PICK_COUNT" "2")
     (org-entry-put nil "QUESTION_POINTS" "3")
-    (insert "\nWhich of the following is correct?\n\n")
-    (insert "- [ ] Option A\n")
-    (insert "- [x] Option B (this is correct)\n")
-    (insert "- [ ] Option C\n")
-    (insert "- [ ] Option D\n\n")))
+    (org-entry-put nil "GROUP_POSITION" "1")
+    (insert "\nThis group will randomly select 2 questions from the pool below.\n\n")
+    
+    (insert "*** Addition Problem\n")
+    (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
+    (insert "\n- [ ] 7\n")
+    (insert "- [x] 8\n")
+    (insert "- [ ] 9\n")
+    (insert "- [ ] 10\n\n")
+    
+    (insert "*** Subtraction Problem\n")
+    (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
+    (insert "\n- [ ] 2\n")
+    (insert "- [x] 3\n")
+    (insert "- [ ] 4\n")
+    (insert "- [ ] 5\n\n")
+    
+    (insert "*** Multiplication Problem\n")
+    (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
+    (insert "\n- [ ] 10\n")
+    (insert "- [x] 12\n")
+    (insert "- [ ] 14\n")
+    (insert "- [ ] 16\n\n")))
 
 ;; Quiz API Functions:1 ends here
 
