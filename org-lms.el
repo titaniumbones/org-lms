@@ -4260,6 +4260,19 @@ Looks for answer choices in the format:
     (insert "- [ ] 14\n")
     (insert "- [ ] 16\n\n")))
 
+(defun org-lms-insert-short-answer-question ()
+  "Insert a new short-answer question header with appropriate structure at point."
+  (interactive)
+  (let ((question-title (read-string "Question title: "))
+        (question-points (read-string "Question points (default 1): " nil nil "3")))
+    (insert (format "*** %s\n" question-title))
+    (org-entry-put nil "QUESTION_TYPE" "short_answer_question")
+    (org-entry-put nil "QUESTION_POINTS" question-points)
+    (org-entry-put nil "CORRECT_COMMENTS" "Good answer!")
+    (org-entry-put nil "INCORRECT_COMMENTS" "Please review this topic.")
+    ;; (insert "\nEnter your question text here.\n\n")
+    ))
+
 ;; Quiz API Functions:1 ends here
 
 ;; library closing:1 ends here
