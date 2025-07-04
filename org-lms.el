@@ -3842,7 +3842,12 @@ if that succeeds, open them"
          (courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))
          (title (nth 4 (org-heading-components)))
          (description (org-lms-export-quiz-description))
-         (quiz-type (or (org-entry-get nil "QUIZ_TYPE") "assignment"))
+         (quiz-type-raw (or (org-entry-get nil "QUIZ_TYPE") "assignment"))
+         (quiz-type (if (member quiz-type-raw '("practice_quiz" "assignment" "graded_survey" "survey"))
+                        quiz-type-raw
+                      (progn
+                        (message "Warning: Invalid QUIZ_TYPE '%s'. Using 'assignment' instead. Valid types: practice_quiz, assignment, graded_survey, survey" quiz-type-raw)
+                        "assignment")))
          (time-limit (org-entry-get nil "TIME_LIMIT"))
          (allowed-attempts (org-entry-get nil "ALLOWED_ATTEMPTS"))
          (scoring-policy (or (org-entry-get nil "SCORING_POLICY") "keep_highest"))
@@ -3891,6 +3896,7 @@ if that succeeds, open them"
         (org-set-property "QUIZ_HTML_URL" (format "%s" (plist-get response :html_url)))
         (org-set-property "QUIZ_MOBILE_URL" (format "%s" (plist-get response :mobile_url)))
         (org-set-property "QUIZ_PREVIEW_URL" (format "%s" (plist-get response :preview_url)))
+        (org-set-property "QUIZ_TYPE" quiz-type)
         (org-set-property "ORG_LMS_CATEGORY" "Quiz"))
       
       response)))
@@ -3992,7 +3998,14 @@ if that succeeds, open them"
          (quizid (org-entry-get nil "QUIZ_ID" t))
          (questionid (org-entry-get nil "QUESTION_ID"))
          (question-name (nth 4 (org-heading-components)))
-         (question-text (org-lms-export-question-text))
+         (question-text-body (org-lms-export-question-text))
+         (question-text (if (and question-text-body 
+                                (string-match-p "\\S-" question-text-body)
+                                (not (string-match-p (regexp-quote question-name) question-text-body)))
+                           (format "<p><strong>%s</strong></p>\n%s" question-name question-text-body)
+                         (if (and question-text-body (string-match-p "\\S-" question-text-body))
+                             question-text-body
+                           (format "<p><strong>%s</strong></p>" question-name))))
          (question-type (or (org-entry-get nil "QUESTION_TYPE") "multiple_choice_question"))
          (points-possible (or (org-entry-get nil "QUESTION_POINTS") "1"))
          (correct-comments (org-entry-get nil "CORRECT_COMMENTS"))
@@ -4003,6 +4016,9 @@ if that succeeds, open them"
                            ("question_text" . ,question-text)
                            ("question_type" . ,question-type)
                            ("points_possible" . ,(string-to-number points-possible)))))
+
+    (message "DEBUG: Question name: %s" question-name)
+    (message "DEBUG: Question text: %s" (substring question-text 0 (min 100 (length question-text))))
 
     ;; Add comments if they exist
     (when correct-comments
@@ -4025,11 +4041,11 @@ if that succeeds, open them"
 
     (let* ((final-params `(("question" . ,question-params)))
            (response (org-lms-canvas-request
-                     (format "courses/%s/quizzes/%s/questions%s"
-                            courseid quizid
-                            (if questionid (format "/%s" questionid) ""))
-                     (if questionid "PUT" "POST")
-                     final-params)))
+                      (format "courses/%s/quizzes/%s/questions%s"
+                              courseid quizid
+                              (if questionid (format "/%s" questionid) ""))
+                      (if questionid "PUT" "POST")
+                      final-params)))
       
       (when (plist-get response :id)
         (org-set-property "QUESTION_ID" (format "%s" (plist-get response :id)))
@@ -4041,20 +4057,25 @@ if that succeeds, open them"
   "Extract quiz answers from the current subtree content.
 Looks for answer choices in the format:
 - [ ] Wrong answer
-- [x] Correct answer
+- [X] Correct answer
 - [ ] Another wrong answer"
   (save-restriction
     (org-narrow-to-subtree)
     (let ((answers '())
           (answer-weight 100))
+      (message "DEBUG: Searching for answers in content...")
       (goto-char (point-min))
-      (while (re-search-forward "^[ \t]*- \\[\\([x ]\\)\\] \\(.*\\)$" nil t)
-        (let* ((is-correct (string= (match-string 1) "x"))
+      (message "DEBUG: Buffer content: %s" (buffer-substring-no-properties (point-min) (point-max)))
+      (while (re-search-forward "^[ \t]*- \\[\\([X ]\\)\\] \\(.*\\)$" nil t)
+        (let* ((checkbox-content (match-string 1))
+               (is-correct (string= checkbox-content "X"))
                (answer-text (match-string 2))
                (weight (if is-correct answer-weight 0))
                (answer `(("answer_text" . ,answer-text)
                         ("answer_weight" . ,weight))))
+          (message "DEBUG: Found checkbox [%s] with text '%s', weight %d" checkbox-content answer-text weight)
           (push answer answers)))
+      (message "DEBUG: Total answers found: %d" (length answers))
       (reverse answers))))
 
 ;; Quiz export helper functions
@@ -4080,7 +4101,7 @@ Looks for answer choices in the format:
             (org-export-as 'canvas-html nil nil t)))))))
 
 (defun org-lms-export-question-text ()
-  "Export question text excluding answer choices (checkbox lists)."
+  "Export question text excluding answer choices (checkbox lists) and grading notes."
   (save-restriction
     (org-narrow-to-subtree)
     (save-excursion
@@ -4091,22 +4112,97 @@ Looks for answer choices in the format:
                        (forward-line 1))
                      (point)))
             (end (save-excursion
-                   (if (outline-next-heading)
-                       (point)
-                     (point-max)))))
+                   ;; Find first subheading (including grading notes)
+                   (let ((current-level (org-outline-level)))
+                     (if (re-search-forward (format "^\\*\\{%d,\\}" (+ current-level 1)) nil t)
+                         (progn (beginning-of-line) (point))
+                       (point-max))))))
         (let ((content (buffer-substring-no-properties start end)))
           (with-temp-buffer
             (insert content)
             (org-mode)
             ;; Remove checkbox list items (answer choices)
             (goto-char (point-min))
-            (while (re-search-forward "^[ \t]*- \\[[ x]\\] .*$" nil t)
+            (while (re-search-forward "^[ \t]*- \\[[ xX]\\] .*$" nil t)
               (replace-match ""))
             ;; Clean up extra newlines
             (goto-char (point-min))
             (while (re-search-forward "\n\n\n+" nil t)
               (replace-match "\n\n"))
             (org-export-as 'canvas-html nil nil t)))))))
+
+(defun org-lms-extract-grading-notes ()
+  "Extract content from Grading Notes subheading (tagged with grading_note)."
+  (save-excursion
+    (org-back-to-heading)
+    (let ((grading-notes ""))
+      (save-restriction
+        (org-narrow-to-subtree)
+        ;; Look for grading_note tagged subheading
+        (when (re-search-forward "^\\*+ .*:grading_note:" nil t)
+          (let* ((notes-start (progn
+                                (forward-line 1)
+                                (point)))
+                 (notes-end (save-excursion
+                              ;; Find next heading at same or higher level
+                              (if (re-search-forward "^\\*+ " nil t)
+                                  (progn (beginning-of-line) (point))
+                                (point-max))))
+                 (notes-content (buffer-substring-no-properties notes-start notes-end)))
+            ;; Clean up the content
+            (setq grading-notes (string-trim notes-content)))))
+      grading-notes)))
+
+(defun org-lms-calculate-quiz-item-position ()
+  "Calculate position of current quiz item within its quiz structure.
+Returns 1-based position counting all quiz items (questions/groups) in the quiz."
+  (save-excursion
+    (let ((current-pos (point))
+          (position 1))
+      ;; Go to the quiz heading (find ancestor with QUIZ tag or QUIZ_ID)
+      (while (and (org-up-heading-safe)
+                  (not (or (member "QUIZ" (org-get-tags))
+                          (org-entry-get nil "QUIZ_ID")
+                          (org-entry-get nil "NEW_QUIZ_ID")))))
+      
+      ;; Now we're at the quiz level, count quiz items before current position
+      (org-map-entries
+       (lambda ()
+         (when (< (point) current-pos)
+           ;; Count if this is a quiz item (has QUESTION_TYPE or PICK_COUNT)
+           (when (or (org-entry-get nil "QUESTION_TYPE")
+                    (org-entry-get nil "PICK_COUNT"))
+             (setq position (1+ position)))))
+       nil 'tree)
+      
+      position)))
+
+(defun org-lms-update-quiz-positions ()
+  "Update POSITION properties for all quiz items in current quiz to match org structure."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading)
+    ;; Make sure we're at the quiz level
+    (while (and (org-up-heading-safe)
+                (not (or (member "QUIZ" (org-get-tags))
+                        (org-entry-get nil "QUIZ_ID")
+                        (org-entry-get nil "NEW_QUIZ_ID")))))
+    
+    (let ((update-count 0))
+      (org-map-entries
+       (lambda ()
+         ;; Update position for quiz items (questions and groups)
+         (when (or (org-entry-get nil "QUESTION_TYPE")
+                  (org-entry-get nil "PICK_COUNT"))
+           (let ((calculated-position (org-lms-calculate-quiz-item-position)))
+             (org-set-property "POSITION" (format "%s" calculated-position))
+             (setq update-count (1+ update-count))
+             (message "Updated position for '%s' to %d" 
+                     (nth 4 (org-heading-components)) 
+                     calculated-position))))
+       nil 'tree)
+      
+      (message "Updated %d quiz item positions" update-count))))
 
 ;; Quiz debugging utilities
 (defun org-lms-debug-quiz-structure ()
@@ -4228,7 +4324,7 @@ Looks for answer choices in the format:
     (org-entry-put nil "INCORRECT_COMMENTS" "Not quite right. Please review the material.")
     (insert "\nWhat is 2 + 2?\n\n")
     (insert "- [ ] 3\n")
-    (insert "- [x] 4\n")
+    (insert "- [X] 4\n")
     (insert "- [ ] 5\n")
     (insert "- [ ] 6\n\n")
     
@@ -4242,21 +4338,21 @@ Looks for answer choices in the format:
     (insert "*** Addition Problem\n")
     (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
     (insert "\n- [ ] 7\n")
-    (insert "- [x] 8\n")
+    (insert "- [X] 8\n")
     (insert "- [ ] 9\n")
     (insert "- [ ] 10\n\n")
     
     (insert "*** Subtraction Problem\n")
     (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
     (insert "\n- [ ] 2\n")
-    (insert "- [x] 3\n")
+    (insert "- [X] 3\n")
     (insert "- [ ] 4\n")
     (insert "- [ ] 5\n\n")
     
     (insert "*** Multiplication Problem\n")
     (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
     (insert "\n- [ ] 10\n")
-    (insert "- [x] 12\n")
+    (insert "- [X] 12\n")
     (insert "- [ ] 14\n")
     (insert "- [ ] 16\n\n")))
 
@@ -4268,10 +4364,474 @@ Looks for answer choices in the format:
     (insert (format "*** %s\n" question-title))
     (org-entry-put nil "QUESTION_TYPE" "short_answer_question")
     (org-entry-put nil "QUESTION_POINTS" question-points)
+    (org-entry-put nil "POSITION" "1")
     (org-entry-put nil "CORRECT_COMMENTS" "Good answer!")
     (org-entry-put nil "INCORRECT_COMMENTS" "Please review this topic.")
-    ;; (insert "\nEnter your question text here.\n\n")
-    ))
+    (insert "\nEnter your question text here.\n\n")
+    (insert "**** Grading Notes                                       :grading_note:\n")
+    (insert "Enter grading instructions for this question here.\n\n")))
+
+(defun org-lms-insert-essay-question ()
+  "Insert a new essay question header with appropriate structure at point."
+  (interactive)
+  (let ((question-title (read-string "Question title: "))
+        (question-points (read-string "Question points (default 5): " nil nil "5")))
+    (insert (format "*** %s\n" question-title))
+    (org-entry-put nil "QUESTION_TYPE" "essay_question")
+    (org-entry-put nil "QUESTION_POINTS" question-points)
+    (org-entry-put nil "POSITION" "1")
+    (org-entry-put nil "CORRECT_COMMENTS" "Excellent essay!")
+    (org-entry-put nil "INCORRECT_COMMENTS" "Please review the essay requirements.")
+    (insert "\nEnter your essay question text here.\n\n")
+    (insert "**** Grading Notes                                       :grading_note:\n")
+    (insert "Enter grading criteria and rubric for this essay question here.\n\n")))
+
+(defun org-lms-delete-quiz-question-by-id (question-id quiz-id &optional course-id)
+  "Delete quiz question QUESTION-ID from quiz QUIZ-ID in Canvas."
+  (setq course-id (or course-id (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-canvas-request 
+   (format "courses/%s/quizzes/%s/questions/%s" course-id quiz-id question-id) 
+   "DELETE"))
+
+(defun org-lms-delete-current-quiz-question ()
+  "Delete the current quiz question from Canvas and remove the heading from buffer."
+  (interactive)
+  (let ((question-id (org-entry-get nil "QUESTION_ID"))
+        (quiz-id (org-entry-get nil "QUIZ_ID" t))
+        (question-type (org-entry-get nil "QUESTION_TYPE"))
+        (heading (nth 4 (org-heading-components))))
+    (if (and question-type question-id quiz-id)
+        (when (y-or-n-p (format "Delete question '%s' (ID: %s) from Canvas and buffer? " heading question-id))
+          (message "Deleting question from Canvas...")
+          (let ((response (org-lms-delete-quiz-question-by-id question-id quiz-id)))
+            (if response
+                (progn
+                  (message "Question deleted from Canvas successfully")
+                  ;; Delete the entire subtree from buffer
+                  (org-back-to-heading)
+                  (org-cut-subtree)
+                  (message "Question removed from buffer"))
+              (message "Failed to delete question from Canvas"))))
+      (message "Current heading is not a quiz question or missing required IDs"))))
+
+;; New Quizzes API Functions
+;; New Quiz request helper function
+(defun org-lms-new-quiz-request (query &optional request-type request-params)
+  "Send QUERY to New Quizzes API with correct base URL."
+  (unless request-type (setq request-type "GET"))
+  (let* ((new-quiz-baseurl (replace-regexp-in-string "/api/v1/$" "/api/quiz/v1/" org-lms-baseurl))
+         (canvas-payload nil)
+         (canvas-err nil)
+         (canvas-status nil)
+         (json-array-type 'list)
+         (json-object-type 'plist)  
+         (json-key-type 'keyword)
+         (json-false nil)
+         (json-params (json-encode request-params))
+         (target (concat new-quiz-baseurl query)))
+    (message "New Quiz target: %s" target)
+    (message "New Quiz params: %s" json-params)
+    (if org-lms-token
+        (progn (setq thisrequest
+                     (request
+                      target
+                      :type request-type
+                      :sync t
+                      :data json-params
+                      :encoding 'utf-8
+                      :headers `(("Authorization" . ,(concat "Bearer " org-lms-token))
+                                ("Content-Type" . "application/json"))
+                      :parser (lambda ()
+                                (ol-jsonwrapper json-read))
+                      :success (cl-function
+                                (lambda (&key data response &allow-other-keys)
+                                  (message "NEW QUIZ SUCCESS: %S" data)
+                                  (message "Response status: %s" (request-response-status-code response))
+                                  (setq canvas-payload data)))
+                      :error (cl-function
+                              (lambda (&key error-thrown data status response &allow-other-keys)
+                                (setq canvas-err error-thrown)
+                                (message "NEW QUIZ ERROR: %s" error-thrown)
+                                (message "Error status: %s" status)
+                                (message "Error data: %s" data)
+                                (when response
+                                  (message "Response status code: %s" (request-response-status-code response))
+                                  (message "Response data: %s" (request-response-data response)))))))
+               (unless (request-response-data thisrequest)
+                 (message "NO PAYLOAD: %s" canvas-err))
+               (or (request-response-data thisrequest) thisrequest))
+      (user-error "You must set org-lms-token in order to make Canvas API requests"))))
+
+;; New Quiz Management Functions
+(defun org-lms-post-new-quiz ()
+  "Create or update a new quiz from current headline properties."
+  (interactive)
+  (let* ((assignment-id (org-entry-get nil "NEW_QUIZ_ID"))
+         (courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))
+         (title (nth 4 (org-heading-components)))
+         (assignment-group-id (or (org-entry-get nil "ASSIGNMENT_GROUP_ID") "1"))
+         (points-possible (or (org-entry-get nil "POINTS_POSSIBLE") "0"))
+         (grading-type (or (org-entry-get nil "GRADING_TYPE") "points"))
+         (due-date (org-entry-get nil "DUE_AT"))
+         (unlock-date (org-entry-get nil "UNLOCK_AT"))
+         (lock-date (org-entry-get nil "LOCK_AT"))
+         (published (org-entry-get nil "OL_PUBLISH"))
+         
+         (quiz-inner-params `(("title" . ,title)
+                             ("assignment_group_id" . ,(string-to-number assignment-group-id))
+                             ("points_possible" . ,(string-to-number points-possible))
+                             ("grading_type" . ,grading-type))))
+    (message "DEBUG: Course ID = %s" courseid)
+    (message "DEBUG: Assignment ID = %s" assignment-id)
+    (message "DEBUG: Title = %s" title)
+    (unless courseid
+      (user-error "Course ID not found! Make sure ORG_LMS_COURSEID is set in your setup file"))
+
+    ;; Add optional parameters if they exist
+    (when due-date
+      (add-to-list 'quiz-inner-params `("due_at" . ,due-date)))
+    (when unlock-date
+      (add-to-list 'quiz-inner-params `("unlock_at" . ,unlock-date)))
+    (when lock-date
+      (add-to-list 'quiz-inner-params `("lock_at" . ,lock-date)))
+    (when published
+      (add-to-list 'quiz-inner-params `("published" . ,(if (string= published "t") t nil))))
+
+    ;; Add quiz settings if they exist
+    (let ((quiz-settings '()))
+      (when-let ((time-limit (org-entry-get nil "TIME_LIMIT")))
+        (push `("session_time_limit_in_seconds" . ,(* 60 (string-to-number time-limit))) quiz-settings)
+        (push `("has_time_limit" . t) quiz-settings))
+      (when-let ((allowed-attempts (org-entry-get nil "ALLOWED_ATTEMPTS")))
+        (push `("multiple_attempts" . t) quiz-settings)
+        (push `("allowed_attempts" . ,(string-to-number allowed-attempts)) quiz-settings))
+      (when-let ((shuffle-answers (org-entry-get nil "SHUFFLE_ANSWERS")))
+        (push `("shuffle_answers" . ,(string= shuffle-answers "t")) quiz-settings))
+      (when quiz-settings
+        (add-to-list 'quiz-inner-params `("quiz_settings" . ,quiz-settings))))
+
+    ;; Wrap in quiz object as required by New Quizzes API
+    (let* ((quiz-params `(("quiz" . ,quiz-inner-params)))
+           (response (org-lms-new-quiz-request
+                     (format "courses/%s/quizzes%s"
+                            courseid
+                            (if assignment-id (format "/%s" assignment-id) ""))
+                     (if assignment-id "PATCH" "POST")
+                     quiz-params)))
+      (message "DEBUG: Final quiz params = %s" quiz-params)
+      (message "New Quiz response: %s" response)
+      (when (plist-get response :id)
+        (org-set-property "NEW_QUIZ_ID" (format "%s" (plist-get response :id)))
+        (when (plist-get response :html_url)
+          (org-set-property "NEW_QUIZ_HTML_URL" (plist-get response :html_url))))
+      response)))
+
+(defun org-lms-get-new-quiz (assignment-id &optional courseid)
+  "Retrieve new quiz ASSIGNMENT-ID in course COURSEID."
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-new-quiz-request (format "courses/%s/quizzes/%s" courseid assignment-id) "GET"))
+
+(defun org-lms-delete-new-quiz (assignment-id &optional courseid)
+  "Delete new quiz ASSIGNMENT-ID in course COURSEID."
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-new-quiz-request (format "courses/%s/quizzes/%s" courseid assignment-id) "DELETE"))
+
+;; New Quiz Item Bank Management Functions
+(defun org-lms-post-new-quiz-item-bank ()
+  "Create or update a new quiz item bank from current headline properties."
+  (interactive)
+  (let* ((bank-id (org-entry-get nil "ITEM_BANK_ID"))
+         (courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))
+         (name (nth 4 (org-heading-components)))
+         (description (org-lms-export-quiz-description))
+         
+         (bank-params `(("name" . ,name)
+                       ("description" . ,description))))
+
+    (let ((response (org-lms-new-quiz-request
+                     (format "courses/%s/item_banks%s"
+                            courseid
+                            (if bank-id (format "/%s" bank-id) ""))
+                     (if bank-id "PATCH" "POST")
+                     bank-params)))
+      (message "Item Bank response: %s" response)
+      (when (plist-get response :id)
+        (org-set-property "ITEM_BANK_ID" (format "%s" (plist-get response :id))))
+      response)))
+
+;; New Quiz Item Management Functions
+(defun org-lms-post-new-quiz-item ()
+  "Create or update a new quiz item from current headline properties."
+  (interactive)
+  (let* ((item-id (org-entry-get nil "NEW_ITEM_ID"))
+         (courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))
+         (assignment-id (org-entry-get nil "NEW_QUIZ_ID" t))
+         (question-type (org-entry-get nil "QUESTION_TYPE"))
+         (question-text (org-lms-export-question-text))
+         (question-points (or (org-entry-get nil "QUESTION_POINTS") "1"))
+         (question-position (org-lms-calculate-quiz-item-position))
+         (correct-comments (org-entry-get nil "CORRECT_COMMENTS"))
+         (incorrect-comments (org-entry-get nil "INCORRECT_COMMENTS"))
+         
+         ;; Map classic question types to new quiz item types
+         (item-type (cond
+                     ((string= question-type "multiple_choice_question") "multiple_choice")
+                     ((string= question-type "short_answer_question") "essay_question")
+                     ((string= question-type "essay_question") "essay_question")
+                     ((string= question-type "true_false_question") "true_false")
+                     (t "multiple_choice")))
+         
+         ;; Build properties (remove duplicated fields that are now at top level)
+         (properties `(("title" . ,(nth 4 (org-heading-components)))
+                      ("points_possible" . ,(string-to-number question-points))))
+         
+         ;; Build interaction data based on question type
+         (interaction-data (cond
+                           ((string= item-type "multiple_choice")
+                            `(("prompt" . ,question-text)))
+                           ((string= item-type "essay_question")
+                            `(("rce" . t)
+                              ("essay" . :json-null)
+                              ("word_count" . t)
+                              ("file_upload" . :json-false)
+                              ("spell_check" . t)
+                              ("word_limit_max" . "1000")
+                              ("word_limit_min" . "0")
+                              ("word_limit_enabled" . t)))
+                           (t `(("prompt" . ,question-text)))))
+         
+         ;; Initialize scoring data based on question type
+         (scoring-data (cond
+                       ((string= item-type "essay_question") 
+                        (let ((grading-notes (org-lms-extract-grading-notes)))
+                          `(("value" . ,(if (and grading-notes (not (string-empty-p grading-notes)))
+                                           grading-notes
+                                         "")))))
+                       (t '()))))
+
+    ;; Add feedback if available
+    (when (or correct-comments incorrect-comments)
+      (let ((feedback '()))
+        (when correct-comments
+          (push `("correct" . ,correct-comments) feedback))
+        (when incorrect-comments
+          (push `("incorrect" . ,incorrect-comments) feedback))
+        (push `("feedback" . ,feedback) properties)))
+
+    ;; Add answer choices for multiple choice questions
+    (when (string= item-type "multiple_choice")
+      (let ((answers (org-lms-extract-quiz-answers)))
+        (message "DEBUG: Extracted answers = %s" answers)
+        (when answers
+          (let ((choices (mapcar (lambda (answer)
+                                 `(("id" . ,(format "choice_%d" (cl-position answer answers)))
+                                   ("position" . ,(+ (cl-position answer answers) 1))
+                                   ("itemBody" . ,(format "<p>%s</p>" (alist-get "answer_text" answer nil nil #'string=)))))
+                               answers))
+                (correct-choices (cl-remove-if-not (lambda (a) 
+                                                   (> (alist-get "answer_weight" a 0 nil #'string=) 0)) 
+                                                 answers)))
+            (message "DEBUG: Choices = %s" choices)
+            (message "DEBUG: Correct choices = %s" correct-choices)
+            (push `("choices" . ,choices) interaction-data)
+            ;; Set scoring data for multiple choice
+            (when correct-choices
+              (setq scoring-data `(("value" . ,(format "choice_%d" (cl-position (car correct-choices) answers))))))))))
+
+    ;; Build the entry (actual question content) using correct New Quiz format
+    (let* ((interaction-type-slug (cond
+                                   ((string= item-type "multiple_choice") "choice")
+                                   ((string= item-type "essay_question") "essay")
+                                   ((string= item-type "true_false") "true_false")
+                                   (t "choice")))
+           
+           ;; Build properties with correct structure
+           (entry-properties (cond
+                             ((string= item-type "multiple_choice")
+                              `(("shuffleRules" . (("choices" . (("toLock" . [])
+                                                                 ("shuffled" . t)))))
+                                ("varyPointsByAnswer" . :json-false)))
+                             ((string= item-type "essay_question")
+                              '())
+                             (t '())))
+           
+           ;; Build feedback structure
+           (feedback-obj '())
+           
+           (entry `(("interaction_type_slug" . ,interaction-type-slug)
+                   ("title" . ,(nth 4 (org-heading-components)))
+                   ("item_body" . ,question-text)
+                   ("calculator_type" . "none")
+                   ("interaction_data" . ,interaction-data)
+                   ("properties" . ,entry-properties)
+                   ("scoring_data" . ,(if scoring-data scoring-data '()))
+                   ("scoring_algorithm" . "Equivalence")
+                   ("feedback" . ,feedback-obj))))
+
+      ;; Add feedback if available
+      (when (or correct-comments incorrect-comments)
+        (when correct-comments
+          (push `("correct" . ,correct-comments) feedback-obj))
+        (when incorrect-comments
+          (push `("incorrect" . ,incorrect-comments) feedback-obj))
+        (setf (alist-get "feedback" entry nil nil #'string=) feedback-obj))
+
+      ;; Build the outer item structure
+      (let ((item `(("entry_type" . "Item")
+                   ("points_possible" . ,(string-to-number question-points))
+                   ("position" . ,question-position)
+                   ("entry" . ,entry))))
+
+        ;; Wrap in item object as required by New Quiz Items API
+        (let* ((final-params `(("item" . ,item))))
+          (message "DEBUG: Calculated position = %s" question-position)
+          (message "DEBUG: Entry = %s" entry)
+          (message "DEBUG: Item = %s" item)
+          (message "DEBUG: Final params = %s" final-params)
+          (let ((response (org-lms-new-quiz-request
+                           (format "courses/%s/quizzes/%s/items%s"
+                                   courseid assignment-id
+                                   (if item-id (format "/%s" item-id) ""))
+                           (if item-id "PATCH" "POST")
+                           final-params)))
+            (message "New Quiz Item response: %s" response)
+            (when (plist-get response :id)
+              (org-set-property "NEW_ITEM_ID" (format "%s" (plist-get response :id))))
+            ;; Always update POSITION property to reflect calculated position
+            (org-set-property "POSITION" (format "%s" question-position))
+            response))))))
+
+(defun org-lms-get-new-quiz-items (assignment-id &optional courseid)
+  "Retrieve all items for new quiz ASSIGNMENT-ID in course COURSEID."
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-new-quiz-request (format "courses/%s/quizzes/%s/items" courseid assignment-id) "GET"))
+
+(defun org-lms-delete-new-quiz-item (item-id assignment-id &optional courseid)
+  "Delete new quiz item ITEM-ID from quiz ASSIGNMENT-ID in course COURSEID."
+  (setq courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+  (org-lms-new-quiz-request 
+   (format "courses/%s/quizzes/%s/items/%s" courseid assignment-id item-id) 
+   "DELETE"))
+
+;; New Quiz comprehensive workflow function
+(defun org-lms-post-new-quiz-with-items ()
+  "Post the current new quiz and all items to Canvas."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading)
+    (message "Creating new quiz...")
+    ;; First create the new quiz
+    (let ((quiz-response (org-lms-post-new-quiz))
+          (item-count 0)
+          (item-responses '()))
+      (if (plist-get quiz-response :id)
+          (progn
+            (message "New quiz created successfully. Processing items...")
+            
+            ;; Process items (no groups in new quizzes, just direct items)
+            (org-map-entries 
+             (lambda ()
+               (when (and (org-entry-get nil "QUESTION_TYPE")
+                         (>= (org-outline-level) 2))
+                 (setq item-count (1+ item-count))
+                 (message "Creating item %d..." item-count)
+                 (let ((item-response (org-lms-post-new-quiz-item)))
+                   (if (plist-get item-response :id)
+                       (progn
+                         (push item-response item-responses)
+                         (message "Item %d created successfully" item-count))
+                     (message "Failed to create item %d" item-count)))))
+             nil 'tree)
+            
+            (message "New quiz creation complete: %d items added" item-count)
+            `(:quiz ,quiz-response :items ,(reverse item-responses) :item-count ,item-count))
+        (message "Failed to create new quiz")
+        nil))))
+
+;; Conversion helper functions
+(defun org-lms-convert-quiz-to-new-quiz ()
+  "Convert current classic quiz heading to new quiz format."
+  (interactive)
+  (when (org-entry-get nil "QUIZ_ID")
+    (let ((quiz-id (org-entry-get nil "QUIZ_ID"))
+          (assignment-group-id (or (org-entry-get nil "ASSIGNMENT_GROUP_ID") "1")))
+      ;; Set new quiz properties
+      (org-set-property "NEW_QUIZ_TYPE" "new_quiz")
+      (org-set-property "ASSIGNMENT_GROUP_ID" assignment-group-id)
+      (unless (org-entry-get nil "GRADING_TYPE")
+        (org-set-property "GRADING_TYPE" "points"))
+      
+      ;; Convert question type properties for child questions
+      (org-map-entries
+       (lambda ()
+         (when (org-entry-get nil "QUESTION_ID")
+           (org-set-property "ORIGINAL_QUESTION_ID" (org-entry-get nil "QUESTION_ID"))
+           (org-delete-property "QUESTION_ID")))
+       nil 'tree)
+      
+      (message "Quiz converted to new quiz format. Use org-lms-post-new-quiz-with-items to create."))))
+
+;; Delete helper function for new quiz items
+(defun org-lms-delete-current-new-quiz-item ()
+  "Delete the current new quiz item from Canvas and remove the heading from buffer."
+  (interactive)
+  (let ((item-id (org-entry-get nil "NEW_ITEM_ID"))
+        (assignment-id (org-entry-get nil "NEW_QUIZ_ID" t))
+        (question-type (org-entry-get nil "QUESTION_TYPE"))
+        (heading (nth 4 (org-heading-components))))
+    (if (and question-type item-id assignment-id)
+        (when (y-or-n-p (format "Delete item '%s' (ID: %s) from Canvas and buffer? " heading item-id))
+          (message "Deleting item from Canvas...")
+          (let ((response (org-lms-delete-new-quiz-item item-id assignment-id)))
+            (if response
+                (progn
+                  (message "Item deleted from Canvas successfully")
+                  ;; Delete the entire subtree from buffer
+                  (org-back-to-heading)
+                  (org-cut-subtree)
+                  (message "Item removed from buffer"))
+              (message "Failed to delete item from Canvas"))))
+      (message "Current heading is not a new quiz item or missing required IDs"))))
+
+(defun org-lms-new-quiz-template ()
+  "Insert a template for a new quiz with sample items."
+  (interactive)
+  (let ((quiz-title (read-string "New quiz title: "))
+        (assignment-group-id (read-string "Assignment group ID (default 1): " nil nil "1"))
+        (due-date (format-time-string "%Y-%m-%d" (time-add (current-time) (* 7 24 3600)))))
+    (insert (format "* %s :NEW_QUIZ:\n" quiz-title))
+    (org-entry-put nil "NEW_QUIZ_TYPE" "new_quiz")
+    (org-entry-put nil "ASSIGNMENT_GROUP_ID" assignment-group-id)
+    (org-entry-put nil "GRADING_TYPE" "points")
+    (org-entry-put nil "TIME_LIMIT" "30")
+    (org-entry-put nil "ALLOWED_ATTEMPTS" "1")
+    (org-entry-put nil "SHUFFLE_ANSWERS" "t")
+    (org-entry-put nil "DUE_AT" due-date)
+    (org-entry-put nil "POINTS_POSSIBLE" "10")
+    (org-entry-put nil "OL_PUBLISH" "nil")
+    (insert "\nThis is the new quiz description. You can include instructions here.\n\n")
+    
+    ;; Add sample multiple choice item
+    (insert "** Multiple Choice Question\n")
+    (org-entry-put nil "QUESTION_TYPE" "multiple_choice_question")
+    (org-entry-put nil "QUESTION_POINTS" "2")
+    (org-entry-put nil "POSITION" "1")
+    (org-entry-put nil "CORRECT_COMMENTS" "Excellent! That's the correct answer.")
+    (org-entry-put nil "INCORRECT_COMMENTS" "Not quite right. Please review the material.")
+    (insert "\nWhat is 2 + 2?\n\n")
+    (insert "- [ ] 3\n")
+    (insert "- [X] 4\n")
+    (insert "- [ ] 5\n")
+    (insert "- [ ] 6\n\n")
+    
+    ;; Add sample short answer item
+    (insert "** Short Answer Question\n")
+    (org-entry-put nil "QUESTION_TYPE" "short_answer_question")
+    (org-entry-put nil "QUESTION_POINTS" "3")
+    (org-entry-put nil "POSITION" "2")
+    (org-entry-put nil "CORRECT_COMMENTS" "Good answer!")
+    (org-entry-put nil "INCORRECT_COMMENTS" "Please provide more detail.")
+    (insert "\nExplain the significance of the year 1492 in European history.\n\n")))
 
 ;; Quiz API Functions:1 ends here
 
