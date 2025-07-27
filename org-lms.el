@@ -4204,6 +4204,30 @@ Returns 1-based position counting all quiz items (questions/groups) in the quiz.
       
       (message "Updated %d quiz item positions" update-count))))
 
+(defun org-lms-remove-quiz-ids ()
+  "Remove QUESTION_GROUP_ID, QUIZ_ID, and QUESTION_ID properties from all headings in current subtree."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading)
+    (let ((removed-count 0))
+      (org-map-entries
+       (lambda ()
+         (let ((removed-from-heading 0))
+           (when (org-entry-get nil "QUESTION_GROUP_ID")
+             (org-entry-delete nil "QUESTION_GROUP_ID")
+             (setq removed-from-heading (1+ removed-from-heading)))
+           (when (org-entry-get nil "QUIZ_ID")
+             (org-entry-delete nil "QUIZ_ID")
+             (setq removed-from-heading (1+ removed-from-heading)))
+           (when (org-entry-get nil "QUESTION_ID")
+             (org-entry-delete nil "QUESTION_ID")
+             (setq removed-from-heading (1+ removed-from-heading)))
+           (when (> removed-from-heading 0)
+             (setq removed-count (1+ removed-count))
+             (message "Removed %d properties from: %s" removed-from-heading (nth 4 (org-heading-components))))))
+       nil 'tree)
+      (message "Removed quiz ID properties from %d headings" removed-count))))
+
 ;; Quiz debugging utilities
 (defun org-lms-debug-quiz-structure ()
   "Debug the current quiz structure showing groups and questions."
