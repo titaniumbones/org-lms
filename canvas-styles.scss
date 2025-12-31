@@ -98,3 +98,9 @@ section.outline-2 h2.content-box {
     margin-top:0.25em;
     margin-bottom: 0.25em;
 }
+
+// bold h5's inside these boxes
+
+#contents-course-schedule h5 {
+    font-weight: bold;
+}

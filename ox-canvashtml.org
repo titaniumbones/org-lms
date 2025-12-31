@@ -19,7 +19,7 @@ Here's a short list of classes & some smaple code to give a bit of a sense of wh
 <p>Librarians are an indispensable resource for helping your students gain confidence and skill in locating and evaluating information. Consult the list of <a href="https://onesearch.library.utoronto.ca/liaison-librarians">Faculty Liaison Librarians</a> to see who could act as a resource to help you prepare your course syllabus (e.g. identify and locate e-resources and readings), help students understand and navigate research tools in your field (e.g. demo a search tool for your students), or assist with teaching your students key information literacy skills (provide information to be included in an online module in Quercus, or as part of an assignment, etc.).</p>
   #+end_src
 
-  I'm not going to try to deal with those ~img~ tags today, as they're a uge time suck.  But we can simplify a fair bitmap
+  I'm not going to try to deal with those ~img~ tags today, as they're a uge time suck.  But we can simplify a fair bit
   #+begin_src html
   <h2 class="content-box pad-box-mini border border-trbl border-round element_toggler"
       style="background-color: #0e3c67; color: #ffffff;"
@@ -601,106 +601,108 @@ also gonna add the capacity to just add an additional div to that sweeps the who
 
 Good thing we did ahtat before though as we have to modify it now anyway for folding
 #+begin_src emacs-lisp
-;;;; Headline
+  ;;;; Headline
 
-(defun org-canvas-html-headline (headline contents info)
-  "Transcode a HEADLINE element from Org to HTML.
-CONTENTS holds the contents of the headline.  INFO is a plist
-holding contextual information."
-  (unless (org-element-property :footnote-section-p headline)
-    (let* ((numberedp (org-export-numbered-headline-p headline info))
-           (numbers (org-export-get-headline-number headline info))
-           (level (+ (org-export-get-relative-level headline info)
-                     (1- (plist-get info :html-toplevel-hlevel))))
-           (todo (and (plist-get info :with-todo-keywords)
-                      (let ((todo (org-element-property :todo-keyword headline)))
-                        (and todo (org-export-data todo info)))))
-           (todo-type (and todo (org-element-property :todo-type headline)))
-           (priority (and (plist-get info :with-priority)
-                          (org-element-property :priority headline)))
-           (text (org-export-data (org-element-property :title headline) info))
-           (tags (and (plist-get info :with-tags)
-                      (org-export-get-tags headline info)))
-           (full-text (funcall (plist-get info :html-format-headline-function)
-                               todo todo-type priority text tags info))
-           (contents (or contents ""))
-	   (id (org-html--reference headline info))
-           (fat-classes (when (or (org-export-read-attribute :attr_canvashtml headline :fat)
-                                  (org-element-property :CANVAS_HTML_FAT headline)
-                                  (org-export-read-attribute :attr_canvashtml headline :fat))
-                          org-canvas-html-fat-classes))
-           (add-toggler (or (org-element-property :CANVAS_HTML_TOGGLE headline)
-                            (org-export-read-attribute :attr_canvashtml headline :toggle)))
-           (show-toggled (or (org-element-property :CANVAS_HTML_SHOW headline)
-                             (org-export-read-attribute :attr_canvashtml headline :show)))
-	   (formatted-text
-	    (if (plist-get info :html-self-link-headlines)
-		(format "<a href=\"#%s\">%s</a>" id full-text)
-	      full-text)))
-      (if (org-export-low-level-p headline info)
-          ;; This is a deep sub-tree: export it as a list item.
-          (let* ((html-type (if numberedp "ol" "ul")))
-	    (concat
-	     (and (org-export-first-sibling-p headline info)
-		  (apply #'format "<%s class=\"org-%s\">\n"
-			 (make-list 2 html-type)))
-	     (org-html-format-list-item
-	      contents (if numberedp 'ordered 'unordered)
-	      nil info nil
-	      (concat (org-html--anchor id nil nil info) formatted-text)) "\n"
-	     (and (org-export-last-sibling-p headline info)
-		  (format "</%s>\n" html-type))))
-	;; Standard headline.  Export it as a section.
-        (let* ((extra-class
-               
-	       (org-element-property :HTML_CONTAINER_CLASS headline))
-               (headline-class (org-element-property :HTML_HEADLINE_CLASS headline))
-	      (headline-all-classes
-               (concat (and  fat-classes " ")
-                       fat-classes
-                       (and add-toggler " ")
-                       (when add-toggler org-canvas-html-toggler-classes)
-                       (and headline-class " ")
-                       headline-class))
-              (first-content (car (org-element-contents headline))))
-          
-          (format "<%s id=\"%s\" class=\"%s\">%s%s</%s>\n"
-                  (org-html--container headline info)
-                  (format "outline-container-%s" id)
-                  (concat (format "outline-%d" level)
-                          (and extra-class " ")
-                          extra-class)
-                  (format "\n<h%d id=\"%s\"%s%s>%s</h%d>\n"
-                          level
-                          id
-			  (if (not headline-all-classes) ""
-			    (format " class=\"%s\"" headline-all-classes))
-                          (if (not add-toggler) ""
-                              (org-canvashtml-toggler-make-aria id))
-                          (concat
-                           (and numberedp
-                                (format
-                                 "<span class=\"section-number-%d\">%s</span> "
-                                 level
-                                 (concat (mapconcat #'number-to-string numbers ".") ".")))
-                           formatted-text)
-                          level)
-                  ;; When there is no section, pretend there is an
-                  ;; empty one to get the correct <div
-                  ;; class="outline-...> which is needed by
-                  ;; `org-info.js'.
+  (defun org-canvas-html-headline (headline contents info)
+    "Transcode a HEADLINE element from Org to HTML.
+  CONTENTS holds the contents of the headline.  INFO is a plist
+  holding contextual information."
+    (unless (org-element-property :footnote-section-p headline)
+      (let* ((numberedp (org-export-numbered-headline-p headline info))
+             (numbers (org-export-get-headline-number headline info))
+             (level (+ (org-export-get-relative-level headline info)
+                       (1- (plist-get info :html-toplevel-hlevel))))
+             (todo (and (plist-get info :with-todo-keywords)
+                        (let ((todo (org-element-property :todo-keyword headline)))
+                          (and todo (org-export-data todo info)))))
+             (todo-type (and todo (org-element-property :todo-type headline)))
+             (priority (and (plist-get info :with-priority)
+                            (org-element-property :priority headline)))
+             (text (org-export-data (org-element-property :title headline) info))
+             (tags (and (plist-get info :with-tags)
+                        (org-export-get-tags headline info)))
+             (full-text (funcall (plist-get info :html-format-headline-function)
+                                 todo todo-type priority text tags info))
+             (contents (or contents ""))
+  	   (id (org-html--reference headline info))
+             (fat-classes (when (or (org-export-read-attribute :attr_canvashtml headline :fat)
+                                    (org-element-property :CANVAS_HTML_FAT headline)
+                                    (org-export-read-attribute :attr_canvashtml headline :fat))
+                            org-canvas-html-fat-classes))
+             (add-toggler (or (org-element-property :CANVAS_HTML_TOGGLE headline)
+                              (org-export-read-attribute :attr_canvashtml headline :toggle)))
+             (show-toggled (or (org-element-property :CANVAS_HTML_SHOW headline)
+                               (org-export-read-attribute :attr_canvashtml headline :show)))
+  	   (formatted-text
+  	    (if (plist-get info :html-self-link-headlines)
+  		(format "<a href=\"#%s\">%s</a>" id full-text)
+  	      full-text)))
+        (if (org-export-low-level-p headline info)
+            ;; This is a deep sub-tree: export it as a list item.
+            (let* ((html-type (if numberedp "ol" "ul")))
+  	    (concat
+  	     (and (org-export-first-sibling-p headline info)
+  		  (apply #'format "<%s class=\"org-%s\">\n"
+  			 (make-list 2 html-type)))
+  	     (org-html-format-list-item
+  	      contents (if numberedp 'ordered 'unordered)
+  	      nil info nil
+  	      (concat (org-html--anchor id nil nil info) formatted-text)) "\n"
+  	     (and (org-export-last-sibling-p headline info)
+  		  (format "</%s>\n" html-type))))
+  	;; Standard headline.  Export it as a section.
+          (let* ((extra-class
+                 
+  	       (org-element-property :HTML_CONTAINER_CLASS headline))
+                 (headline-class (org-element-property :HTML_HEADLINE_CLASS headline))
+  	      (headline-all-classes
+                 (concat (and  fat-classes " ")
+                         fat-classes
+                         (and add-toggler " ")
+                         (when add-toggler org-canvas-html-toggler-classes)
+                         (and headline-class " ")
+                         headline-class))
+                (first-content (car (org-element-contents headline))))
+            
+            (format "<%s id=\"%s\" class=\"%s\">%s%s</%s>\n"
+                    (org-html--container headline info)
+                    (format "outline-container-%s" id)
+                    (concat (format "outline-%d" level)
+                            (and extra-class " ")
+                            extra-class)
+                    (format "\n<h%d id=\"%s\"%s%s>%s%s%s</h%d>\n"
+                            level
+                            id
+  			  (if (not headline-all-classes) ""
+  			    (format " class=\"%s\"" headline-all-classes))
+                            (if (not add-toggler) ""
+                                (org-canvashtml-toggler-make-aria id))
+                            (if (> level 3) "<strong>" "")
+                            (concat
+                             (and numberedp
+                                  (format
+                                   "<span class=\"section-number-%d\">%s</span> "
+                                   level
+                                   (concat (mapconcat #'number-to-string numbers ".") ".")))
+                             formatted-text)
+                            (if (> level 3) "</strong>" "")
+                            level)
+                    ;; When there is no section, pretend there is an
+                    ;; empty one to get the correct <div
+                    ;; class="outline-...> which is needed by
+                    ;; `org-info.js'.
 
-                  ;; also, for now add an extra div (!)
-                  ;; which could mess things up
-                  (concat
-                   (format "<div id=\"contents-%s\"%s>"
-                           id
-                           (when (and add-toggler (not show-toggled)) " style=\"display:none\""))
-                   (if (eq (org-element-type first-content) 'section) contents
-                     (concat (org-canvas-html-section first-content "" info) contents))
-                   "</div>")
-                  
-                  (org-html--container headline info)))))))
+                    ;; also, for now add an extra div (!)
+                    ;; which could mess things up
+                    (concat
+                     (format "<div id=\"contents-%s\"%s>"
+                             id
+                             (when (and add-toggler (not show-toggled)) " style=\"display:none\""))
+                     (if (eq (org-element-type first-content) 'section) contents
+                       (concat (org-canvas-html-section first-content "" info) contents))
+                     "</div>")
+                    
+                    (org-html--container headline info)))))))
 
 #+end_src
 

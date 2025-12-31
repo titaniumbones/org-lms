@@ -1,3 +1,4 @@
+
 ;; [[file:ox-canvashtml.org::*Requirements][Requirements:1]]
 (require  'ox-html)
 ;; Requirements:1 ends here
@@ -621,7 +622,11 @@ return just the body with an extra CSS tag"
                            (format "</%s>\n" (nth 1 (assq 'content (plist-get info :html-divs))))
                            ))
          (tempFile (make-temp-file "canvas-html-export" nil ".html" rawHtml)))
+    ;; compy contents of  tempFile  to ~/tmp/canvas-pre-juice.html
+    (copy-file "canvas-html-export.html" "pre-juice.html" t)
     (call-process "juice" nil "*juice-process*" nil "--css" org-canvas-html-css-file tempFile tempFile)
+    ;; write tempFIle to ~/tmp.canvas-post-juice.html
+    (copy-file "canvas-html-export.html" "post-juice.html" t)
     (with-temp-buffer
       (insert-file-contents tempFile)
       (buffer-string))))
@@ -640,7 +645,9 @@ holding export options."
            ;; Footnotes section.
            (org-html-footnote-section info)))
          (tempFile (make-temp-file "canvas-html-export" nil ".html" rawHtml)))
+    (copy-file tempFile "~/tmp/pre-juice.html" t)
     (call-process "juice" nil "*juice-process*" nil "--css" org-canvas-html-css-file tempFile tempFile)
+    (copy-file tempFile "~/tmp/post-juice.html" t)
     (with-temp-buffer
       (insert-file-contents tempFile)
       (buffer-string))))
