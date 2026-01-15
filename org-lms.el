@@ -3817,6 +3817,9 @@ if that succeeds, open them"
 ;; Preliminary mode defn:1 ends here
 
 ;; [[file:org-lms.org::*library closing][library closing:1]]
+;; Optional migration module
+(require 'org-lms-migration nil t)
+
 (provide 'org-lms)
 ;;; org-lms ends here
 ;; Quiz API Functions:1 starts here
