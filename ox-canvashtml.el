@@ -106,7 +106,8 @@ Bound dynamically during export by `org-lms-upload-org-images'.")
   :translate-alist '((template . canvas-html-template)
                      (inner-template . org-canvas-html-inner-template)
                      (section . org-canvas-html-section)
-                     (headline . org-canvas-html-headline))
+                     (headline . org-canvas-html-headline)
+                     (link . org-canvashtml-link))
     :menu-entry
   '(?2 "Export to HTML"
        ((?H "As HTML buffer" org-canvas-html-export-as-html)
