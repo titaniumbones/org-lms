@@ -201,8 +201,9 @@ INFO is a plist holding contextual information.  See
      ((and (plist-get info :html-inline-images)
 	   (org-export-inline-image-p
 	    link (plist-get info :html-inline-image-rules)))
-      (let* ((abs-path (expand-file-name
-			(url-unhex-string raw-path)
+      (let* ((orig-path (org-element-property :path link))
+	     (abs-path (expand-file-name
+			(url-unhex-string orig-path)
 			(file-name-directory
 			 (or (plist-get info :input-file) ""))))
 	     (canvas-url (and org-canvashtml-image-url-map

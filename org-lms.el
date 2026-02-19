@@ -1082,7 +1082,7 @@ but there are other possible endpoints; see the API for details. Optionally orga
              (setq formstring (concat formstring "-F '" (symbol-name (car prop))
                                       "=" (format "%s" (cdr prop)) "' ")))
     (setq formstring (concat formstring " -F 'file=@" filepath "' 2> /dev/null"))
-    (let* ((thiscommand  (concat "curl '"
+    (let* ((thiscommand  (concat "curl -L '"
                                  upload-url
                                  "' " formstring))
            (curlres  (shell-command-to-string thiscommand))
