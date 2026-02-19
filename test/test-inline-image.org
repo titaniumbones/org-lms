@@ -1,0 +1,89 @@
+#+TITLE: Canvas Image Layout Test
+#+ORG_LMS_COURSEID: 35724
+
+* Canvas Image Layout Test
+:PROPERTIES:
+:OL_PUBLISH: t
+:CANVASID: 2375428
+:CANVAS_PAGE_URL: canvas-image-layout-test
+:CANVAS_HTML_URL: https://q.utoronto.ca/courses/35724/pages/canvas-image-layout-test
+:CANVAS_SHORT_URL: canvas-image-layout-test
+:CANVAS_EDITING_ROLES: teachers
+:END:
+
+This page demonstrates all supported inline image layout variants.
+Upload with =M-x org-lms-post-page= from this heading.
+Subsequent uploads update the same page (via PUT once =CANVAS_SHORT_URL= is set).
+
+** Plain Inline Image
+
+[[file:20100310_95.JPG]]
+
+** Float Right
+
+#+ATTR_HTML: :class float-right
+[[file:20100310_95.JPG]]
+
+Text wrapping to the left of a float-right image. The image should appear
+flush right with this paragraph text flowing around its left side. Canvas
+preserves the =float: right= style inlined by juice from the =.figure.float-right=
+CSS rule in =canvas-styles.css=.
+
+** Float Left
+
+#+ATTR_HTML: :class float-left
+[[file:20100310_95.JPG]]
+
+Text wrapping to the right of a float-left image. The image should appear
+flush left with this paragraph text flowing around its right side. Canvas
+preserves the =float: left= style inlined by juice from the =.figure.float-left=
+CSS rule in =canvas-styles.css=.
+
+** Two Columns — Text Left, Image Right
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col
+Weekly content, readings, links, and other text go here. This column takes
+up approximately half the available width. The image is shown to the right.
+#+END_canvas-col
+#+BEGIN_canvas-col
+[[file:20100310_95.JPG]]
+#+END_canvas-col
+#+END_canvas-2col
+
+** Two Columns — Image Left, Text Right
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col
+[[file:20100310_95.JPG]]
+#+END_canvas-col
+#+BEGIN_canvas-col
+Content on the right side of the layout. The image occupies the left column
+and this text occupies the right column. Both columns have equal width.
+#+END_canvas-col
+#+END_canvas-2col
+
+** Two Columns — Wide (Text) + Narrow (Image)
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col-wide
+Wide column (~2/3): main content, narrative text, or an extended reading list
+goes here. This is the =canvas-col-wide= class with =flex: 2 1 55%=.
+#+END_canvas-col-wide
+#+BEGIN_canvas-col-narrow
+[[file:20100310_95.JPG]]
+#+END_canvas-col-narrow
+#+END_canvas-2col
+
+** Two Columns — Narrow (Image) + Wide (Text)
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col-narrow
+[[file:20100310_95.JPG]]
+#+END_canvas-col-narrow
+#+BEGIN_canvas-col-wide
+Wide column (~2/3) on the right: main content goes here. The narrow image
+column is on the left. This is the =canvas-col-narrow= + =canvas-col-wide=
+combination with the image preceding the text.
+#+END_canvas-col-wide
+#+END_canvas-2col

@@ -177,6 +177,97 @@
         (when (file-exists-p cache)
           (delete-file cache))))))
 
+;;; Layout QA constants and helpers
+
+(defconst test-layout-org
+  (expand-file-name "test-inline-image.org"
+                    (file-name-directory (or load-file-name buffer-file-name)))
+  "Persistent org file with all image layout variants for manual Canvas QA.")
+
+(defun test-export-to-canvas-html (org-content)
+  "Export ORG-CONTENT as canvas-html with juice mocked out.
+Navigates to the first level-1 heading and exports that subtree.
+Returns the HTML string."
+  (let ((temp-org (make-temp-file "canvas-layout-test" nil ".org")))
+    (unwind-protect
+        (progn
+          (write-region org-content nil temp-org)
+          (with-current-buffer (find-file-noselect temp-org)
+            (org-mode)
+            (goto-char (point-min))
+            (re-search-forward "^\\* " nil t)
+            (beginning-of-line)
+            (prog1
+                (cl-letf (((symbol-function 'copy-file) #'ignore)
+                          ((symbol-function 'call-process) (lambda (&rest _) 0)))
+                  (org-export-as 'canvas-html t nil t))
+              (kill-buffer))))
+      (when (file-exists-p temp-org)
+        (delete-file temp-org)))))
+
+;;; Phase 7 Test: Float-right class propagation
+
+(ert-deftest org-lms-image-test-07-float-right-class ()
+  "#+ATTR_HTML :class float-right should appear on the figure wrapper div."
+  (let* ((html (test-export-to-canvas-html
+                "#+TITLE: Float Test\n\n* Float Test\n\n#+ATTR_HTML: :class float-right\n[[file:fake.jpg]]\n")))
+    (should (stringp html))
+    (should (string-match-p "class=\"figure float-right\"" html))))
+
+;;; Phase 8 Test: Two-column flex layout classes
+
+(ert-deftest org-lms-image-test-08-two-column-layout ()
+  "canvas-2col and canvas-col special blocks should export with correct classes."
+  (let* ((html (test-export-to-canvas-html
+                (concat "#+TITLE: Two Col Test\n\n* Two Col Test\n\n"
+                        "#+BEGIN_canvas-2col\n"
+                        "#+BEGIN_canvas-col\nText.\n#+END_canvas-col\n"
+                        "#+BEGIN_canvas-col\nMore text.\n#+END_canvas-col\n"
+                        "#+END_canvas-2col\n"))))
+    (should (stringp html))
+    (should (string-match-p "class=\"canvas-2col\"" html))
+    (should (string-match-p "class=\"canvas-col\"" html))))
+
+;;; Phase 9 Test: Wide + narrow column classes
+
+(ert-deftest org-lms-image-test-09-wide-narrow-columns ()
+  "canvas-col-wide and canvas-col-narrow classes should both appear in output."
+  (let* ((html (test-export-to-canvas-html
+                (concat "#+TITLE: Wide Narrow\n\n* Wide Narrow\n\n"
+                        "#+BEGIN_canvas-2col\n"
+                        "#+BEGIN_canvas-col-wide\nWide.\n#+END_canvas-col-wide\n"
+                        "#+BEGIN_canvas-col-narrow\nNarrow.\n#+END_canvas-col-narrow\n"
+                        "#+END_canvas-2col\n"))))
+    (should (stringp html))
+    (should (string-match-p "class=\"canvas-col-wide\"" html))
+    (should (string-match-p "class=\"canvas-col-narrow\"" html))))
+
+;;; Phase 10 Test: Post full layout page to Canvas (live API)
+
+(ert-deftest org-lms-image-test-10-post-layout-page ()
+  "Post test/test-inline-image.org to Canvas sandbox; prints URL for visual QA.
+After the first run, CANVAS_SHORT_URL is saved to the file so future
+runs update the same page via PUT rather than creating a new one."
+  :tags '(:live-api)
+  (skip-unless (file-exists-p test-layout-org))
+  (skip-unless (stringp org-lms-token))
+  (let* (response)
+    (with-current-buffer (find-file-noselect test-layout-org)
+      (org-mode)
+      (goto-char (point-min))
+      (re-search-forward "^\\* " nil t)
+      (beginning-of-line)
+      (cl-letf (((symbol-function 'browse-url) #'ignore))
+        (setq response (org-lms-post-page)))
+      (when (buffer-modified-p)
+        (save-buffer))
+      (kill-buffer))
+    (should response)
+    (let ((html-url (plist-get response :html_url)))
+      (when html-url
+        (message "Canvas layout page posted: %s" html-url)
+        (message "Visually verify all layouts at: %s" html-url)))))
+
 ;;; Run all tests if invoked as a batch script
 
 (when noninteractive
