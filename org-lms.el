@@ -742,6 +742,8 @@ will be moved in this case too."
           `((html . ,(citeproc-formatter-create
 	              :rt (citeproc-formatter-fun-create org-lms-citeproc-fmt-alist)
 	              :bib #'citeproc-fmt--html-bib-formatter))))
+         (org-canvashtml-image-url-map
+          (org-lms-upload-org-images courseid "Uploaded Images"))
          (atext (org-export-as 'canvas-html subtreep nil t))
          (is_public (or (org-lms-get-keyword "IS_PUBLIC") t))
          (license (or (org-lms-get-keyword "LICENSE") "cc_by_nc_sa"))
@@ -925,6 +927,9 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
            )
       ;; (message "canvas evals to %s" (if canvasid "SOMETHING " "NOTHING" ))
       (let* ((org-export-with-tags nil)
+             (org-canvashtml-image-url-map
+              (org-lms-upload-org-images (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                         "Uploaded Images"))
              (page-params `(("wiki_page" .
                              (("title" .  ,(identity .item) )
                               ("body" . ,(org-export-as 'canvas-html t nil t))
@@ -4861,5 +4866,115 @@ Returns 1-based position counting all quiz items (questions/groups) in the quiz.
     (insert "\nExplain the significance of the year 1492 in European history.\n\n")))
 
 ;; Quiz API Functions:1 ends here
+
+;; [[file:org-lms.org::*Inline Image Upload][Inline Image Upload:1]]
+;;; Phase 1: Canvas preview URL construction
+
+(defun org-lms-canvas-file-preview-url (file-id &optional courseid)
+  "Return Canvas inline preview URL for FILE-ID in COURSEID.
+Derives canvas host from `org-lms-baseurl' by stripping /api/v1/ suffix."
+  (let* ((base (or org-lms-baseurl ""))
+         (canvas-host (replace-regexp-in-string "/api/v1/?$" "" base))
+         (courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))))
+    (format "%s/courses/%s/files/%s/preview" canvas-host courseid file-id)))
+
+;;; Phase 2: Image cache helpers
+
+(defun org-lms-image-cache-file ()
+  "Return path to image cache file alongside the current org buffer."
+  (concat (file-name-directory (buffer-file-name)) ".canvas-image-cache.el"))
+
+(defun org-lms-load-image-cache ()
+  "Load and return image cache alist, or nil if not found.
+Cache maps md5-hash strings to Canvas preview URL strings."
+  (let ((cache-file (org-lms-image-cache-file)))
+    (when (file-exists-p cache-file)
+      (with-temp-buffer
+        (insert-file-contents cache-file)
+        (condition-case nil
+            (read (current-buffer))
+          (error nil))))))
+
+(defun org-lms-save-image-cache (cache)
+  "Write CACHE alist to the image cache file."
+  (let ((cache-file (org-lms-image-cache-file)))
+    (with-temp-file cache-file
+      (prin1 cache (current-buffer)))))
+
+;;; Phase 3: Buffer image scanning
+
+(defun org-lms-collect-local-images (&optional buffer)
+  "Return deduplicated list of absolute paths to local images linked in BUFFER.
+BUFFER defaults to current buffer. Finds file-type links matching
+`org-html-inline-image-rules' that exist on disk."
+  (with-current-buffer (or buffer (current-buffer))
+    (let* ((dir (file-name-directory (buffer-file-name)))
+           (paths '()))
+      (org-element-map (org-element-parse-buffer) 'link
+        (lambda (link)
+          (when (and (string= "file" (org-element-property :type link))
+                     (org-export-inline-image-p link org-html-inline-image-rules))
+            (let ((abs-path (expand-file-name
+                             (url-unhex-string (org-element-property :path link))
+                             dir)))
+              (when (file-exists-p abs-path)
+                (push abs-path paths))))))
+      (delete-dups paths))))
+
+;;; Phase 4: Upload orchestration with deduplication
+
+(defun org-lms-upload-image-if-needed (filepath cache courseid &optional folder)
+  "Upload FILEPATH to Canvas if its MD5 hash is not already in CACHE.
+CACHE is an alist mapping md5-hash -> canvas-preview-url.
+COURSEID is the Canvas course ID. FOLDER is the upload folder name.
+Returns (canvas-url . updated-cache)."
+  (let* ((hash (with-temp-buffer
+                 (insert-file-contents-literally filepath)
+                 (md5 (buffer-string))))
+         (cached-url (alist-get hash cache nil nil #'string=)))
+    (if cached-url
+        (progn
+          (message "Image %s: cache hit, skipping upload"
+                   (file-name-nondirectory filepath))
+          (cons cached-url cache))
+      (condition-case err
+          (let* ((folder (or folder "Uploaded Images"))
+                 (curlres (org-lms-post-new-file filepath nil folder courseid))
+                 (file-data (when (and curlres (> (length curlres) 0))
+                              (ol-jsonwrapper json-read-from-string curlres)))
+                 (file-id (when file-data (plist-get file-data :id)))
+                 (canvas-url (when file-id
+                               (org-lms-canvas-file-preview-url file-id courseid))))
+            (if canvas-url
+                (cons canvas-url (cons (cons hash canvas-url) cache))
+              (message "Warning: could not extract file ID for %s" filepath)
+              (cons nil cache)))
+        (error
+         (message "Warning: failed to upload %s: %s"
+                  filepath (error-message-string err))
+         (cons nil cache))))))
+
+(defun org-lms-upload-org-images (&optional courseid folder)
+  "Upload all local images in current org buffer to Canvas.
+COURSEID defaults to ORG_LMS_COURSEID keyword.
+FOLDER is the Canvas folder name (default \"Uploaded Images\").
+Returns alist mapping absolute local paths to Canvas preview URLs."
+  (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
+         (folder (or folder "Uploaded Images"))
+         (images (org-lms-collect-local-images))
+         (cache (org-lms-load-image-cache))
+         (url-map '()))
+    (when images
+      (message "Uploading %d image(s) to Canvas..." (length images))
+      (dolist (filepath images)
+        (let* ((result (org-lms-upload-image-if-needed filepath cache courseid folder))
+               (canvas-url (car result)))
+          (setq cache (cdr result))
+          (when canvas-url
+            (push (cons filepath canvas-url) url-map))))
+      (org-lms-save-image-cache cache)
+      (message "Canvas image upload done: %d uploaded/cached" (length url-map)))
+    url-map))
+;; Inline Image Upload:1 ends here
 
 ;; library closing:1 ends here

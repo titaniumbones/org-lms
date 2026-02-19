@@ -95,6 +95,12 @@ or filename if no title."
       (t desc))))
 ;; Add a link type for internal canvas links:1 ends here
 
+;; [[file:ox-canvashtml.org::*Inline image URL map][Inline image URL map:1]]
+(defvar org-canvashtml-image-url-map nil
+  "Alist mapping absolute local image paths to Canvas preview URLs.
+Bound dynamically during export by `org-lms-upload-org-images'.")
+;; Inline image URL map:1 ends here
+
 ;; [[file:ox-canvashtml.org::*define the derived backend][define the derived backend:1]]
 (org-export-define-derived-backend 'canvas-html 'html
   :translate-alist '((template . canvas-html-template)
@@ -195,7 +201,14 @@ INFO is a plist holding contextual information.  See
      ((and (plist-get info :html-inline-images)
 	   (org-export-inline-image-p
 	    link (plist-get info :html-inline-image-rules)))
-      (org-html--format-image path attributes-plist info))
+      (let* ((abs-path (expand-file-name
+			(url-unhex-string raw-path)
+			(file-name-directory
+			 (or (plist-get info :input-file) ""))))
+	     (canvas-url (and org-canvashtml-image-url-map
+			      (alist-get abs-path org-canvashtml-image-url-map
+					 nil nil #'string=))))
+	(org-html--format-image (or canvas-url path) attributes-plist info)))
      ;; Radio target: Transcode target's contents and use them as
      ;; link's description.
      ((string= type "radio")
