@@ -1,3 +1,21 @@
+/* Inline image float helpers — use #+ATTR_HTML: :class float-right (or float-left)
+   on a standalone image paragraph. juice inlines these as style= attributes. */
+.figure.float-right {
+  float: right;
+  margin: 0 0 1em 1.5em;
+  max-width: 35%; }
+
+.figure.float-left {
+  float: left;
+  margin: 0 1.5em 1em 0;
+  max-width: 35%; }
+
+.figure.float-right img,
+.figure.float-left img {
+  width: 100%;
+  height: auto;
+  display: block; }
+
 .mygrid {
   display: grid;
   grid-template-columns: 1fr 1fr; }

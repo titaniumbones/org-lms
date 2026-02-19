@@ -107,7 +107,8 @@ Bound dynamically during export by `org-lms-upload-org-images'.")
                      (inner-template . org-canvas-html-inner-template)
                      (section . org-canvas-html-section)
                      (headline . org-canvas-html-headline)
-                     (link . org-canvashtml-link))
+                     (link . org-canvashtml-link)
+                     (paragraph . org-canvashtml-paragraph))
     :menu-entry
   '(?2 "Export to HTML"
        ((?H "As HTML buffer" org-canvas-html-export-as-html)
@@ -599,6 +600,32 @@ holding contextual information."
                   
                   (org-html--container headline info)))))))
 ;; Unfortunately, have to replace the headline function too :-(:1 ends here
+
+;; [[file:ox-canvashtml.org::*Paragraph with figure class propagation][Paragraph:1]]
+(defun org-canvashtml-paragraph (paragraph contents info)
+  "Like `org-html-paragraph' but propagates #+ATTR_HTML :class to figure wrapper.
+This lets #+ATTR_HTML :class float-right on a standalone image paragraph
+add that class to the outer <div class=\"figure\"> so CSS rules like
+.figure.float-right { float: right } can be targeted by juice inlining."
+  (if (org-html-standalone-image-p paragraph info)
+      (let* ((caption (org-export-get-caption paragraph))
+             (label (org-element-property :name paragraph))
+             (extra-class (plist-get (org-export-read-attribute :attr_html paragraph) :class))
+             (label-str (when label
+                          (format " id=\"%s\""
+                                  (org-export-get-reference label info))))
+             (class-str (if extra-class
+                            (format " figure %s" extra-class)
+                          " figure")))
+        (format "\n<div%s class=\"%s\">\n%s%s\n</div>"
+                (or label-str "")
+                (string-trim class-str)
+                contents
+                (if caption
+                    (format "\n<p>%s</p>" (org-trim (org-export-data caption info)))
+                  "")))
+    (org-html-paragraph paragraph contents info)))
+;; Paragraph:1 ends here
 
 ;; [[file:ox-canvashtml.org::*Add the template functions][Add the template functions:1]]
 (defun canvas-html-template (contents info)
