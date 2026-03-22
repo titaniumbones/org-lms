@@ -213,6 +213,89 @@ Returns final status plist, or signals error on timeout/failure."
       (error "Migration timed out after %d seconds" timeout))
     status))
 
+;;;; Async Polling
+
+(defvar org-lms-mig--poll-timer nil
+  "Active timer for async migration polling.")
+
+(defvar org-lms-mig--poll-state nil
+  "State plist for the active async poll.
+Keys: :course-id :migration-id :start-time :timeout
+      :on-complete :on-error :on-progress")
+
+(defun org-lms-mig--poll-tick ()
+  "Timer callback that checks migration status once.
+Reschedules itself or calls completion/error callbacks."
+  (condition-case err
+      (let* ((course-id (plist-get org-lms-mig--poll-state :course-id))
+             (migration-id (plist-get org-lms-mig--poll-state :migration-id))
+             (timeout (plist-get org-lms-mig--poll-state :timeout))
+             (start-time (plist-get org-lms-mig--poll-state :start-time))
+             (on-complete (plist-get org-lms-mig--poll-state :on-complete))
+             (on-error (plist-get org-lms-mig--poll-state :on-error))
+             (on-progress (plist-get org-lms-mig--poll-state :on-progress))
+             (status (org-lms-mig-get-status course-id migration-id))
+             (workflow-state (plist-get status :workflow_state)))
+        (message "Migration status: %s (progress: %s%%)"
+                 workflow-state
+                 (or (plist-get status :completion) 0))
+        (when on-progress
+          (funcall on-progress status))
+        (cond
+         ((member workflow-state '("imported" "completed"))
+          (org-lms-mig--poll-cancel)
+          (when on-complete
+            (funcall on-complete status)))
+         ((member workflow-state '("failed" "pre_process_error"))
+          (org-lms-mig--poll-cancel)
+          (let ((msg (format "Migration failed: %s"
+                             (plist-get status :migration_issues))))
+            (if on-error
+                (funcall on-error msg)
+              (message "%s" msg))))
+         ((>= (- (float-time) start-time) timeout)
+          (org-lms-mig--poll-cancel)
+          (let ((msg (format "Migration timed out after %d seconds" timeout)))
+            (if on-error
+                (funcall on-error msg)
+              (message "%s" msg))))))
+    (error
+     (org-lms-mig--poll-cancel)
+     (let ((on-error (plist-get org-lms-mig--poll-state :on-error)))
+       (if on-error
+           (funcall on-error (error-message-string err))
+         (message "Migration poll error: %s" (error-message-string err)))))))
+
+(defun org-lms-mig-poll-until-complete-async
+    (course-id migration-id &optional timeout on-complete on-error on-progress)
+  "Poll migration status asynchronously using a timer.
+COURSE-ID and MIGRATION-ID identify the Canvas migration.
+TIMEOUT defaults to `org-lms-mig-poll-timeout'.
+ON-COMPLETE is called with the final status plist on success.
+ON-ERROR is called with an error message string on failure/timeout.
+ON-PROGRESS is called with the status plist on each poll tick."
+  (when org-lms-mig--poll-timer
+    (org-lms-mig--poll-cancel))
+  (setq org-lms-mig--poll-state
+        (list :course-id course-id
+              :migration-id migration-id
+              :start-time (float-time)
+              :timeout (or timeout org-lms-mig-poll-timeout)
+              :on-complete on-complete
+              :on-error on-error
+              :on-progress on-progress))
+  (setq org-lms-mig--poll-timer
+        (run-at-time 0 org-lms-mig-poll-interval #'org-lms-mig--poll-tick))
+  (message "Async migration polling started (every %ds, timeout %ds)"
+           org-lms-mig-poll-interval
+           (or timeout org-lms-mig-poll-timeout)))
+
+(defun org-lms-mig--poll-cancel ()
+  "Cancel the active async poll timer."
+  (when org-lms-mig--poll-timer
+    (cancel-timer org-lms-mig--poll-timer)
+    (setq org-lms-mig--poll-timer nil)))
+
 ;;;; Snapshot Functions
 
 (defun org-lms-mig--generate-snapshot-id ()
@@ -329,10 +412,8 @@ SNAPSHOT can be a snapshot plist or a snapshot ID string."
           (with-current-buffer (find-file-noselect file)
             ;; Restore keywords
             (dolist (kw (plist-get file-data :keywords))
-              ;; Keywords are trickier - need to replace in-buffer
-              ;; For now, just log them
-              (message "Would restore keyword %s = %s in %s"
-                       (car kw) (cdr kw) file))
+              (org-lms-set-keyword (car kw) (cdr kw))
+              (cl-incf restored))
             ;; Restore heading properties
             (dolist (heading-data (plist-get file-data :headings))
               (goto-char (plist-get heading-data :position))
@@ -374,14 +455,20 @@ SCOPE is one of: `buffer', `directory', `project'."
 
 (defun org-lms-mig--parse-asset-mapping (raw-mapping)
   "Parse RAW-MAPPING from Canvas API into usable hash tables.
-Returns a plist mapping canvas-key to hash-table of old-id -> new-id."
+RAW-MAPPING is a plist as returned by the Canvas API (via `ol-jsonwrapper'),
+e.g. (:assignments (:12345 \"67890\" ...) :quizzes (:111 \"222\" ...)).
+Returns a plist mapping canvas-key to hash-table of old-id -> new-id,
+where both keys and values are strings."
   (let ((result nil))
-    (cl-loop for (key . val) on raw-mapping by #'cddr
+    (cl-loop for (key val) on raw-mapping by #'cddr
              do (let ((ht (make-hash-table :test 'equal))
-                      (key-str (symbol-name key)))
-                  ;; val is an alist like ((\"old\" . \"new\") ...)
-                  (dolist (pair val)
-                    (puthash (car pair) (cdr pair) ht))
+                      (key-str (replace-regexp-in-string
+                                "^:" "" (symbol-name key))))
+                  ;; val is a plist of (:old-id "new-id" ...) from JSON
+                  (cl-loop for (old-key new-val) on val by #'cddr
+                           do (puthash (replace-regexp-in-string
+                                        "^:" "" (symbol-name old-key))
+                                       new-val ht))
                   (setq result (plist-put result (intern key-str) ht))))
     result))
 
@@ -679,17 +766,24 @@ OPTIONS passed to `org-lms-mig-create'."
       (setq org-lms-mig--current-state
             (plist-put org-lms-mig--current-state :canvas-migration-id migration-id))
       (message "Migration created with ID %s. Polling for completion..." migration-id)
-      ;; Poll for completion
-      (let ((final-status (org-lms-mig-poll-until-complete dest-course-id migration-id)))
-        (setq org-lms-mig--current-state
-              (plist-put org-lms-mig--current-state :canvas-status
-                         (plist-get final-status :workflow_state)))
-        (message "Migration completed. Fetching asset mapping...")
-        ;; Get asset mapping
-        (let ((mapping (org-lms-mig-get-asset-mapping dest-course-id migration-id)))
-          (setq org-lms-mig--current-state
-                (plist-put org-lms-mig--current-state :asset-mapping mapping))
-          (message "Asset mapping retrieved. Ready to update org files."))))))
+      ;; Poll for completion asynchronously so Emacs stays responsive
+      (org-lms-mig-poll-until-complete-async
+       dest-course-id migration-id nil
+       ;; on-complete
+       (lambda (final-status)
+         (setq org-lms-mig--current-state
+               (plist-put org-lms-mig--current-state :canvas-status
+                          (plist-get final-status :workflow_state)))
+         (message "Migration completed. Fetching asset mapping...")
+         (let ((mapping (org-lms-mig-get-asset-mapping dest-course-id migration-id)))
+           (setq org-lms-mig--current-state
+                 (plist-put org-lms-mig--current-state :asset-mapping mapping))
+           (message "Asset mapping retrieved. Ready to update org files.")))
+       ;; on-error
+       (lambda (err-msg)
+         (setq org-lms-mig--current-state
+               (plist-put org-lms-mig--current-state :status 'failed))
+         (user-error "%s" err-msg))))))
 
 ;;;###autoload
 (defun org-lms-migrate-update-ids (&optional scope)
