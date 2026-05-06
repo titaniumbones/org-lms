@@ -1068,32 +1068,39 @@ but there are other possible endpoints; see the API for details. Optionally orga
 
 
 (defun org-lms-upload-file-to-storage (filepath fileinfo)
-  "using a canvas file upload response, upload a file to the file storage."
-  (interactive)
-  (message "uploading file. fileinfo: %s" fileinfo)
-  (let* ((upload-url (map-elt fileinfo :upload_url ))
+  "Step 2 of Canvas's multi-step file upload: POST FILEPATH to the inst-fs
+upload URL returned in FILEINFO from `org-lms-file-post-request'.
+
+Invokes curl via `call-process' rather than `shell-command-to-string'
+so multipart fields and the file path are passed as discrete arguments
+(no shell quoting / single-quote vulnerability), and the upload has a
+bounded timeout instead of being able to hang Emacs indefinitely on
+large files.
+
+Returns the response body as a JSON string (the file metadata Canvas
+emits after capturing the upload). The string is empty if the upload
+failed."
+  (let* ((upload-url (map-elt fileinfo :upload_url))
+         (file-param (or (map-elt fileinfo :file_param) "file"))
          (params-plist (map-elt fileinfo :upload_params))
          (params-alist (org-lms-plist-to-alist params-plist))
-         (canvas-payload)
-         (canvas-err )
-         (formstring ""))
-    (cl-loop for prop in params-alist
-             do
-             (setq formstring (concat formstring "-F '" (symbol-name (car prop))
-                                      "=" (format "%s" (cdr prop)) "' ")))
-    (setq formstring (concat formstring " -F 'file=@" filepath "' 2> /dev/null"))
-    (let* ((thiscommand  (concat "curl -L '"
-                                 upload-url
-                                 "' " formstring))
-           (curlres  (shell-command-to-string thiscommand))
-           (file_id (if (> (length curlres) 0 )
-                        (format "%s"
-                                (plist-get
-                                 (ol-jsonwrapper json-read-from-string curlres) :id )))))
-      (message "upload curl command response: %s" curlres)
-      ;;(f-write-text thiscommand 'utf-8 "~/src/org-grading/filecurlcommand.sh")
-      curlres
-      )))
+         (curl-args (list "-sS" "-L" "--max-time" "600")))
+    (dolist (p params-alist)
+      (setq curl-args
+            (append curl-args
+                    (list "-F" (format "%s=%s"
+                                       (symbol-name (car p))
+                                       (or (cdr p) ""))))))
+    (setq curl-args
+          (append curl-args
+                  (list "-F" (format "%s=@%s" file-param filepath)
+                        upload-url)))
+    (with-temp-buffer
+      (let ((status (apply #'call-process "curl" nil t nil curl-args)))
+        (if (zerop status)
+            (buffer-string)
+          (message "Canvas upload curl exited %s: %s" status (buffer-string))
+          "")))))
 ;; Getters:1 ends here
 
 ;; [[file:org-lms.org::*Getters][Getters:2]]
