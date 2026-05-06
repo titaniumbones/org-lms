@@ -71,6 +71,15 @@
     Probably customize is a rotten place to put this!"
   :type '(string))
 
+(defcustom org-lms-request-timeout 600
+  "Timeout (seconds) for synchronous Canvas API requests.
+The `request' library defaults synchronous calls to 30 seconds, which
+silently turns slow Canvas responses into errors that look like network
+failures. We use a generous default (10 minutes) and surface the value
+explicitly on every sync `request' call so behaviour does not depend on
+the upstream default."
+  :type 'integer)
+
 (defvar-local org-lms-course nil
   "Locally-set variable representing the local course.")
 
@@ -632,12 +641,13 @@ will be moved in this case too."
         (progn (setq thisrequest
                      (request
                       target
-                      
+
                       :type request-type
                       :headers `(("Authorization" . ,(concat "Bearer " org-lms-token))
                                  ("Content-Type" . "application/json")
                                  )
                       :sync t
+                      :timeout org-lms-request-timeout
                       ;;:data   (if  json-params (encode-coding-string json-params 'utf-8)  nil) ;; (or data nil)
                       :data   (if  json-params json-params  nil)
                       ;;:encoding 'no-conversion
@@ -1001,8 +1011,9 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
                              ;: ("Content-Type" . "application/json")
                              )
                   :sync t
+                  :timeout org-lms-request-timeout
                   ;;:data   json-params ;; (or data nil)
-                  :params request-params 
+                  :params request-params
                   ;;:encoding 'no-conversion
                   :parser (lambda ()
                             ;; (if (and (boundp 'file) file)
@@ -1482,6 +1493,7 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                         (request
                          downloadurl
                                 :sync t
+                                :timeout org-lms-request-timeout
                          :parser 'buffer-string )))
                     (fullpath (expand-file-name filename (org-entry-get (point) "ORG_LMS_ASSIGNMENT_DIRECTORY"))))
                (message "attachment exists")
@@ -3673,6 +3685,7 @@ maybe key-type needs to be keyword though! Still a work in progress.
                  :type request-type
                  :headers `(("Authorization" . ,(concat "Bearer " org-lms-token)))
                  :sync t
+                 :timeout org-lms-request-timeout
                  :data (if  request-params request-params nil)
                  :parser 'buffer-string
                  :success (cl-function
@@ -4476,6 +4489,7 @@ Returns 1-based position counting all quiz items (questions/groups) in the quiz.
                       target
                       :type request-type
                       :sync t
+                      :timeout org-lms-request-timeout
                       :data json-params
                       :encoding 'utf-8
                       :headers `(("Authorization" . ,(concat "Bearer " org-lms-token))
