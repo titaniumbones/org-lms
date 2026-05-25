@@ -4112,7 +4112,9 @@ Looks for answer choices in the format:
   (save-restriction
     (org-narrow-to-subtree)
     (save-excursion
-      (org-back-to-heading)
+      ;; invisible-ok: the subtree may be folded; anchor to its own heading
+      ;; regardless of fold state (otherwise errors "Before first headline").
+      (org-back-to-heading t)
       (let ((start (progn 
                      (forward-line 1)
                      (while (looking-at "^[ \t]*:")
@@ -4133,7 +4135,9 @@ Looks for answer choices in the format:
   (save-restriction
     (org-narrow-to-subtree)
     (save-excursion
-      (org-back-to-heading)
+      ;; invisible-ok: the subtree may be folded; anchor to its own heading
+      ;; regardless of fold state (otherwise errors "Before first headline").
+      (org-back-to-heading t)
       (let ((start (progn 
                      (forward-line 1)
                      (while (looking-at "^[ \t]*:")
@@ -4162,7 +4166,9 @@ Looks for answer choices in the format:
 (defun org-lms-extract-grading-notes ()
   "Extract content from Grading Notes subheading (tagged with grading_note)."
   (save-excursion
-    (org-back-to-heading)
+    ;; invisible-ok: the subtree may be folded (otherwise errors
+    ;; "Before first headline").
+    (org-back-to-heading t)
     (let ((grading-notes ""))
       (save-restriction
         (org-narrow-to-subtree)
