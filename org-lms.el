@@ -1616,7 +1616,15 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
           (org-set-property "GRADING_TYPE" (format "%s"(plist-get response-data :grading_type)))
           (org-set-property "CANVASID" (format "%s"(plist-get response-data :id)))
           
-          (if reflection 
+          ;; Sync rubric association if the assignment headline declares
+          ;; :RUBRIC_HEADING: or :RUBRIC_ID:.  No-op for assignments without
+          ;; one.  Helper lives in org-lms-rubrics.el; load lazily so we
+          ;; don't force a hard dependency for non-rubric users.
+          (when (fboundp 'org-lms-ensure-rubric-association-for-assignment)
+            (ignore-errors
+              (org-lms-ensure-rubric-association-for-assignment)))
+
+          (if reflection
               (let* ((reflection-params `(("assignment" .
                                            (("name" .  ,(concat  (nth 4 (org-heading-components)) " Reflection Questions") )
                                             ("description" . ,(org-export-as 'html t nil t))
@@ -3762,6 +3770,8 @@ copy that subtree as slack text for posting to slack."
 
 (defun isassignment (entry)
   (member "assignment" (org-get-tags )))
+(defun isrubric (entry)
+  (member "rubric" (org-get-tags)))
 (defun org-lms-assignment-wim ()
   "post current asisgnment to org-lms as an assignment, using wim criteria"
   (interactive)
@@ -3795,6 +3805,7 @@ copy that subtree as slack text for posting to slack."
     ((pred (string= "grades")) (org-lms-grades-wim))
     ((pred (string= "lecture")) (org-lms-export-reveal-wim-to-html))
     ((pred (string= "syllabus")) (org-lms-post-syllabus))
+    ((pred (string= "rubric")) (org-lms-rubric-wim))
     (- (progn (message "no section foind, please set the \"ORG_LMS_SECTION\" keyword.") nil)))
   )
 ;; Completely ad-hoc function designed exclusively for my own purposes:2 ends here
@@ -3908,8 +3919,11 @@ if that succeeds, open them"
       (add-to-list 'quiz-params `("due_at" . ,(o-l-date-to-timestamp due-date))))
     (when unlock-date
       (add-to-list 'quiz-params `("unlock_at" . ,(o-l-date-to-timestamp unlock-date))))
-    (when lock-date
-      (add-to-list 'quiz-params `("lock_at" . ,(o-l-date-to-timestamp lock-date))))
+    (if lock-date
+        (add-to-list 'quiz-params `("lock_at" . ,(o-l-date-to-timestamp lock-date)))
+      ;; No local LOCK_AT: explicitly clear any stale value on Canvas
+      (when canvasid
+        (add-to-list 'quiz-params '("lock_at" . ""))))
 
     (let* ((final-params `(("quiz" . ,quiz-params)))
            (response (org-lms-canvas-request
@@ -3918,15 +3932,20 @@ if that succeeds, open them"
                             (if canvasid (format "/%s" canvasid) ""))
                      (if canvasid "PUT" "POST")
                      final-params)))
-      
+
       (when (plist-get response :id)
         (org-set-property "QUIZ_ID" (format "%s" (plist-get response :id)))
         (org-set-property "QUIZ_HTML_URL" (format "%s" (plist-get response :html_url)))
         (org-set-property "QUIZ_MOBILE_URL" (format "%s" (plist-get response :mobile_url)))
         (org-set-property "QUIZ_PREVIEW_URL" (format "%s" (plist-get response :preview_url)))
         (org-set-property "QUIZ_TYPE" quiz-type)
-        (org-set-property "ORG_LMS_CATEGORY" "Quiz"))
-      
+        (org-set-property "ORG_LMS_CATEGORY" "Quiz")
+        ;; Write back lock_at so the local state reflects Canvas
+        (let ((remote-lock (plist-get response :lock_at)))
+          (if remote-lock
+              (org-set-property "LOCK_AT" remote-lock)
+            (org-delete-property "LOCK_AT"))))
+
       response)))
 
 ;; Quiz Question Group Management Functions
@@ -3985,7 +4004,8 @@ if that succeeds, open them"
               (message "Processing child questions for group...")
               (org-map-entries
                (lambda ()
-                 (when (org-entry-get nil "QUESTION_TYPE")
+                 (when (and (org-entry-get nil "QUESTION_TYPE")
+                            (not (org-in-commented-heading-p)))
                    (setq question-count (1+ question-count))
                    (let ((existing-question-id (org-entry-get nil "QUESTION_ID")))
                      (if existing-question-id
@@ -4022,6 +4042,11 @@ if that succeeds, open them"
 (defun org-lms-post-quiz-question ()
   "Create or update a quiz question from current headline properties."
   (interactive)
+  ;; Honor Org's COMMENT keyword: never post a commented question (or one
+  ;; under a commented group/quiz).  The group/quiz loops also skip these,
+  ;; so this guard mainly protects direct interactive invocation.
+  (when (org-in-commented-heading-p)
+    (user-error "org-lms: heading is commented (COMMENT); not posting question"))
   (let* ((courseid (org-lms-get-keyword "ORG_LMS_COURSEID"))
          (quizid (org-entry-get nil "QUIZ_ID" t))
          (questionid (org-entry-get nil "QUESTION_ID"))
@@ -4313,6 +4338,8 @@ Returns 1-based position counting all quiz items (questions/groups) in the quiz.
             (org-map-entries 
              (lambda ()
                (cond
+                ;; Skip COMMENT-ed subtrees entirely (honor Org's COMMENT keyword)
+                ((org-in-commented-heading-p) nil)
                 ;; Handle question groups (they process their own children)
                 ((org-entry-get nil "PICK_COUNT")
                  (setq group-count (1+ group-count))
