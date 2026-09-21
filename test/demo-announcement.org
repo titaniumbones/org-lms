@@ -1,0 +1,100 @@
+#+TITLE: org-lms feature demo — announcement
+#+ORG_LMS_COURSEID: 35724
+
+* Week 7: Field Trip Logistics and a Tour of Every Styling Feature
+:PROPERTIES:
+:ORG_LMS_WITHHOLD: t
+:END:
+
+This announcement exists to exercise every layout and styling feature that
+~ox-canvashtml~ currently supports. The image below is a *local file* on disk;
+posting uploads it to the course Files area and rewrites the link.
+
+#+CAPTION: Lake Ontario, March. A float-right figure with a caption.
+#+ATTR_HTML: :class float-right
+[[file:20100310_95.JPG]]
+
+Text set beside a floated figure wraps around it. This paragraph is here to
+give the float something to wrap against, so you can see that the ~float-right~
+class survived Canvas's HTML sanitizer as an inlined ~style~ attribute rather
+than a class reference to a stylesheet Canvas never loads. The figure is capped
+at 35% of the container width.
+
+** Alert boxes
+
+#+BEGIN_canvas-alert-info
+*Info.* Meet at the Old Vic steps at 08:45. The bus leaves at 09:00 sharp.
+#+END_canvas-alert-info
+
+#+BEGIN_canvas-alert-warning
+*Warning.* Bring waterproof boots. The shoreline path floods at high water.
+#+END_canvas-alert-warning
+
+#+BEGIN_canvas-alert-success
+*Success.* Everyone who submitted a permission form by Friday is confirmed.
+#+END_canvas-alert-success
+
+#+BEGIN_canvas-alert-danger
+*Danger.* Do not walk out onto the ice, under any circumstances.
+#+END_canvas-alert-danger
+
+A single paragraph can carry an alert class too, without a block:
+
+#+ATTR_HTML: :class canvas-alert-info
+This paragraph got its styling from ~#+ATTR_HTML: :class canvas-alert-info~.
+
+** Two columns, equal width
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col
+*What to bring.* Boots, a warm layer, a notebook you don't mind getting wet,
+and a phone with a working camera. We will be outside for roughly three hours
+with one indoor break.
+#+END_canvas-col
+#+BEGIN_canvas-col
+[[file:20100310_95.JPG]]
+#+END_canvas-col
+#+END_canvas-2col
+
+** Two columns, wide text and narrow image
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col-wide
+*Reading before the trip.* Skim the two shoreline-change chapters in the
+course reader. You do not need to take notes, but you should arrive able to
+say roughly how far the waterline has moved since 1954 and what the main
+drivers were. We will start the morning with that question.
+#+END_canvas-col-wide
+#+BEGIN_canvas-col-narrow
+[[file:20100310_95.JPG]]
+#+END_canvas-col-narrow
+#+END_canvas-2col
+
+** A styled table
+
+| Time  | Location          | What                     |
+|-------+-------------------+--------------------------|
+| 08:45 | Old Vic steps     | Assemble                 |
+| 09:00 | Bus               | Depart                   |
+| 10:15 | Bluffers Park     | Shoreline transect       |
+| 12:30 | Pavilion          | Lunch, indoors           |
+| 14:00 | Bus               | Return                   |
+
+** An explicitly sized image
+
+#+CAPTION: Same file again, constrained to 240px with an explicit alt attribute.
+#+ATTR_HTML: :width 240 :alt Ice on the Lake Ontario shoreline
+[[file:20100310_95.JPG]]
+
+Note that the same local file appears four times in this document but is
+uploaded to Canvas only once — the md5 cache in ~.canvas-image-cache.el~
+dedupes it, and all four links point at the same Canvas file.
+
+** Ordinary markup still works
+
+- A bullet list
+- With /emphasis/, *strong*, and ~code~
+- And a [[https://q.utoronto.ca][link to Quercus]]
+
+1. A numbered list
+2. Second item

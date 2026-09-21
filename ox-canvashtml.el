@@ -211,7 +211,16 @@ INFO is a plist holding contextual information.  See
 	     (canvas-url (and org-canvashtml-image-url-map
 			      (alist-get abs-path org-canvashtml-image-url-map
 					 nil nil #'string=))))
-	(org-html--format-image (or canvas-url path) attributes-plist info)))
+	;; `org-html--format-image' derives a missing alt from the last path
+	;; segment, which is "preview" for every Canvas file URL.  Keep the
+	;; original filename instead so the alt text stays meaningful.
+	(org-html--format-image
+	 (or canvas-url path)
+	 (if (and canvas-url (not (plist-get attributes-plist :alt)))
+	     (plist-put (copy-sequence attributes-plist)
+			:alt (file-name-nondirectory (url-unhex-string orig-path)))
+	   attributes-plist)
+	 info)))
      ;; Radio target: Transcode target's contents and use them as
      ;; link's description.
      ((string= type "radio")

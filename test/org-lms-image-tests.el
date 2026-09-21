@@ -379,6 +379,60 @@ POSTER passed to `org-lms-canvas-request'."
     (should (string-match-p (regexp-quote (test-expected-preview-url)) description))
     (should-not (string-match-p "src=\"file:" description))))
 
+
+;;; Phase 14/15 Tests: ORG_LMS_WITHHOLD controls announcement publish state
+
+(ert-deftest org-lms-image-test-14-announcement-withhold-unpublishes ()
+  "ORG_LMS_WITHHOLD on an announcement headline sends published=false."
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Withheld\n#+ORG_LMS_COURSEID: %d\n\n"
+                                  "* Withheld Announcement\n"
+                                  ":PROPERTIES:\n:ORG_LMS_WITHHOLD: t\n:END:\n\nBody.\n")
+                          test-courseid)
+                  #'org-lms-headline-to-announcement)))
+    (should (eq :json-false (alist-get "published" params nil nil #'string=)))
+    (should-not (assoc "is_published" params))))
+
+(ert-deftest org-lms-image-test-15-announcement-defaults-to-published ()
+  "Without ORG_LMS_WITHHOLD an announcement is sent as published=true."
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Live\n#+ORG_LMS_COURSEID: %d\n\n"
+                                  "* Live Announcement\n\nBody.\n")
+                          test-courseid)
+                  #'org-lms-headline-to-announcement)))
+    (should (eq t (alist-get "published" params nil nil #'string=)))))
+
+
+;;; Phase 16 Test: assignments are unpublished with a real JSON false
+
+(ert-deftest org-lms-image-test-16-assignment-unpublished-is-json-false ()
+  "Without OL_PUBLISH an assignment sends published=false, not null.
+Canvas ignores a null, so nil would leave the publish state to chance."
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Draft\n#+ORG_LMS_COURSEID: %d\n\n"
+                                  "* Draft Assignment\n\nBody.\n")
+                          test-courseid)
+                  #'org-lms-post-assignment))
+         (assignment (alist-get "assignment" params nil nil #'string=)))
+    (should (eq :json-false (alist-get "published" assignment nil nil #'string=)))))
+
+;;; Phase 17 Test: rewritten images keep a meaningful alt attribute
+
+(ert-deftest org-lms-image-test-17-rewritten-image-keeps-filename-alt ()
+  "Rewriting a file: link to a Canvas preview URL must not make alt=\"preview\".
+`org-html--format-image' derives a missing alt from the last path segment,
+which is \"preview\" for every Canvas file URL."
+  (skip-unless (file-exists-p test-image))
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Alt Test\n#+ORG_LMS_COURSEID: %d\n\n"
+                                  "* Alt Test\n\n[[file:%s]]\n")
+                          test-courseid test-image)
+                  #'org-lms-headline-to-announcement))
+         (message-html (alist-get "message" params nil nil #'string=)))
+    (should (stringp message-html))
+    (should (string-match-p "alt=\"20100310_95\\.JPG\"" message-html))
+    (should-not (string-match-p "alt=\"preview\"" message-html))))
+
 ;;; Run all tests if invoked as a batch script
 
 (when noninteractive

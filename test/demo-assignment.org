@@ -1,0 +1,94 @@
+#+TITLE: org-lms feature demo — assignment
+#+ORG_LMS_COURSEID: 35724
+
+* Shoreline Transect Report (styling feature demo)
+:PROPERTIES:
+:DUE_AT: 2026-10-15
+:ASSIGNMENT_WEIGHT: 0.15
+:GRADING_TYPE: points
+:CANVAS_SUBMISSION_TYPES: (online_upload)
+:END:
+
+Write a 1200-word report on the transect you walked at Bluffers Park. This
+description exercises the same styling features as the companion announcement,
+so you can compare how Canvas renders them in an assignment body.
+
+#+CAPTION: Your transect starts where the ice meets the sand. A float-left figure.
+#+ATTR_HTML: :class float-left
+[[file:20100310_95.JPG]]
+
+The figure to the left is a local file that was uploaded to the course Files
+area when this assignment was posted. Text wraps around it the same way it does
+in an announcement, which is worth confirming separately: Canvas runs assignment
+descriptions and discussion bodies through the same sanitizer, but they are
+rendered inside different page templates with different container widths.
+
+#+BEGIN_canvas-alert-danger
+*Late work.* The hard deadline is 15 October at 23:59. Submissions after that
+are not accepted without a registrar's accommodation.
+#+END_canvas-alert-danger
+
+** What to submit
+:PROPERTIES:
+:CANVAS_HTML_FAT: t
+:END:
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col
+*The report.* A single PDF, 1200 words give or take 10%, with your transect
+map as an appendix. Cite the two shoreline-change chapters and at least one
+source you found yourself.
+#+END_canvas-col
+#+BEGIN_canvas-col
+*The data.* Your raw measurements as a CSV, one row per station, with the
+column headers we agreed on in week 6. Do not clean or interpolate anything.
+#+END_canvas-col
+#+END_canvas-2col
+
+** How it will be graded
+
+| Criterion                  | Points | What earns full marks                       |
+|----------------------------+--------+---------------------------------------------|
+| Measurement quality        |      5 | Stations spaced as specified, no gaps       |
+| Interpretation             |      5 | Claims follow from your own data            |
+| Use of the reading         |      3 | Both chapters engaged, not just cited       |
+| Writing and figures        |      2 | Readable prose, legible map, labelled axes  |
+
+#+BEGIN_canvas-alert-info
+*Info.* The rubric above is the same one attached to this assignment in
+SpeedGrader. If they disagree, the SpeedGrader rubric wins.
+#+END_canvas-alert-info
+
+** A worked example
+:PROPERTIES:
+:CANVAS_HTML_TOGGLE: t
+:END:
+
+#+BEGIN_canvas-2col
+#+BEGIN_canvas-col-narrow
+[[file:20100310_95.JPG]]
+#+END_canvas-col-narrow
+#+BEGIN_canvas-col-wide
+*Reading a photograph like this one.* Start with the waterline, then find the
+debris line above it, then the vegetation edge above that. The distance between
+the first two tells you about the last few days; the distance between the
+second and third tells you about the last few years. Your transect should
+record all three at every station.
+#+END_canvas-col-wide
+#+END_canvas-2col
+
+#+BEGIN_canvas-alert-warning
+*Warning.* Photographs are evidence, not measurements. Do not substitute a
+picture for a number in your data file.
+#+END_canvas-alert-warning
+
+** Checklist
+
+- [ ] PDF report, 1200 words
+- [ ] Transect map as an appendix
+- [ ] CSV of raw measurements
+- [ ] Both required chapters cited
+
+#+CAPTION: Constrained to 200px, with an explicit alt attribute.
+#+ATTR_HTML: :width 200 :alt Ice on the Lake Ontario shoreline
+[[file:20100310_95.JPG]]

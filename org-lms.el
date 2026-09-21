@@ -1573,7 +1573,9 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                               ("grading_type" . ,gradingtype)
                               ("grading_standard_idcomment" . 458)
                               ("points_possible" . ,(or pointspossible 10))
-                              ("published" . ,(if publish t nil) )
+                              ;; :json-false, not nil: nil encodes as JSON null,
+                              ;; which Canvas ignores rather than treating as false.
+                              ("published" . ,(if publish t :json-false))
                               
                               ))
          response finalparams)
@@ -1806,7 +1808,11 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (section (org-entry-get (point) "OL_SECTION_ID" t))
          (params `(("title" . ,atitle)
                    ("message" . ,atext)
-                   ("is_published" . (not (org-entry-get (point) "ORG_LMS_WITHHOLD")))
+                   ;; Canvas calls this "published", and it needs a real JSON
+                   ;; boolean: nil would encode as null, which Canvas ignores.
+                   ("published" . ,(if (org-entry-get (point) "ORG_LMS_WITHHOLD")
+                                       :json-false
+                                     t))
                    ("is_announcement" . t))))
     (when (and section (not (string-equal apipath "groups")))
       (add-to-list 'params `("specific_sections" . ,(s-split " " section))  ))
