@@ -440,6 +440,42 @@ which is \"preview\" for every Canvas file URL."
     (should (string-match-p "alt=\"20100310_95\\.JPG\"" message-html))
     (should-not (string-match-p "alt=\"preview\"" message-html))))
 
+
+;;; Phase 18 Test: #+OPTIONS: tags:t must not leak tags into Canvas
+
+(ert-deftest org-lms-image-test-18-file-options-cannot-reenable-tags ()
+  "A file that sets `#+OPTIONS: tags:t' must still post without tags.
+In-buffer `#+OPTIONS:' -- usually inherited from a shared `#+SETUPFILE:'
+-- override both the global `org-export-with-tags' and `org-export-as''s
+EXT-PLIST, so a plain `let' around the export is not enough."
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Tagged\n#+ORG_LMS_COURSEID: %d\n"
+                                  "#+OPTIONS: tags:t\n\n"
+                                  "* Parent Assignment\n\nIntro.\n\n"
+                                  "** Finding Your Folder   :ATTACH:\n\nChild body.\n")
+                          test-courseid)
+                  #'org-lms-post-assignment))
+         (description (alist-get "description"
+                                 (alist-get "assignment" params nil nil #'string=)
+                                 nil nil #'string=)))
+    (should (stringp description))
+    (should (string-match-p "Finding Your Folder" description))
+    (should-not (string-match-p "ATTACH" description))))
+
+(ert-deftest org-lms-image-test-19-announcement-also-suppresses-tags ()
+  "Announcements suppress tags too; the function never bound the option at all."
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Tagged\n#+ORG_LMS_COURSEID: %d\n"
+                                  "#+OPTIONS: tags:t\n\n"
+                                  "* Parent Announcement\n\nIntro.\n\n"
+                                  "** Sub Heading   :ATTACH:\n\nChild body.\n")
+                          test-courseid)
+                  #'org-lms-headline-to-announcement))
+         (message-html (alist-get "message" params nil nil #'string=)))
+    (should (stringp message-html))
+    (should (string-match-p "Sub Heading" message-html))
+    (should-not (string-match-p "ATTACH" message-html))))
+
 ;;; Run all tests if invoked as a batch script
 
 (when noninteractive

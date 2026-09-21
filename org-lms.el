@@ -475,6 +475,35 @@ default values are:
 ;; Read-lines: Belongs up with the utility functions:1 ends here
 
 ;; [[file:org-lms.org::lms-process][lms-process]]
+(defvar org-lms-forced-export-options '(:with-tags nil)
+  "Export options org-lms forces on every Canvas export.
+A plist of option keywords and the values to force.
+
+A plain `let' of the matching `org-export-with-*' variable does not
+work, and neither does `org-export-as''s EXT-PLIST argument, which the
+manual describes as \"inferior to file-local settings\": an in-buffer
+`#+OPTIONS:' line beats both.  Course files routinely inherit
+`#+OPTIONS: ... tags:t' from a shared `#+SETUPFILE:', which is enough
+to put :ATTACH: into a Canvas assignment description.
+`org-export-filter-options-functions' runs after all of that has been
+resolved, so it is the one place that wins.
+
+Tags are org-side bookkeeping -- ATTACH, assignment, noexport -- and
+mean nothing to students, so they are suppressed by default.  Add
+`:with-todo-keywords nil' or `:with-statistics-cookies nil' here to
+suppress those too.")
+
+(defmacro org-lms-with-forced-export-options (&rest body)
+  "Evaluate BODY with `org-lms-forced-export-options' applied to every export."
+  (declare (indent 0) (debug t))
+  `(let ((org-export-filter-options-functions
+          (cons (lambda (info _backend)
+                  (cl-loop for (key value) on org-lms-forced-export-options by #'cddr
+                           do (setq info (plist-put info key value)))
+                  info)
+                org-export-filter-options-functions)))
+     ,@body))
+
 (defun org-lms-process-props () 
 "retrieve all properties in a headline, then downcase and standardize the key names so that they are convenient to use with `let-alist`"
 (cl-loop for (key . value) in (org-entry-properties)
@@ -942,7 +971,8 @@ Data should be a list of 3-cell alists, in which the values of `column_id',
                                          "Uploaded Images"))
              (page-params `(("wiki_page" .
                              (("title" .  ,(identity .item) )
-                              ("body" . ,(org-export-as 'canvas-html t nil t))
+                              ("body" . ,(org-lms-with-forced-export-options
+                                           (org-export-as 'canvas-html t nil t)))
                               ("editing_roles" . ,(or .editing_roles "teachers"))
                               ("published" . ,(if (and .ol_publish
                                                        (not (string= .ol_publish "nil")))
@@ -1562,7 +1592,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
           (org-lms-upload-org-images (org-lms-get-keyword "ORG_LMS_COURSEID")
                                      "Uploaded Images" t))
          (assignment-params `(("name" .  ,(nth 4 (org-heading-components)) )
-                              ("description" . ,(org-export-as 'canvas-html t nil t))
+                              ("description" . ,(org-lms-with-forced-export-options
+                                                  (org-export-as 'canvas-html t nil t)))
                               ("due_at" . ,(o-l-date-to-timestamp
                                             (or duedate
                                                 (format-time-string "%Y-%m-%d"
@@ -1802,7 +1833,8 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
                (org-lms-get-keyword "ORG_LMS_COURSEID")
              courseid)
            "Uploaded Images" t))
-         (atext (org-export-as 'canvas-html t nil t))
+         (atext (org-lms-with-forced-export-options
+                  (org-export-as 'canvas-html t nil t)))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
          (section (org-entry-get (point) "OL_SECTION_ID" t))
