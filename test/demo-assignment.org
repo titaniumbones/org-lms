@@ -7,6 +7,13 @@
 :ASSIGNMENT_WEIGHT: 0.15
 :GRADING_TYPE: points
 :CANVAS_SUBMISSION_TYPES: (online_upload)
+:CANVASID: 1836170
+:OL_PUBLISH: nil
+:ORG_LMS_CATEGORY: Assignment
+:CANVAS_HTML_URL: https://q.utoronto.ca/courses/35724/assignments/1836170
+:CANVAS_SUBMISSION_URL: https://q.utoronto.ca/courses/35724/assignments/1836170/submissions?zip=1
+:SUBMISSIONS_DOWNLOAD_URL: https://q.utoronto.ca/courses/35724/assignments/1836170/submissions?zip=1
+:GRADING_STANDARD_ID: nil
 :END:
 
 Write a 1200-word report on the transect you walked at Bluffers Park. This

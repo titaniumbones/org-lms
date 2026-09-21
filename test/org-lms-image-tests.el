@@ -380,28 +380,35 @@ POSTER passed to `org-lms-canvas-request'."
     (should-not (string-match-p "src=\"file:" description))))
 
 
-;;; Phase 14/15 Tests: ORG_LMS_WITHHOLD controls announcement publish state
+;;; Phase 14/15 Tests: ORG_LMS_WITHHOLD delays an announcement
 
-(ert-deftest org-lms-image-test-14-announcement-withhold-unpublishes ()
-  "ORG_LMS_WITHHOLD on an announcement headline sends published=false."
+;; Canvas has no draft state for announcements.  It ignores published=false at
+;; create time and answers HTTP 400 to a PUT carrying it (verified against
+;; course 35724, topic 3612569, 2026-09-21).  The only way to keep an
+;; announcement off students' radar is delayed_post_at.
+
+(ert-deftest org-lms-image-test-14-announcement-withhold-delays-posting ()
+  "ORG_LMS_WITHHOLD sends a future delayed_post_at and leaves published true."
   (let* ((params (test-post-headline-offline
                   (format (concat "#+TITLE: Withheld\n#+ORG_LMS_COURSEID: %d\n\n"
                                   "* Withheld Announcement\n"
-                                  ":PROPERTIES:\n:ORG_LMS_WITHHOLD: t\n:END:\n\nBody.\n")
+                                  ":PROPERTIES:\n:ORG_LMS_WITHHOLD: 2027-01-15\n:END:\n\nBody.\n")
                           test-courseid)
-                  #'org-lms-headline-to-announcement)))
-    (should (eq :json-false (alist-get "published" params nil nil #'string=)))
-    (should-not (assoc "is_published" params))))
+                  #'org-lms-headline-to-announcement))
+         (delayed (alist-get "delayed_post_at" params nil nil #'string=)))
+    (should (eq t (alist-get "published" params nil nil #'string=)))
+    (should (stringp delayed))
+    (should (string-prefix-p "2027-01-15" delayed))))
 
-(ert-deftest org-lms-image-test-15-announcement-defaults-to-published ()
-  "Without ORG_LMS_WITHHOLD an announcement is sent as published=true."
+(ert-deftest org-lms-image-test-15-announcement-defaults-to-posting-now ()
+  "Without ORG_LMS_WITHHOLD no delayed_post_at is sent."
   (let* ((params (test-post-headline-offline
                   (format (concat "#+TITLE: Live\n#+ORG_LMS_COURSEID: %d\n\n"
                                   "* Live Announcement\n\nBody.\n")
                           test-courseid)
                   #'org-lms-headline-to-announcement)))
-    (should (eq t (alist-get "published" params nil nil #'string=)))))
-
+    (should (eq t (alist-get "published" params nil nil #'string=)))
+    (should-not (assoc "delayed_post_at" params))))
 
 ;;; Phase 16 Test: assignments are unpublished with a real JSON false
 

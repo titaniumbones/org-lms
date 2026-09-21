@@ -1808,14 +1808,26 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (section (org-entry-get (point) "OL_SECTION_ID" t))
          (params `(("title" . ,atitle)
                    ("message" . ,atext)
-                   ;; Canvas calls this "published", and it needs a real JSON
-                   ;; boolean: nil would encode as null, which Canvas ignores.
-                   ("published" . ,(if (org-entry-get (point) "ORG_LMS_WITHHOLD")
-                                       :json-false
-                                     t))
+                   ;; Canvas has no draft state for announcements: it ignores
+                   ;; published=false on create and answers 400 to a PUT
+                   ;; carrying it.  Announcements are always published; to keep
+                   ;; one off students' radar you delay its posting date, which
+                   ;; is what ORG_LMS_WITHHOLD does below.
+                   ("published" . t)
                    ("is_announcement" . t))))
     (when (and section (not (string-equal apipath "groups")))
       (add-to-list 'params `("specific_sections" . ,(s-split " " section))  ))
+    ;; ORG_LMS_WITHHOLD holds the date to post on.  A bare `t' (or anything
+    ;; that is not a date) means "not yet, and I will pick a date later", so
+    ;; push it a year out rather than guessing at the intent.
+    (let ((withhold (org-entry-get (point) "ORG_LMS_WITHHOLD")))
+      (when withhold
+        (add-to-list 'params
+                     `("delayed_post_at"
+                       . ,(or (ignore-errors (o-l-date-to-timestamp withhold))
+                              (format-time-string
+                               "%Y-%m-%dT%H:%M:%S%z"
+                               (time-add (current-time) (* 365 24 3600))))))))
     ;; (message "BUILDMETA DEFN")
     ;; (prin1 (symbol-function  'org-html--build-meta-info))
     ;; (message "%s" atext)

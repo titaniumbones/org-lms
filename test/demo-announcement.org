@@ -4,6 +4,9 @@
 * Week 7: Field Trip Logistics and a Tour of Every Styling Feature
 :PROPERTIES:
 :ORG_LMS_WITHHOLD: t
+:ORG_LMS_ANNOUNCEMENT_ID: nil
+:ORG_LMS_ANNOUNCEMENT_URL: nil
+:ORG_LMS_POSTED_AT: nil
 :END:
 
 This announcement exists to exercise every layout and styling feature that
