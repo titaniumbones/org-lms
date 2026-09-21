@@ -476,6 +476,26 @@ EXT-PLIST, so a plain `let' around the export is not enough."
     (should (string-match-p "Sub Heading" message-html))
     (should-not (string-match-p "ATTACH" message-html))))
 
+
+;;; Phase 20 Test: multiple classes reach the figure wrapper
+
+(ert-deftest org-lms-image-test-20-figure-accepts-multiple-classes ()
+  "`:class float-left boxed' must land both classes on the figure wrapper.
+The boxed border is pure CSS (.figure.boxed in canvas-styles.css); this
+guards the elisp half, which is `org-canvashtml-paragraph' passing the
+whole :class string through rather than just the first token."
+  (let ((html (test-export-to-canvas-html
+               (concat "#+TITLE: Boxed\n\n* Boxed\n\n"
+                       "#+CAPTION: A caption inside the box.\n"
+                       "#+ATTR_HTML: :class float-left boxed\n"
+                       "[[file:fake.jpg]]\n"))))
+    (should (stringp html))
+    (should (string-match-p "class=\"figure float-left boxed\"" html))
+    ;; the caption <p> must be inside the wrapper, or a border would not box it
+    (should (string-match-p
+             "class=\"figure float-left boxed\">\n<img[^>]*>\n\n<p>A caption inside the box.</p>\n</div>"
+             html))))
+
 ;;; Run all tests if invoked as a batch script
 
 (when noninteractive

@@ -89,6 +89,27 @@ record all three at every station.
 picture for a number in your data file.
 #+END_canvas-alert-warning
 
+** A boxed figure
+
+A border can wrap the image and its caption together, because the caption is a
+paragraph inside the same figure wrapper. Add ~boxed~ to the ~:class~; it
+combines with the float and column classes.
+
+#+CAPTION: The box encloses the picture and this caption as one unit.
+#+ATTR_HTML: :class boxed :width 320
+[[file:20100310_95.JPG]]
+
+And the same thing floated right, so text wraps around the boxed unit rather
+than around a bare image.
+
+#+CAPTION: Boxed and floated right.
+#+ATTR_HTML: :class float-right boxed
+[[file:20100310_95.JPG]]
+
+The box uses ~box-sizing: border-box~, so a boxed float still honours the 35%
+width cap that ~float-right~ sets rather than overflowing it by the width of
+its own padding and border.
+
 ** Checklist
 
 - [ ] PDF report, 1200 words

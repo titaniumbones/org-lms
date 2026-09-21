@@ -104,3 +104,93 @@ section.outline-2 h2.content-box {
 #contents-course-schedule h5 {
     font-weight: bold;
 }
+
+// Alert / callout boxes
+// Usage: #+BEGIN_canvas-alert-info ... #+END_canvas-alert-info
+$alert-info-bg:    #e8f4fd;
+$alert-info-border: #1e88e5;
+$alert-info-text:   #0d47a1;
+
+$alert-warning-bg:    #fff8e1;
+$alert-warning-border: #f9a825;
+$alert-warning-text:   #6d4c00;
+
+$alert-success-bg:    #e8f5e9;
+$alert-success-border: #43a047;
+$alert-success-text:   #1b5e20;
+
+$alert-danger-bg:    #fdecea;
+$alert-danger-border: #e53935;
+$alert-danger-text:   #7f0000;
+
+%canvas-alert-base {
+    padding: 1em 1.25em;
+    margin-bottom: 1.25em;
+    border-left: 5px solid;
+    border-radius: 4px;
+}
+
+.canvas-alert-info {
+    @extend %canvas-alert-base;
+    background-color: $alert-info-bg;
+    border-left-color: $alert-info-border;
+    color: $alert-info-text;
+}
+
+.canvas-alert-warning {
+    @extend %canvas-alert-base;
+    background-color: $alert-warning-bg;
+    border-left-color: $alert-warning-border;
+    color: $alert-warning-text;
+}
+
+.canvas-alert-success {
+    @extend %canvas-alert-base;
+    background-color: $alert-success-bg;
+    border-left-color: $alert-success-border;
+    color: $alert-success-text;
+}
+
+.canvas-alert-danger {
+    @extend %canvas-alert-base;
+    background-color: $alert-danger-bg;
+    border-left-color: $alert-danger-border;
+    color: $alert-danger-text;
+}
+
+/* ============================================================
+   Boxed figures: a border around the image AND its caption.
+
+   The caption is a <p> inside the same <div class="figure"> that
+   `org-canvashtml-paragraph' builds, so a border on the wrapper
+   encloses both.  juice inlines this as a style attribute, so it
+   survives Canvas's sanitizer.
+
+   USAGE:
+     #+CAPTION: What the picture shows.
+     #+ATTR_HTML: :class boxed
+     [[file:photo.jpg]]
+
+   Combines with the float helpers and the column classes:
+     #+ATTR_HTML: :class float-right boxed
+   ============================================================ */
+
+$figure-box-border: #c3cad1;
+$figure-box-bg: #fafbfc;
+$figure-box-caption: #4a5561;
+
+.figure.boxed {
+    // border-box so a boxed float still honours the 35% max-width above
+    box-sizing: border-box;
+    border: 1px solid $figure-box-border;
+    border-radius: 4px;
+    padding: 0.75em;
+    background-color: $figure-box-bg;
+}
+
+.figure.boxed > p {
+    margin: 0.6em 0 0 0;
+    font-size: 0.9em;
+    line-height: 1.35;
+    color: $figure-box-caption;
+}
