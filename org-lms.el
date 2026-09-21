@@ -1556,6 +1556,11 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (reflection (org-entry-get nil "OL_HAS_REFLECTION"))
          (reflection-id (org-entry-get nil "OL_REFLECTION_ID"))
          (org-export-with-tags nil)
+         ;; Upload local inline images before exporting the description, so
+         ;; `org-canvashtml-link' can rewrite file: links to Canvas URLs.
+         (org-canvashtml-image-url-map
+          (org-lms-upload-org-images (org-lms-get-keyword "ORG_LMS_COURSEID")
+                                     "Uploaded Images" t))
          (assignment-params `(("name" .  ,(nth 4 (org-heading-components)) )
                               ("description" . ,(org-export-as 'canvas-html t nil t))
                               ("due_at" . ,(o-l-date-to-timestamp
@@ -1784,6 +1789,17 @@ STUDENTID identifies the student, ASSIGNMENTID the assignment, and COURSEID the 
          (org-html-klipsify-src nil)
          (org-export-with-title nil)
          ;;(courseid (plist-get course :id))
+         ;; Upload any local inline images first and bind the resulting
+         ;; path->URL map, so `org-canvashtml-link' rewrites file: links to
+         ;; Canvas preview URLs.  Group announcements pass a group id as
+         ;; COURSEID, but files still live in the course, so fall back to the
+         ;; ORG_LMS_COURSEID keyword there.
+         (org-canvashtml-image-url-map
+          (org-lms-upload-org-images
+           (if (string-equal apipath "groups")
+               (org-lms-get-keyword "ORG_LMS_COURSEID")
+             courseid)
+           "Uploaded Images" t))
          (atext (org-export-as 'canvas-html t nil t))
          (response nil)
          (oldid (org-entry-get (point) "ORG_LMS_ANNOUNCEMENT_ID"))
@@ -4957,14 +4973,22 @@ Cache maps md5-hash strings to Canvas preview URL strings."
 
 ;;; Phase 3: Buffer image scanning
 
-(defun org-lms-collect-local-images (&optional buffer)
+(defun org-lms-collect-local-images (&optional buffer subtreep)
   "Return deduplicated list of absolute paths to local images linked in BUFFER.
-BUFFER defaults to current buffer. Finds file-type links matching
+BUFFER defaults to current buffer.  With SUBTREEP non-nil, scan only the
+subtree around point instead of the whole buffer -- use this when the
+caller exports a subtree, so posting one headline doesn't upload every
+image in the file.  Finds file-type links matching
 `org-html-inline-image-rules' that exist on disk."
   (with-current-buffer (or buffer (current-buffer))
     (let* ((dir (file-name-directory (buffer-file-name)))
-           (paths '()))
-      (org-element-map (org-element-parse-buffer) 'link
+           (paths '())
+           (tree (save-excursion
+                   (save-restriction
+                     (when (and subtreep (not (org-before-first-heading-p)))
+                       (org-narrow-to-subtree))
+                     (org-element-parse-buffer)))))
+      (org-element-map tree 'link
         (lambda (link)
           (when (and (string= "file" (org-element-property :type link))
                      (org-export-inline-image-p link org-html-inline-image-rules))
@@ -5008,14 +5032,16 @@ Returns (canvas-url . updated-cache)."
                   filepath (error-message-string err))
          (cons nil cache))))))
 
-(defun org-lms-upload-org-images (&optional courseid folder)
+(defun org-lms-upload-org-images (&optional courseid folder subtreep)
   "Upload all local images in current org buffer to Canvas.
 COURSEID defaults to ORG_LMS_COURSEID keyword.
 FOLDER is the Canvas folder name (default \"Uploaded Images\").
+With SUBTREEP non-nil, only images in the subtree around point are
+uploaded; see `org-lms-collect-local-images'.
 Returns alist mapping absolute local paths to Canvas preview URLs."
   (let* ((courseid (or courseid (org-lms-get-keyword "ORG_LMS_COURSEID")))
          (folder (or folder "Uploaded Images"))
-         (images (org-lms-collect-local-images))
+         (images (org-lms-collect-local-images nil subtreep))
          (cache (org-lms-load-image-cache))
          (url-map '()))
     (when images

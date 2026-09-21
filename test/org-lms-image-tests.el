@@ -268,6 +268,117 @@ runs update the same page via PUT rather than creating a new one."
         (message "Canvas layout page posted: %s" html-url)
         (message "Visually verify all layouts at: %s" html-url)))))
 
+
+;;; Phase 11 Test: Subtree-scoped image collection
+
+(ert-deftest org-lms-image-test-11-collect-local-images-subtree ()
+  "With SUBTREEP non-nil, only images inside the current subtree are collected."
+  (let* ((org-content
+          (format (concat "#+TITLE: Scope Test\n\n"
+                          "* First\n\n[[file:%s]]\n\n"
+                          "* Second\n\nNo image here.\n")
+                  test-image))
+         (temp-org (make-temp-file "org-image-scope" nil ".org"))
+         in-first in-second)
+    (unwind-protect
+        (progn
+          (write-region org-content nil temp-org)
+          (with-current-buffer (find-file-noselect temp-org)
+            (org-mode)
+            (goto-char (point-min))
+            (re-search-forward "^\\* First" nil t)
+            (beginning-of-line)
+            (setq in-first (org-lms-collect-local-images nil t))
+            (goto-char (point-min))
+            (re-search-forward "^\\* Second" nil t)
+            (beginning-of-line)
+            (setq in-second (org-lms-collect-local-images nil t))
+            (kill-buffer))
+          (should (equal in-first (list test-image)))
+          (should (null in-second)))
+      (when (file-exists-p temp-org)
+        (delete-file temp-org)))))
+
+;;; Helpers for offline post tests
+
+(defconst test-stub-file-id 4242
+  "Canvas file ID returned by the stubbed uploader in offline post tests.")
+
+(defun test-post-headline-offline (org-content poster)
+  "Write ORG-CONTENT to a temp org file, then call POSTER on its first headline.
+Canvas network calls are stubbed: the file uploader returns
+`test-stub-file-id', and `org-lms-canvas-request' records its arguments
+instead of issuing a request.  Returns the request-params alist that
+POSTER passed to `org-lms-canvas-request'."
+  (let ((temp-org (make-temp-file "org-canvas-offline" nil ".org"))
+        captured)
+    (unwind-protect
+        (progn
+          (write-region org-content nil temp-org)
+          (with-current-buffer (find-file-noselect temp-org)
+            (org-mode)
+            (goto-char (point-min))
+            (re-search-forward "^\\* " nil t)
+            (beginning-of-line)
+            (cl-letf (((symbol-function 'browse-url) #'ignore)
+                      ((symbol-function 'org-lms-post-new-file)
+                       (lambda (&rest _)
+                         (format "{\"id\": %d}" test-stub-file-id)))
+                      ((symbol-function 'org-lms-canvas-request)
+                       (lambda (_query &optional _type params &rest _)
+                         (setq captured params)
+                         (list :id 1
+                               :url "https://q.utoronto.ca/courses/35724/discussion_topics/1"
+                               :html_url "https://q.utoronto.ca/courses/35724/assignments/1"
+                               :posted_at "2026-01-01T00:00:00Z"
+                               :due_at "2026-01-08T00:00:00Z"
+                               :published t))))
+              (funcall poster))
+            (set-buffer-modified-p nil)
+            (kill-buffer))
+          captured)
+      (when (file-exists-p temp-org)
+        (delete-file temp-org))
+      (let ((cache (concat (file-name-directory temp-org) ".canvas-image-cache.el")))
+        (when (file-exists-p cache)
+          (delete-file cache))))))
+
+(defun test-expected-preview-url ()
+  "Canvas preview URL the stubbed uploader should produce for course 35724."
+  (org-lms-canvas-file-preview-url test-stub-file-id test-courseid))
+
+;;; Phase 12 Test: Announcement embeds uploaded image
+
+(ert-deftest org-lms-image-test-12-announcement-embeds-canvas-url ()
+  "An inline local image in an announcement is uploaded and linked by Canvas URL."
+  (skip-unless (file-exists-p test-image))
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Ann Test\n#+ORG_LMS_COURSEID: %d\n\n"
+                                  "* Announcement With Image\n\n[[file:%s]]\n\nBody text.\n")
+                          test-courseid test-image)
+                  #'org-lms-headline-to-announcement))
+         (message-html (alist-get "message" params nil nil #'string=)))
+    (should (stringp message-html))
+    (should (string-match-p (regexp-quote (test-expected-preview-url)) message-html))
+    (should-not (string-match-p "src=\"file:" message-html))))
+
+;;; Phase 13 Test: Assignment embeds uploaded image
+
+(ert-deftest org-lms-image-test-13-assignment-embeds-canvas-url ()
+  "An inline local image in an assignment is uploaded and linked by Canvas URL."
+  (skip-unless (file-exists-p test-image))
+  (let* ((params (test-post-headline-offline
+                  (format (concat "#+TITLE: Assn Test\n#+ORG_LMS_COURSEID: %d\n\n"
+                                  "* Assignment With Image\n\n[[file:%s]]\n\nDo the thing.\n")
+                          test-courseid test-image)
+                  #'org-lms-post-assignment))
+         (description (alist-get "description"
+                                 (alist-get "assignment" params nil nil #'string=)
+                                 nil nil #'string=)))
+    (should (stringp description))
+    (should (string-match-p (regexp-quote (test-expected-preview-url)) description))
+    (should-not (string-match-p "src=\"file:" description))))
+
 ;;; Run all tests if invoked as a batch script
 
 (when noninteractive
