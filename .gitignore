@@ -1,2 +1,56 @@
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+# .env.sh carries a Canvas OAuth token.  Never commit it.
+.env.sh
+
+# ---------------------------------------------------------------------------
+# Editor and OS cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+*.~undo-tree~
+*.textClipping
 .aider*
-/test/
+TAGS
+
+# ---------------------------------------------------------------------------
+# Build and dependency output
+# ---------------------------------------------------------------------------
+*.elc
+.cask/
+.sass-cache/
+*.scssc
+
+# Org archives are regenerated from the tracked .org sources.
+*.org_archive
+
+# ---------------------------------------------------------------------------
+# Scratch
+# ---------------------------------------------------------------------------
+# Three iterations of the same org-wikimedia experiment; all define
+# org-wikimedia--direct-url-and-caption.  Ignored, not deleted.
+/clauude-ting.el
+/test.el
+/test2.el
+# Created by a stray shell redirect.
+/org-lms.el scalar drawer
+
+# ---------------------------------------------------------------------------
+# test/
+# ---------------------------------------------------------------------------
+# Default-deny, because this directory holds student data: students.csv,
+# students-merged.json, qstudents.json, qsubmissions.json.  A file here is
+# tracked only by being added to the allowlist below, so no roster can be
+# committed by accident.
+#
+# `/test/*' and not `/test/': git cannot re-include a file whose parent
+# DIRECTORY is excluded, so with `/test/' the negations below would be
+# silently ignored -- which is what forced `git add -f' on every test file.
+/test/*
+!/test/demo-announcement.org
+!/test/demo-assignment.org
+!/test/org-lms-image-tests.el
+!/test/org-lms-migration-tests.el
+!/test/post-demos.el
+!/test/run-tests.sh
+!/test/test-inline-image.org
