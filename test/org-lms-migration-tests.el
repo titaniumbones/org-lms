@@ -264,5 +264,73 @@ Binds `test-file' to the file path."
       ;; Cleanup in case test fails
       (org-lms-mig--poll-cancel))))
 
+(ert-deftest org-lms-mig-test-compose-raw-mappings ()
+  "Composing two raw mappings should chain old->intermediate->new."
+  ;; Mapping A: 391058 IDs -> 391111 IDs
+  (let* ((mapping-a '(:assignments (:100 "200" :101 "201")
+                      :quizzes (:300 "400")))
+         ;; Mapping B: 391111 IDs -> 434551 IDs
+         (mapping-b '(:assignments (:200 "500" :201 "501")
+                      :quizzes (:400 "600")))
+         (composed (org-lms-mig--compose-raw-mappings mapping-a mapping-b))
+         (parsed (org-lms-mig--parse-asset-mapping composed)))
+    ;; Should map 100 -> 500 (100->200->500)
+    (should (equal "500" (gethash "100" (plist-get parsed 'assignments))))
+    ;; Should map 101 -> 501 (101->201->501)
+    (should (equal "501" (gethash "101" (plist-get parsed 'assignments))))
+    ;; Should map 300 -> 600 (300->400->600)
+    (should (equal "600" (gethash "300" (plist-get parsed 'quizzes))))))
+
+(ert-deftest org-lms-mig-test-detect-org-course-id ()
+  "Should detect course ID from CANVAS_HTML_URL properties."
+  (let* ((temp-file (make-temp-file "mig-detect-" nil ".org"))
+         (org-lms-mig--property-registry org-lms-mig--property-registry))
+    (unwind-protect
+        (progn
+          (with-temp-file temp-file
+            (insert "#+TITLE: Test\n"
+                    "* Assignment 1\n"
+                    ":PROPERTIES:\n"
+                    ":CANVAS_HTML_URL: https://example.com/courses/12345/assignments/100\n"
+                    ":END:\n"
+                    "* Assignment 2\n"
+                    ":PROPERTIES:\n"
+                    ":CANVAS_HTML_URL: https://example.com/courses/12345/assignments/101\n"
+                    ":END:\n"))
+          (with-current-buffer (find-file-noselect temp-file)
+            (let ((result (org-lms-mig--detect-org-course-id 'buffer)))
+              (should (equal "12345" result)))))
+      (delete-file temp-file))))
+
+(ert-deftest org-lms-mig-test-update-link-params ()
+  "Should replace file IDs in ?preview= query parameters."
+  (let* ((temp-file (make-temp-file "mig-preview-" nil ".org"))
+         ;; Parsed mapping with files hash table
+         (file-ht (make-hash-table :test 'equal))
+         (mapping (list (intern "files") file-ht)))
+    (puthash "38070544" "99999999" file-ht)
+    (puthash "37377625" "88888888" file-ht)
+    (unwind-protect
+        (progn
+          (with-temp-file temp-file
+            (insert "#+TITLE: Test\n"
+                    "* Readings\n"
+                    "- [[https://example.com/courses/434551/files/folder/Week01?preview=38070544][Link 1]]\n"
+                    "- [[https://example.com/courses/434551/files/folder/Week01?preview=37377625][Link 2]]\n"
+                    "- [[https://example.com/courses/434551/files/folder/Week01?preview=99999][No mapping]]\n"))
+          (with-current-buffer (find-file-noselect temp-file)
+            (let ((count (org-lms-mig-update-link-params mapping 'buffer)))
+              ;; Should have updated 2 preview IDs (third has no mapping)
+              (should (= 2 count))
+              ;; Verify the replacements
+              (goto-char (point-min))
+              (should (search-forward "preview=99999999" nil t))
+              (goto-char (point-min))
+              (should (search-forward "preview=88888888" nil t))
+              ;; Unmapped one should remain unchanged
+              (goto-char (point-min))
+              (should (search-forward "preview=99999]" nil t)))))
+      (delete-file temp-file))))
+
 (provide 'org-lms-migration-tests)
 ;;; org-lms-migration-tests.el ends here
